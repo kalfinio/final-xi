@@ -446,6 +446,8 @@ export function isBigGameScorer(p) {
 export const SPECIAL_BADGES = {
   pele: ['3× World Champion'],
   ibra: ['Infinity Aura', 'Football Icon'],
+  hakimi: ['2x European Winner'],
+  marquinhos: ['2x European Winner'],
 }
 
 // Individual aura value added to a player's own value (NOT a team synergy):
@@ -619,6 +621,17 @@ const BOX_TO_BOX_ROLES = ['Box-to-Box Engine']
 const COMMANDING_CB_ROLES = ['Defensive Leader', 'Ball-Playing Defender']
 const BALLPLAYING_DEF_ROLES = ['Ball-Playing Defender']
 const FULLBACK_ROLES = ['Attacking Fullback', 'Balanced Fullback', 'Defensive Fullback']
+// Roles where high playerPoints must not inflate scoring — these players score
+// via set-pieces and rare moments, not sustained attacking output.
+const LOW_SCORER_ROLES = new Set([...BALLWINNER_ROLES, ...COMMANDING_CB_ROLES, ...FULLBACK_ROLES,
+  'Attacking Wingback', 'Balanced Wingback', 'Defensive Wingback'])
+// Roles that give realistic assists only rarely — playerPoints must not inflate
+// a high-rated CB to match creative midfielders in assist probability.
+const LOW_ASSIST_ROLES = new Set([
+  'Defensive Leader', 'Ball-Playing Defender',
+  'Defensive Shield', 'Ball Winner',
+  'Defensive Fullback', 'Defensive Wingback',
+])
 
 function inRoles(p, list) {
   return list.includes(p.role)
@@ -965,29 +978,50 @@ function scorerWeight(p, lateStage = false) {
   else if (inRoles(p, WIDE_ATT_ROLES)) w = 9
   else if (p.role === 'Final Passer') w = 5
   else if (inRoles(p, BOX_TO_BOX_ROLES)) w = 3.5
-  else if (p.posType === 'MID') w = 2.5
-  else if (p.posType === 'DEF') w = 0.8
+  else if (p.role === 'Tempo Controller') w = 2.0
+  // defensive midfield — can score occasionally but must not top the charts
+  else if (p.role === 'Defensive Shield' || p.role === 'Ball Winner') w = 0.4
+  // defenders — goals are rare and almost always from set-pieces
+  else if (p.role === 'Ball-Playing Defender' || p.role === 'Balanced Fullback' || p.role === 'Balanced Wingback') w = 0.5
+  else if (p.role === 'Attacking Fullback' || p.role === 'Attacking Wingback') w = 0.8
+  else if (p.role === 'Defensive Leader' || p.role === 'Defensive Fullback' || p.role === 'Defensive Wingback') w = 0.2
+  else if (p.posType === 'MID') w = 2.0
+  else if (p.posType === 'DEF') w = 0.3
   else if (p.posType === 'GK') w = 0.02
   else w = 4
-  if (isBigGameScorer(p)) { w += 4; if (lateStage) w += 5 } // strict, verified set
-  if (p.tags.includes('big_game_player')) w += 2
+  // Base Big Game Scorer boost reduced 4→1 so a CDM with a final goal doesn't
+  // routinely outscore attackers; the lateStage spike keeps clutch history relevant.
+  if (isBigGameScorer(p)) { w += 2; if (lateStage) w += 5 }
+  if (p.tags.includes('big_game_player')) w += 1.5
   if (p.tags.includes('is_messi')) w += 8
   if (p.tags.includes('current_superstar')) w += 2
-  return Math.max(0.02, w + playerPoints(p) / 12)
+  // playerPoints bonus skipped for low-scorer roles — a high-rated CDM's rating
+  // should not override their positional scoring frequency.
+  return Math.max(0.02, w + (LOW_SCORER_ROLES.has(p.role) ? 0 : playerPoints(p) / 12))
 }
 
 function assistWeight(p) {
   let w
   if (inRoles(p, ATT_CREATOR_ROLES) || inRoles(p, DEEP_PLAYMAKER_ROLES)) w = 10
   else if (inRoles(p, WIDE_ATT_ROLES)) w = 6
+  // Wingbacks in wide slots provide plenty of crosses and through-balls
+  else if (p.role === 'Attacking Wingback' || p.role === 'Balanced Wingback') w = 5
   else if (inRoles(p, BOX_TO_BOX_ROLES)) w = 5
-  else if (inRoles(p, FULLBACK_ROLES)) w = 4
+  else if (p.role === 'Attacking Fullback' || p.role === 'Balanced Fullback') w = 4
   else if (inRoles(p, FINISHER_ROLES)) w = 3
-  else if (p.posType === 'DEF') w = 1.2
+  // Defensive fullback/wingback — occasional assists but not creative distributors
+  else if (p.role === 'Defensive Fullback' || p.role === 'Defensive Wingback') w = 1.0
+  // CB and CDM defensive roles — rare assists, almost always from set-pieces
+  else if (p.role === 'Defensive Leader' || p.role === 'Ball-Playing Defender') w = 0.5
+  else if (p.role === 'Defensive Shield' || p.role === 'Ball Winner') w = 0.5
+  else if (p.posType === 'DEF') w = 0.4
   else if (p.posType === 'GK') w = 0.02
   else w = 2
   if (p.tags.includes('played_with_messi')) w += 1
-  return Math.max(0.02, w + playerPoints(p) / 16)
+  // playerPoints not applied to low-assist roles — a high-rated CB like Puyol (52 pts)
+  // must not inflate to match creative midfielders through rating alone.
+  const ptBonus = (LOW_ASSIST_ROLES.has(p.role) || (p.posType === 'DEF' && w <= 1.0)) ? 0 : playerPoints(p) / 16
+  return Math.max(0.02, w + ptBonus)
 }
 
 function weightedPick(rng, players, weightFn, excludeId) {
@@ -1004,6 +1038,12 @@ function weightedPick(rng, players, weightFn, excludeId) {
 }
 
 const OPP_GOAL_LABELS = ['Opponent Striker', 'Opponent Winger', 'Opponent Midfielder', 'Set-piece header', 'Long-range strike', 'Counterattack finish']
+const DEF_GOAL_LABELS = ['header', 'set-piece header', 'back-post header', 'near-post header', 'corner header']
+// Preposition-inclusive so the display reads: "— long ball from Puyol"
+const DEF_ASSIST_LABELS = ['long ball from', 'flick-on by', 'set-piece knockdown by', 'second ball from', 'recycled corner by']
+const GK_MIRACLE_LABELS_LATE = ['emergency corner header', 'desperate late header', 'late set-piece header']
+const GK_MIRACLE_LABELS_ST = ['stoppage-time set-piece header', 'last-gasp corner header', 'final-minute corner header']
+const GK_MIRACLE_ASSIST_ROLES = new Set(['Final Passer', 'Creative Magician', 'Tempo Controller', 'Touchline Winger', 'Attacking Fullback', 'Attacking Wingback', 'Balanced Fullback', 'Balanced Wingback'])
 
 // Explicit overrides for names where the algorithm can't produce the right
 // short form — e.g. "Cristiano Ronaldo" must be "CR7", not "Ronaldo".
@@ -1078,14 +1118,38 @@ function buildGoals(rng, players, gf, ga, tallies, lateStage = false) {
   const minutes = sides.map(() => 1 + Math.floor(rng() * 90)).sort((a, b) => a - b)
   const shuffledSides = shuffle(sides, rng)
   const events = []
+  const gk = players.find((p) => p.posType === 'GK')
   for (let i = 0; i < minutes.length; i++) {
     const minute = minutes[i]
     if (shuffledSides[i] === 'us') {
-      const scorer = weightedPick(rng, players, (pp) => scorerWeight(pp, lateStage))
-      const assistMaybe = rng() < 0.78 ? weightedPick(rng, players.filter((p) => p.posType !== 'GK'), assistWeight, scorer ? scorer.id : null) : null
+      // GK miracle: only in desperation (85+, tight or losing match). Extremely rare.
+      // rng() only consumed when the first two guards pass to avoid wasting RNG budget.
+      const isGkMiracle = gk && minute >= 85 && gf <= ga + 1 && rng() < (lateStage ? 0.07 : 0.02)
+      let scorer, label, assistMaybe, assistLabel
+      if (isGkMiracle) {
+        scorer = gk
+        const gkLabels = minute >= 90 ? GK_MIRACLE_LABELS_ST : GK_MIRACLE_LABELS_LATE
+        label = gkLabels[Math.floor(rng() * gkLabels.length)]
+        const gkAssistPool = players.filter((p) => GK_MIRACLE_ASSIST_ROLES.has(p.role))
+        assistMaybe = weightedPick(rng, gkAssistPool.length > 0 ? gkAssistPool : players.filter((p) => p.posType !== 'GK'), assistWeight, gk.id)
+        assistLabel = null
+      } else {
+        // GK excluded from normal scoring — goals must come from outfield players
+        scorer = weightedPick(rng, players.filter((p) => p.posType !== 'GK'), (pp) => scorerWeight(pp, lateStage))
+        const isDefScorer = scorer && scorer.posType === 'DEF'
+        // defenders nearly always have an assist (set-piece delivery); midfielders less so
+        const assistProb = isDefScorer ? 0.94 : 0.78
+        assistMaybe = rng() < assistProb ? weightedPick(rng, players.filter((p) => p.posType !== 'GK'), assistWeight, scorer ? scorer.id : null) : null
+        // defender goals get a set-piece descriptor; label driven by rng to stay varied
+        label = isDefScorer ? DEF_GOAL_LABELS[Math.floor(rng() * DEF_GOAL_LABELS.length)] : null
+        // defensive assisters (CB/CDM) get a contextual label so "assist Puyol" reads
+        // as "long ball from Puyol" rather than implying a creative through-pass
+        const isDefAssist = assistMaybe && LOW_ASSIST_ROLES.has(assistMaybe.role)
+        assistLabel = isDefAssist ? DEF_ASSIST_LABELS[Math.floor(rng() * DEF_ASSIST_LABELS.length)] : null
+      }
       if (scorer) tallies.forEach((t) => { t.goals[scorer.id] = (t.goals[scorer.id] || 0) + 1 })
       if (assistMaybe) tallies.forEach((t) => { t.assists[assistMaybe.id] = (t.assists[assistMaybe.id] || 0) + 1 })
-      events.push({ minute, side: 'us', scorer: scorer ? scorer.name : 'Final XI', assist: assistMaybe ? assistMaybe.name : null })
+      events.push({ minute, side: 'us', scorer: scorer ? scorer.name : 'Final XI', assist: assistMaybe ? assistMaybe.name : null, label, assistLabel })
     } else {
       events.push({ minute, side: 'opp', scorer: OPP_GOAL_LABELS[Math.floor(rng() * OPP_GOAL_LABELS.length)], assist: null })
     }

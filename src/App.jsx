@@ -632,7 +632,7 @@ function EventsTimeline({ events, squadNames }) {
       {events.map((e, i) => (
         <div key={i} className={`text-xs ${e.side === 'us' ? 'text-primary' : 'text-secondary'}`}>
           <span className="text-gold/70 font-mono mr-1">{e.minute}'</span>
-          {e.side === 'us' ? <>{squadDisplayName(e.scorer, squadNames)}{e.assist ? <span className="text-secondary"> — assist {squadDisplayName(e.assist, squadNames)}</span> : ''}</> : <span className="text-secondary">{e.scorer} (opponent)</span>}
+          {e.side === 'us' ? <>{squadDisplayName(e.scorer, squadNames)}{e.label ? ` ${e.label}` : ''}{e.assist ? <span className="text-secondary"> — {e.assistLabel ? `${e.assistLabel} ` : 'assist '}{squadDisplayName(e.assist, squadNames)}</span> : ''}</> : <span className="text-secondary">{e.scorer} (opponent)</span>}
         </div>
       ))}
     </div>
