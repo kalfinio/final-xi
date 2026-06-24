@@ -347,7 +347,7 @@ export const PLAYERS = [
   P('thiagosilva', 'Thiago Silva', 'CB', 'Brazil', 'PSG', ['CB'], ['psg_star', 'big_game_player', 'european_winner'], 50, 'Ball-Playing Defender', 'modern'),
   P('chiellini', 'Giorgio Chiellini', 'CB', 'Italy', 'Juventus', ['CB'], ['serial_winner', 'big_game_player'], 50, 'No-Nonsense Centre-Back', 'modern'),
   P('bonucci', 'Leonardo Bonucci', 'CB', 'Italy', 'Juventus', ['CB'], ['serial_winner', 'big_game_player'], 40, 'Ball-Playing Defender', 'modern'),
-  P('marquinhos', 'Marquinhos', 'CB', 'Brazil', 'PSG', ['CB', 'CDM'], ['psg_star', 'modern_icon'], 44, 'Ball-Playing Defender', 'modern'),
+  P('marquinhos', 'Marquinhos', 'CB', 'Brazil', 'PSG', ['CB'], ['psg_star', 'modern_icon'], 44, 'Ball-Playing Defender', 'modern'),
 
   // --- MID ---
   P('debruyne', 'Kevin De Bruyne', 'CM', 'Belgium', 'Man City', ['CM', 'CAM'], ['city_core', 'current_superstar', 'premier_league_star', 'big_game_player'], 78, 'Advanced Playmaker', 'modern'),
@@ -1241,6 +1241,54 @@ export function outcomeLabel(result) {
     return `Shock exit after finishing ${ordinal(pos)}`
   }
   return `Eliminated in ${result.exitStage}`
+}
+
+// A short, dramatic one-line headline for a run. Pure + deterministic — derives
+// only from the existing result/squad data, consumes no RNG and changes no
+// balance. Priority order is intentional (most striking story wins).
+// GOAT Draft uses a 2+ threshold: with only four GOAT-tier players in the DB,
+// fielding three in one XI is vanishingly rare, so two already tells the story.
+export function runVerdict(result, squad) {
+  if (!result || !squad) return ''
+  const players = squad.map((s) => s.player).filter(Boolean)
+  const gk = players.find((p) => p.posType === 'GK')
+  const champion = result.champion
+  const wins = result.leaguePhase?.record?.w ?? 0
+  const draws = result.leaguePhase?.record?.d ?? 0
+  const losses = result.leaguePhase?.record?.l ?? 0
+  const position = result.leaguePhase?.position
+  const exitStage = result.exitStage
+  const identity = tacticalIdentity(squad)
+  const total = computeRating(squad).total
+  const goatCount = players.filter(isGoat).length
+
+  // 1. Keeper Miracle — the goalkeeper found the net at least once this run.
+  if (gk) {
+    const matches = [...(result.leaguePhase?.matches || []), result.playoff, ...(result.knockouts || [])].filter(Boolean)
+    const gkScored = matches.some((m) => (m.events || []).some((e) => e.side === 'us' && e.scorer === gk.name))
+    if (gkScored) return 'Keeper Miracle'
+  }
+  // 2. Final Heartbreak — knockout story trumps all league records.
+  if (exitStage === 'Final' && !champion) return 'Final Heartbreak'
+  // 3. Shock Exit — top-4 seed dumped in the Round of 16.
+  if (exitStage === 'Round of 16' && position && position <= 4) return 'Shock Exit'
+  // 4. Perfect League Phase — flawless 8W-0D-0L sweep (draws disqualify this).
+  if (wins === 8 && draws === 0 && losses === 0) return 'Perfect League Phase'
+  // 5. Unbeaten League Phase — went through without a loss but had at least one draw.
+  if (losses === 0 && draws > 0) return 'Unbeaten League Phase'
+  // 6. GOAT Draft — won it all with two or more GOAT-tier legends in the XI.
+  if (champion && goatCount >= 2) return 'GOAT Draft'
+  // 7. Galáctico Chaos — champion playing the all-out star-studded identity.
+  if (champion && identity === 'Galáctico Chaos') return 'Galáctico Chaos'
+  // 8. Final Mentality XI — champion built around big-game finalists.
+  if (champion && identity === 'Final Mentality XI') return 'Final Mentality XI'
+  // 9. Tactical Masterclass — champion without a stacked superteam rating.
+  if (champion && total < 235) return 'Tactical Masterclass'
+  // 10. Underdog Run — reached the Semi-final or better with a modest squad.
+  const reachedSF = champion || exitStage === 'Final' || exitStage === 'Semi-final'
+  if (reachedSF && total < 200) return 'Underdog Run'
+  // 11. Fallback.
+  return champion ? 'Conquered Europe' : 'European Run Ended'
 }
 
 export function simulate({ rating, difficulty = 'classic', squad, rng = Math.random }) {
