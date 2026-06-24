@@ -720,6 +720,13 @@ export function computeWeaknesses(squad) {
   if (countRole(WIDE_ATT_ROLES) >= 2 && !hasTrueST) weaknesses.push({ name: 'Inside Forwards, No Striker', desc: 'Wide forwards but nobody up top.', pts: -6, kind: 'role' })
   if (!hasBigGame) weaknesses.push({ name: 'No Big-Game Threat', desc: 'Nobody who turns up on the biggest nights.', pts: -4, kind: 'role' })
 
+  // shape weaknesses — width and creator balance
+  const WIDE_SLOTS = ['RW', 'LW', 'RM', 'LM', 'RWB', 'LWB']
+  const hasWidth = players.some((p) => p.eligibleSlots.some((s) => WIDE_SLOTS.includes(s)))
+  if (!hasWidth) weaknesses.push({ name: 'No Natural Width', desc: 'No wide players to stretch the pitch.', pts: -5, kind: 'role' })
+  const creators = players.filter((p) => ATT_CREATOR_ROLES.includes(p.role)).length
+  if (creators >= 4) weaknesses.push({ name: 'Too Many Creators', desc: 'Lots of flair, not enough balance or steel.', pts: -5, kind: 'role' })
+
   // modern-era weakness
   const modernCount = players.filter((p) => p.era === 'modern').length
   const provenTags = ['euro_legend', 'european_winner', 'final_scorer', 'big_game_player']
@@ -853,10 +860,82 @@ export const DIFFICULTIES = {
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
 
+// ---------------------------------------------------------------------------
+// Balance tuning (Phase 3). One place to retune the simulation.
+// ---------------------------------------------------------------------------
+const SIM = {
+  // strength rating → neutral win probability (before weaknesses / round pressure)
+  RATING_MID: 131,        // rating mapping to ~0.50 strength (pre-difficulty)
+  RATING_SPREAD: 340,     // larger = flatter curve; differentiates elite tiers
+  STRENGTH_LO: -0.30,
+  STRENGTH_HI: 0.34,
+  PROB_FLOOR: 0.08,
+  // hard caps on the base strength probability per difficulty — keeps even
+  // monster squads off 0.85–0.95 per-match territory on Classic/Legendary.
+  PROB_CEIL: { casual: 0.85, classic: 0.80, legendary: 0.71 },
+  // weaknesses drag the win probability directly, independent of the (often
+  // inflated) headline rating. Capped so no single flaw feels scripted.
+  WEAK_DRAG_SCALE: 0.006,
+  WEAK_DRAG_MAX: 0.15,
+  // per-knockout-match probability bounds + chance the tie reaches penalties.
+  // The ceiling lets Casual's elite squads breathe while Classic/Legendary stay
+  // lower via their own PROB_CEIL caps.
+  KO_PR_FLOOR: 0.05,
+  KO_PR_CEIL: 0.84,
+  KO_DRAW_BAND: 0.14,
+  // opponent pressure rises each round — the Final is the hardest match.
+  ROUND_PRESSURE: {
+    'Knockout Play-Off': 0.00,
+    'Round of 16': 0.03,
+    'Quarter-final': 0.06,
+    'Semi-final': 0.09,
+    'Final': 0.12,
+  },
+  // League Phase position model (lower position number = better finish)
+  LEAGUE_DRAW_BAND: 0.22,
+  LEAGUE_POS_POINTS: 1.25,
+  LEAGUE_POS_GD: 0.28,
+  LEAGUE_NUDGE_MULT: 30,  // league strength nudge = (p - 0.5) * MULT
+  LEAGUE_NUDGE_LO: -7,
+  LEAGUE_NUDGE_HI: 6,
+  LEAGUE_JITTER: 9,       // (rng-0.5) * JITTER
+}
+
+// Strength rating → neutral per-match win probability (no weaknesses / pressure).
 export function winProbability(rating, difficulty = 'classic') {
-  const base = 0.4 + clamp((rating - 100) / 200, -0.3, 0.45)
+  const s = clamp((rating - SIM.RATING_MID) / SIM.RATING_SPREAD, SIM.STRENGTH_LO, SIM.STRENGTH_HI)
   const offset = DIFFICULTIES[difficulty]?.offset ?? 0
-  return clamp(base + offset, 0.05, 0.95)
+  const ceil = SIM.PROB_CEIL[difficulty] ?? 0.77
+  return clamp(0.50 + s + offset, SIM.PROB_FLOOR, ceil)
+}
+
+// Per-run base knockout win probability for a finalized squad: raw strength
+// minus a capped drag from squad weaknesses. This is the Play-Off / pre-pressure
+// probability; later rounds subtract ROUND_PRESSURE from it.
+export function squadBaseProb(squad, difficulty = 'classic') {
+  const { base, bonuses, weaknesses } = computeRating(squad)
+  const strengthRating = base + bonuses.reduce((a, b) => a + b.pts, 0)
+  const weaknessMag = -weaknesses.reduce((a, w) => a + w.pts, 0)
+  const strengthProb = winProbability(strengthRating, difficulty)
+  const drag = clamp(weaknessMag * SIM.WEAK_DRAG_SCALE, 0, SIM.WEAK_DRAG_MAX)
+  return clamp(strengthProb - drag, SIM.KO_PR_FLOOR, SIM.KO_PR_CEIL)
+}
+
+// Win chance of a single knockout round after applying that round's pressure.
+export function roundWinChance(baseProb, round) {
+  const pr = clamp(baseProb - (SIM.ROUND_PRESSURE[round] ?? 0), SIM.KO_PR_FLOOR, SIM.KO_PR_CEIL)
+  return clamp(pr + SIM.KO_DRAW_BAND / 2, 0, 0.99) // includes the penalty-shootout edge
+}
+
+// UI helper — tuned, honest knockout outlook for a squad. Returns the early-round
+// (Round of 16) win chance plus qualitative pressure / difficulty wording.
+export function knockoutOutlook(squad, difficulty = 'classic') {
+  const base = squadBaseProb(squad, difficulty)
+  const r16 = Math.round(roundWinChance(base, 'Round of 16') * 100)
+  const final = Math.round(roundWinChance(base, 'Final') * 100)
+  const pressure = final >= 60 ? 'Moderate' : final >= 50 ? 'High' : 'Severe'
+  const eliteScale = { casual: 'Competitive', classic: 'Elite', legendary: 'Brutal' }
+  return { r16, final, pressure, finalDifficulty: eliteScale[difficulty] || 'Elite' }
 }
 
 // ---------------------------------------------------------------------------
@@ -984,18 +1063,20 @@ function topEntry(map, byId, key) {
 // A single decisive match (used for the Knockout Play-Off + every knockout
 // round). Returns the match object with an `eliminated` flag.
 // usedOpponents (Set) ensures no team appears in two different KO rounds.
-function decisiveMatch(rng, p, rating, players, tallies, round, usedOpponents) {
+function decisiveMatch(rng, baseProb, rating, players, tallies, round, usedOpponents) {
   const available = OPPONENTS.filter(o => !usedOpponents.has(o))
   const pool = available.length > 0 ? available : OPPONENTS
   const opponent = pool[Math.floor(rng() * pool.length)]
   usedOpponents.add(opponent)
+  // Opponent pressure rises each round; the Final is the hardest match.
+  const p = clamp(baseProb - (SIM.ROUND_PRESSURE[round] ?? 0), SIM.KO_PR_FLOOR, SIM.KO_PR_CEIL)
   const roll = rng()
   let result, mgf, mga, pens = null, eliminated = false
 
   if (roll < p) {
     result = 'win'
     mgf = 1 + Math.floor(rng() * 3); mga = Math.floor(rng() * mgf)
-  } else if (roll < p + 0.22) {
+  } else if (roll < p + SIM.KO_DRAW_BAND) {
     mgf = Math.floor(rng() * 2); mga = mgf
     const wonPens = rng() < 0.5
     const a = 3 + Math.floor(rng() * 3)
@@ -1027,7 +1108,8 @@ export function outcomeLabel(result) {
 }
 
 export function simulate({ rating, difficulty = 'classic', squad, rng = Math.random }) {
-  const p = winProbability(rating, difficulty)
+  // Base knockout win probability for this squad: strength minus weakness drag.
+  const p = squadBaseProb(squad, difficulty)
   const players = squad.map((s) => s.player).filter(Boolean)
   const byId = Object.fromEntries(players.map((pl) => [pl.id, pl]))
   const tally = { goals: {}, assists: {} }        // whole-run tally
@@ -1043,7 +1125,7 @@ export function simulate({ rating, difficulty = 'classic', squad, rng = Math.ran
     const roll = rng()
     let result, mgf, mga, points
     if (roll < p) { result = 'win'; mgf = 1 + Math.floor(rng() * 3); mga = Math.floor(rng() * mgf); points = 3; lw++ }
-    else if (roll < p + 0.25) { result = 'draw'; mgf = Math.floor(rng() * 2); mga = mgf; points = 1; ld++ }
+    else if (roll < p + SIM.LEAGUE_DRAW_BAND) { result = 'draw'; mgf = Math.floor(rng() * 2); mga = mgf; points = 1; ld++ }
     else { result = 'loss'; mga = 1 + Math.floor(rng() * 2); mgf = Math.floor(rng() * mga); points = 0; ll++ }
     lgf += mgf; lga += mga
     const events = buildGoals(rng, players, mgf, mga, [tally, leagueTally])
@@ -1056,10 +1138,10 @@ export function simulate({ rating, difficulty = 'classic', squad, rng = Math.ran
   const points = lw * 3 + ld
   const gd = lgf - lga
 
-  // Position estimate: driven by points + goal difference + rating, with a small
-  // seeded jitter. Lower number = higher finish. Clamped to 1..36.
-  const ratingNudge = clamp((rating - 110) / 12, -4, 6)
-  const strength = points * 1.35 + gd * 0.4 + ratingNudge + (rng() - 0.5) * 5
+  // Position estimate: driven by points + goal difference + a strength nudge
+  // tied to the tuned win probability, with seeded jitter. Lower = better finish.
+  const ratingNudge = clamp((p - 0.50) * SIM.LEAGUE_NUDGE_MULT, SIM.LEAGUE_NUDGE_LO, SIM.LEAGUE_NUDGE_HI)
+  const strength = points * SIM.LEAGUE_POS_POINTS + gd * SIM.LEAGUE_POS_GD + ratingNudge + (rng() - 0.5) * SIM.LEAGUE_JITTER
   const position = clamp(Math.round(37 - strength), 1, 36)
   const qualification = position <= 8 ? 'direct' : position <= 24 ? 'playoff' : 'eliminated'
   const qualLabel = qualification === 'direct' ? 'Direct to Round of 16' : qualification === 'playoff' ? 'Knockout Play-Off' : 'Eliminated in League Phase'

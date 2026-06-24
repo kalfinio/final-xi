@@ -17,7 +17,7 @@ import {
   tacticalIdentity,
   eraCounts,
   bestEraPick,
-  winProbability,
+  knockoutOutlook,
   simulate,
   ordinal,
   outcomeLabel,
@@ -543,7 +543,7 @@ function BonusesScreen({ squad, config, rerollsUsed, onSimulate }) {
   const { base, bonusTotal, total, bonuses, weaknesses } = computeRating(squad)
   const identity = tacticalIdentity(squad)
   const [howOpen, setHowOpen] = useState(false)
-  const winPct = Math.round(winProbability(total, config.difficulty) * 100)
+  const outlook = knockoutOutlook(squad, config.difficulty)
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 sm:py-8">
@@ -568,7 +568,7 @@ function BonusesScreen({ squad, config, rerollsUsed, onSimulate }) {
           <div><span className="text-primary font-semibold">Role Synergies</span> = tactical role combinations</div>
           <div><span className="text-primary font-semibold">Weakness Penalties</span> = squad balance problems</div>
           <div><span className="text-primary font-semibold">Final Rating</span> = player value + bonuses + role synergies − weaknesses</div>
-          <div className="text-gold/80">Final Rating raises your knockout win chance each round.</div>
+          <div className="text-gold/80">A higher Final Rating lifts your odds — but pressure rises every round and the Final is the hardest match.</div>
         </div>
       )}
 
@@ -595,7 +595,11 @@ function BonusesScreen({ squad, config, rerollsUsed, onSimulate }) {
       </div>
 
       <div className="text-center">
-        <p className="text-sm text-secondary mb-3">Estimated knockout win chance: <span className="text-gold font-bold">{winPct}%</span> per round</p>
+        <div className="mb-4 p-3 rounded-lg bg-card border border-border inline-block text-left">
+          <div className="text-sm text-secondary">Early-round win chance: <span className="text-gold font-bold">{outlook.r16}%</span><span className="text-secondary"> → Final {outlook.final}%</span></div>
+          <div className="text-xs text-secondary mt-1">Knockout pressure: <span className="text-primary font-semibold">{outlook.pressure}</span><span className="mx-1.5">·</span>Final difficulty: <span className="text-primary font-semibold">{outlook.finalDifficulty}</span></div>
+          {config.difficulty === 'legendary' && <div className="text-[11px] text-danger/80 mt-1">Legendary reduces your margin for error.</div>}
+        </div>
         <Button onClick={onSimulate} className="w-full sm:w-auto">Begin European Run</Button>
       </div>
     </div>
@@ -754,7 +758,8 @@ function ResultScreen({ squad, result, config, rerollsUsed, onPlayAgain }) {
   const bestModern = bestEraPick(squad, 'modern')
   const bestLegend = bestEraPick(squad, 'legend')
   const diffName = DIFFICULTIES[config.difficulty].name
-  const winPct = Math.round(winProbability(total, config.difficulty) * 100)
+  const outlook = knockoutOutlook(squad, config.difficulty)
+  const winPct = outlook.r16
   const [copied, setCopied] = useState(false)
 
   const lp = result.leaguePhase
@@ -784,8 +789,8 @@ function ResultScreen({ squad, result, config, rerollsUsed, onPlayAgain }) {
         <DetailRow label="League Phase record" value={`${lp.record.w}W-${lp.record.d}D-${lp.record.l}L`} />
         <DetailRow label="League Phase goals" value={`${lp.gf}–${lp.ga} (${lp.gd >= 0 ? '+' : ''}${lp.gd})`} />
         <DetailRow label="Final rating" value={total} accent="text-gold" />
-        <DetailRow label="Win chance / round" value={`${winPct}%`} />
-        <DetailRow label="Difficulty" value={diffName} />
+        <DetailRow label="Early-round win chance" value={`${winPct}% → Final ${outlook.final}%`} />
+        <DetailRow label="Difficulty" value={`${diffName} · ${outlook.finalDifficulty} final`} />
         <DetailRow label="Tactical identity" value={identity} accent="text-gold" />
         <DetailRow label="Key role synergy" value={roleSynergy ? `${roleSynergy.name} (+${roleSynergy.pts})` : '—'} accent={roleSynergy ? 'text-success' : 'text-secondary'} />
         <DetailRow label="Biggest weakness" value={weak ? weak.name : 'None'} accent={weak ? 'text-danger' : 'text-success'} />
