@@ -29,6 +29,12 @@ import {
   loadStats,
   favoriteFormation,
   recordGame,
+  shortDisplayName,
+  ROLE_GUIDE,
+  auraLabel,
+  playerBadges,
+  roleReasonText,
+  roleEvidenceText,
 } from './data'
 import { buildShareData, buildShareText, downloadShareCard } from './share'
 
@@ -47,6 +53,28 @@ const POS_BADGE = {
 function PosBadge({ type, label }) {
   return (
     <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide ${POS_BADGE[type]}`}>{label ?? type}</span>
+  )
+}
+
+// Aura / special badge styling, keyed by badge label.
+function badgeStyle(label) {
+  if (label === 'GOAT') return 'text-gold bg-gold/15 border-gold/50'
+  if (label === 'GOAT Candidate') return 'text-amber-200 bg-amber-200/10 border-amber-200/40'
+  if (label === 'Big Game Scorer') return 'text-success bg-success/10 border-success/40'
+  if (label === 'Football Icon') return 'text-amber-200 bg-amber-200/10 border-amber-200/40'
+  if (label === 'Infinity Aura' || label === '3× World Champion') return 'text-pink-300 bg-pink-300/10 border-pink-300/40'
+  return 'text-secondary bg-surface border-border'
+}
+
+function Badges({ player, className = '' }) {
+  const badges = playerBadges(player)
+  if (badges.length === 0) return null
+  return (
+    <div className={`flex flex-wrap gap-1 ${className}`}>
+      {badges.map((b) => (
+        <span key={b} className={`px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wide border ${badgeStyle(b)}`}>{b}</span>
+      ))}
+    </div>
   )
 }
 
@@ -69,8 +97,6 @@ function ModeBadge({ mode }) {
     </span>
   )
 }
-
-const shortName = (n) => n.split(' ').slice(-1)[0]
 
 // ---------------------------------------------------------------------------
 // Intro
@@ -115,12 +141,35 @@ function HowToPlay() {
   )
 }
 
+function RoleGuide() {
+  const groups = ['Goalkeeper', 'Defence', 'Midfield', 'Wide & Attacking Mid', 'Strikers']
+  return (
+    <div className="mt-2 p-4 rounded-lg bg-card border border-border space-y-3">
+      {groups.map((g) => (
+        <div key={g}>
+          <div className="text-[10px] uppercase tracking-widest text-gold/80 mb-1.5">{g}</div>
+          <div className="space-y-1.5">
+            {ROLE_GUIDE.filter((r) => r.group === g).map((r) => (
+              <div key={r.role} className="flex gap-2">
+                <span className="shrink-0 w-32 text-xs font-semibold text-primary">{r.role}</span>
+                <span className="text-xs text-secondary leading-snug">{r.line}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+      <div className="pt-1 border-t border-border text-xs text-secondary">A player can only be drafted or moved into a slot their position allows — roles describe how they play, not where they can go.</div>
+    </div>
+  )
+}
+
 function IntroScreen({ onStart, stats }) {
   const [formation, setFormation] = useState(null)
   const [mode, setMode] = useState('random')
   const [difficulty, setDifficulty] = useState('classic')
   const [pool, setPool] = useState('modern')
   const [howOpen, setHowOpen] = useState(false)
+  const [roleOpen, setRoleOpen] = useState(false)
   const fav = favoriteFormation(stats)
 
   return (
@@ -174,6 +223,14 @@ function IntroScreen({ onStart, stats }) {
             <span className="text-secondary text-sm">{howOpen ? '−' : '+'}</span>
           </button>
           {howOpen && <HowToPlay />}
+        </div>
+
+        <div className="fx-in fx-d4 mb-6">
+          <button onClick={() => setRoleOpen((o) => !o)} className="w-full flex items-center justify-between p-3 rounded-lg border border-border bg-surface text-left">
+            <span className="text-sm font-semibold">Role Guide</span>
+            <span className="text-secondary text-sm">{roleOpen ? '−' : '+'}</span>
+          </button>
+          {roleOpen && <RoleGuide />}
         </div>
 
         <h2 className="fx-in fx-d4 text-xs uppercase tracking-widest text-secondary mb-2">Formation</h2>
@@ -242,8 +299,15 @@ function WhyPoints({ player }) {
       {b.traits.map((t, i) => (
         <div key={i} className="flex justify-between"><span className="text-secondary">{t.label}</span><span className="text-primary">+{t.pts}</span></div>
       ))}
-      <div className="flex justify-between text-secondary"><span>Role</span><span className="text-gold/80">{b.role}</span></div>
+      {b.extras.map((x, i) => (
+        <div key={`x${i}`} className="flex justify-between"><span className="text-secondary">{x.label}</span><span className="text-gold">+{x.pts}</span></div>
+      ))}
+      <div className="flex justify-between text-secondary"><span>Role</span><span className="text-gold/80">{b.role}{b.secondaryRole ? ` · ${b.secondaryRole}` : ''}</span></div>
       <div className="flex justify-between border-t border-border pt-1 font-bold"><span>Player value</span><span className="text-gold">{b.total}</span></div>
+      <div className="border-t border-border pt-1.5 mt-1 space-y-1">
+        <div className="text-secondary leading-snug"><span className="text-primary font-semibold">Why this role: </span>{roleReasonText(player)}</div>
+        <div className="text-secondary leading-snug"><span className="text-primary font-semibold">Evidence: </span>{roleEvidenceText(player)}</div>
+      </div>
     </div>
   )
 }
@@ -258,7 +322,8 @@ function PlayerCard({ player, onPick }) {
           <PosBadge type={player.posType} label={player.primaryPos} />
         </div>
         <div className="text-sm text-secondary">{player.country} · {player.club}</div>
-        <div className="text-xs text-gold/80 mb-2">{player.role}</div>
+        <div className="text-xs text-gold/80 mb-2">{player.role}{player.secondaryRole ? <span className="text-secondary"> · {player.secondaryRole}</span> : ''}</div>
+        <Badges player={player} className="mb-2" />
         <div className="flex flex-wrap gap-1.5 mb-2">
           {player.tags.map((t) => (
             <span key={t} className="px-2 py-0.5 rounded bg-surface border border-border text-[10px] text-secondary">{TAG_LABELS[t]}</span>
@@ -284,7 +349,7 @@ function SquadPreview({ squad, activeIndex }) {
       {squad.map((s, i) => (
         <div key={i} className={`px-2 py-1 rounded text-xs border ${i === activeIndex ? 'border-gold bg-card' : s.player ? 'border-border bg-surface' : 'border-border bg-bg text-secondary'}`}>
           <span className="font-bold mr-1 text-gold/80">{s.slot}</span>
-          {s.player ? <span className="text-primary">{shortName(s.player.name)}</span> : <span className="text-secondary">·</span>}
+          {s.player ? <span className="text-primary">{shortDisplayName(s.player.name)}</span> : <span className="text-secondary">·</span>}
         </div>
       ))}
     </div>
@@ -378,11 +443,11 @@ function SetXIScreen({ config, draftedSquad, onConfirm, onReset }) {
     const aOk = canPlay(a.player, b.slot)
     const bOk = canPlay(b.player, a.slot)
     if (!aOk) {
-      setMessage(`${shortName(a.player.name)} can only play ${a.player.eligibleSlots.join(' or ')}.`)
+      setMessage(`${shortDisplayName(a.player.name)} can only play ${a.player.eligibleSlots.join(' or ')}.`)
       return
     }
     if (!bOk) {
-      setMessage(`${shortName(b.player.name)} can only play ${b.player.eligibleSlots.join(' or ')}.`)
+      setMessage(`${shortDisplayName(b.player.name)} can only play ${b.player.eligibleSlots.join(' or ')}.`)
       return
     }
     const next = squad.map((s, idx) => {
@@ -422,7 +487,7 @@ function SetXIScreen({ config, draftedSquad, onConfirm, onReset }) {
 
       {selPlayer && (
         <div className="mb-3 p-2.5 rounded-lg bg-card border border-gold/40 text-sm text-center">
-          <span className="font-semibold text-gold">{shortName(selPlayer.name)}</span>
+          <span className="font-semibold text-gold">{shortDisplayName(selPlayer.name)}</span>
           <span className="text-secondary"> can play: {selPlayer.eligibleSlots.join(', ')}</span>
         </div>
       )}
@@ -512,7 +577,7 @@ function BonusesScreen({ squad, config, rerollsUsed, onSimulate }) {
         {bonuses.length === 0 && <p className="text-secondary text-center text-sm">No bonuses triggered.</p>}
         {bonuses.map((b, i) => (
           <div key={i} className="flex justify-between items-center gap-3 p-3 rounded-lg bg-card border border-border">
-            <span className="font-semibold flex items-center gap-2 min-w-0"><span className="truncate">{b.name}</span>{b.kind === 'role' && <span className="text-[9px] text-gold/70 border border-gold/30 rounded px-1 shrink-0">ROLE</span>}{b.kind === 'era' && <span className="text-[9px] text-gold/70 border border-gold/30 rounded px-1 shrink-0">ERA</span>}</span>
+            <span className="font-semibold flex items-center gap-2 min-w-0"><span className="truncate">{b.name}</span>{b.kind === 'role' && <span className="text-[9px] text-gold/70 border border-gold/30 rounded px-1 shrink-0">ROLE</span>}{b.kind === 'era' && <span className="text-[9px] text-gold/70 border border-gold/30 rounded px-1 shrink-0">ERA</span>}{b.kind === 'aura' && <span className="text-[9px] text-gold border border-gold/50 bg-gold/10 rounded px-1 shrink-0">AURA</span>}</span>
             <span className="font-bold text-success shrink-0">+{b.pts}</span>
           </div>
         ))}
@@ -558,7 +623,7 @@ function EventsTimeline({ events }) {
       {events.map((e, i) => (
         <div key={i} className={`text-xs ${e.side === 'us' ? 'text-primary' : 'text-secondary'}`}>
           <span className="text-gold/70 font-mono mr-1">{e.minute}'</span>
-          {e.side === 'us' ? <>{shortName(e.scorer)}{e.assist ? <span className="text-secondary"> — assist {shortName(e.assist)}</span> : ''}</> : <span className="text-secondary">{e.scorer} (opponent)</span>}
+          {e.side === 'us' ? <>{shortDisplayName(e.scorer)}{e.assist ? <span className="text-secondary"> — assist {shortDisplayName(e.assist)}</span> : ''}</> : <span className="text-secondary">{e.scorer} (opponent)</span>}
         </div>
       ))}
     </div>
@@ -573,7 +638,7 @@ function StatsGrid({ stats }) {
       <Stat label="xG" value={stats.xg} />
       <Stat label="Saves" value={stats.saves} />
       <Stat label="Fouls" value={stats.fouls} />
-      <Stat label="MotM" value={shortName(String(stats.potm))} />
+      <Stat label="MotM" value={shortDisplayName(String(stats.potm))} />
     </div>
   )
 }
@@ -623,8 +688,8 @@ function LeaguePhaseCard({ lp }) {
         <Stat label="Record" value={`${lp.record.w}-${lp.record.d}-${lp.record.l}`} />
         <Stat label="Goals" value={`${lp.gf}-${lp.ga}`} />
         <Stat label="GD" value={`${lp.gd >= 0 ? '+' : ''}${lp.gd}`} />
-        <Stat label="Top scorer" value={lp.topScorer ? `${shortName(lp.topScorer.name)} ${lp.topScorer.goals}` : '—'} />
-        <Stat label="Top assist" value={lp.topAssister ? `${shortName(lp.topAssister.name)} ${lp.topAssister.assists}` : '—'} />
+        <Stat label="Top scorer" value={lp.topScorer ? `${shortDisplayName(lp.topScorer.name)} ${lp.topScorer.goals}` : '—'} />
+        <Stat label="Top assist" value={lp.topAssister ? `${shortDisplayName(lp.topAssister.name)} ${lp.topAssister.assists}` : '—'} />
       </div>
       {lp.bestMatch && <div className="text-xs text-secondary mb-2">Best match: {lp.bestMatch.score} vs {lp.bestMatch.opponent}</div>}
       <button onClick={() => setOpen((o) => !o)} className="text-xs text-secondary hover:text-gold">{open ? 'Hide match reports' : 'View 8 match reports'} {open ? '−' : '+'}</button>
@@ -724,13 +789,13 @@ function ResultScreen({ squad, result, config, rerollsUsed, onPlayAgain }) {
         <DetailRow label="Tactical identity" value={identity} accent="text-gold" />
         <DetailRow label="Key role synergy" value={roleSynergy ? `${roleSynergy.name} (+${roleSynergy.pts})` : '—'} accent={roleSynergy ? 'text-success' : 'text-secondary'} />
         <DetailRow label="Biggest weakness" value={weak ? weak.name : 'None'} accent={weak ? 'text-danger' : 'text-success'} />
-        <DetailRow label="MVP" value={`${mvp.name} (${playerPoints(mvp)} pts)`} />
-        <DetailRow label="Top scorer" value={result.topScorer ? `${result.topScorer.name} (${result.topScorer.goals})` : '—'} accent="text-success" />
-        <DetailRow label="Top assister" value={result.topAssister ? `${result.topAssister.name} (${result.topAssister.assists})` : '—'} />
+        <DetailRow label="MVP" value={`${shortDisplayName(mvp.name)} (${playerPoints(mvp)} pts)`} />
+        <DetailRow label="Top scorer" value={result.topScorer ? `${shortDisplayName(result.topScorer.name)} (${result.topScorer.goals})` : '—'} accent="text-success" />
+        <DetailRow label="Top assister" value={result.topAssister ? `${shortDisplayName(result.topAssister.name)} (${result.topAssister.assists})` : '—'} />
         <DetailRow label="Best match" value={result.bestMatch ? `${result.bestMatch.score} vs ${result.bestMatch.opponent}` : '—'} />
         <DetailRow label="Toughest opponent" value={result.toughestOpponent || '—'} accent="text-danger" />
         <DetailRow label="Key bonus" value={best ? `${best.name} (+${best.pts})` : '—'} accent={best ? 'text-success' : 'text-secondary'} />
-        <DetailRow label="Smartest pick" value={`${smart.name} — ${smart.rarity}%`} accent="text-success" />
+        <DetailRow label="Smartest pick" value={`${shortDisplayName(smart.name)} — ${smart.rarity}%`} accent="text-success" />
         <DetailRow label="Era mix" value={`Legends ${era.legends} / Modern ${era.modern}`} />
         <DetailRow label="Rerolls used" value={`${rerollsUsed} / ${TOTAL_REROLLS}`} />
       </div>

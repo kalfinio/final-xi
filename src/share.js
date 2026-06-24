@@ -1,9 +1,7 @@
 // Frontend-only share helpers: viral copy text + a text-only PNG share card.
 // No images, logos, badges, photos, or banned competition wording.
 
-function lastName(name) {
-  return name.split(' ').slice(-1)[0]
-}
+import { shortDisplayName } from './data'
 
 // Common shape used by both the copy text and the PNG card.
 function ordinal(n) {
@@ -43,9 +41,9 @@ export function buildShareData({
     winPct,
     identity: config.identity,
     mvp: mvp ? mvp.name : '—',
-    topScorer: topScorer ? `${lastName(topScorer.name)}, ${topScorer.goals} goals` : '—',
-    topAssister: topAssister ? `${lastName(topAssister.name)}, ${topAssister.assists} assists` : '—',
-    smart: smart ? `${lastName(smart.name)}, ${smart.rarity}% pick rate` : '—',
+    topScorer: topScorer ? `${shortDisplayName(topScorer.name)}, ${topScorer.goals} goals` : '—',
+    topAssister: topAssister ? `${shortDisplayName(topAssister.name)}, ${topAssister.assists} assists` : '—',
+    smart: smart ? `${shortDisplayName(smart.name)}, ${smart.rarity}% pick rate` : '—',
     bestBonus: best ? `${best.name} (+${best.pts})` : 'None',
     keyWeakness: weak ? weak.name : 'None',
     rerolls: `${rerollsUsed}/${totalRerolls}`,

@@ -101,10 +101,122 @@ export const SLOT_NAMES = {
 }
 
 // ---------------------------------------------------------------------------
-// Player database — strict eligibility + tactical roles
+// Final XI roles (Phase 2 — exact approved role names)
 // ---------------------------------------------------------------------------
+// These are the ONLY valid public role names. ROLE_GUIDE is the single source
+// of truth; both `role` and `secondaryRole` must be one of these, and
+// validation fails otherwise.
+export const ROLE_GUIDE = [
+  // Goalkeeper
+  { role: 'Shot Stopper', group: 'Goalkeeper', line: 'Pure reflexes — commands the box and makes the saves that win ties.' },
+  { role: 'Sweeper Keeper', group: 'Goalkeeper', line: 'A keeper who races off his line and starts attacks with the ball at his feet.' },
+  { role: 'Big Match Keeper', group: 'Goalkeeper', line: 'The keeper you want on the biggest nights — calm and decisive under pressure.' },
+  // Defence
+  { role: 'Defensive Leader', group: 'Defence', line: 'Marshals the back line — wins headers, blocks shots and organises everyone.' },
+  { role: 'Ball-Playing Defender', group: 'Defence', line: 'A defender comfortable stepping out and building play from the back.' },
+  { role: 'Attacking Fullback', group: 'Defence', line: 'A flying wide defender who overlaps and delivers from the byline.' },
+  { role: 'Defensive Fullback', group: 'Defence', line: 'A disciplined wide defender who shuts down the flank first.' },
+  // Midfield
+  { role: 'Defensive Shield', group: 'Midfield', line: 'The screen in front of the defence — protects the back line and recycles the ball.' },
+  { role: 'Ball Winner', group: 'Midfield', line: 'A relentless tackler who hunts the ball and breaks up play.' },
+  { role: 'Tempo Controller', group: 'Midfield', line: 'Dictates the rhythm from deep with passing range and vision.' },
+  { role: 'Box-to-Box Engine', group: 'Midfield', line: 'Covers every blade of grass — defends and arrives in the box.' },
+  { role: 'Final Passer', group: 'Midfield', line: 'Threads the killer pass and unlocks defences from midfield.' },
+  // Wide / Attacking Mid
+  { role: 'Creative Magician', group: 'Wide & Attacking Mid', line: 'The flair player — beats defenders and conjures chances from nothing.' },
+  { role: 'Inside Forward', group: 'Wide & Attacking Mid', line: 'Starts wide, cuts inside onto his stronger foot and shoots.' },
+  { role: 'Touchline Winger', group: 'Wide & Attacking Mid', line: 'Hugs the touchline, beats his man and whips in the cross.' },
+  { role: 'Direct Runner', group: 'Wide & Attacking Mid', line: 'Frightening pace — runs in behind and attacks the space.' },
+  // Strikers
+  { role: 'Complete Striker', group: 'Strikers', line: 'Does it all up top — holds the ball, links play and scores.' },
+  { role: 'Box Finisher', group: 'Strikers', line: 'Lives in the box — the poacher who puts the chances away.' },
+  { role: 'Link-Up Striker', group: 'Strikers', line: 'Drops in to link play and bring others into the attack.' },
+  { role: 'Big Game Scorer', group: 'Strikers', line: 'Turns up on the biggest European nights — scores the goals that decide finals.' },
+]
+
+// Maps the old detailed tactical roles onto the approved Final XI roles (bulk
+// default). Per-player exceptions live in ROLE_OVERRIDES.
+const ROLE_MAP = {
+  'Goalkeeper': 'Shot Stopper',
+  'Sweeper Keeper': 'Sweeper Keeper',
+  'Wing-Back': 'Attacking Fullback',
+  'Complete Wing-Back': 'Attacking Fullback',
+  'Inverted Wing-Back': 'Attacking Fullback',
+  'Full-Back': 'Defensive Fullback',
+  'Central Defender': 'Defensive Leader',
+  'No-Nonsense Centre-Back': 'Defensive Leader',
+  'Ball-Playing Defender': 'Ball-Playing Defender',
+  'Libero': 'Ball-Playing Defender',
+  'Anchor': 'Defensive Shield',
+  'Defensive Midfielder': 'Defensive Shield',
+  'Ball-Winning Midfielder': 'Ball Winner',
+  'Regista': 'Tempo Controller',
+  'Deep-Lying Playmaker': 'Tempo Controller',
+  'Box-to-Box Midfielder': 'Box-to-Box Engine',
+  'Mezzala': 'Box-to-Box Engine',
+  'Advanced Playmaker': 'Final Passer',
+  'Roaming Playmaker': 'Tempo Controller',
+  'Trequartista': 'Creative Magician',
+  'Shadow Striker': 'Link-Up Striker',
+  'Inverted Winger': 'Inside Forward',
+  'Winger': 'Touchline Winger',
+  'Inside Forward': 'Inside Forward',
+  'False Nine': 'Creative Magician',
+  'Complete Forward': 'Complete Striker',
+  'Advanced Forward': 'Box Finisher',
+  'Target Forward': 'Link-Up Striker',
+  'Poacher': 'Box Finisher',
+  'Deep-Lying Forward': 'Link-Up Striker',
+}
+
+// Per-player role corrections (and secondary roles) keyed by id. Overrides the
+// bulk ROLE_MAP. All values must be approved roles.
+const ROLE_OVERRIDES = {
+  // Big Match Keepers
+  casillas: { role: 'Big Match Keeper' },
+  buffon: { role: 'Big Match Keeper' },
+  neuer: { role: 'Sweeper Keeper', secondaryRole: 'Big Match Keeper' },
+  courtois: { role: 'Big Match Keeper' },
+  // GOAT Tier
+  messi: { role: 'Creative Magician', secondaryRole: 'Inside Forward' },
+  ronaldo: { role: 'Inside Forward', secondaryRole: 'Big Game Scorer' },
+  maradona: { role: 'Creative Magician', secondaryRole: 'Direct Runner' },
+  pele: { role: 'Complete Striker', secondaryRole: 'Creative Magician' },
+  // GOAT Candidates + corrected examples
+  cruyff: { role: 'Creative Magician', secondaryRole: 'Link-Up Striker' },
+  nazario: { role: 'Complete Striker', secondaryRole: 'Direct Runner' },
+  zidane: { role: 'Creative Magician', secondaryRole: 'Big Game Scorer' },
+  beckenbauer: { role: 'Ball-Playing Defender', secondaryRole: 'Defensive Leader' },
+  // Midfield corrections
+  pirlo: { role: 'Tempo Controller' },
+  xavi: { role: 'Tempo Controller' },
+  kroos: { role: 'Tempo Controller' },
+  modric: { role: 'Tempo Controller', secondaryRole: 'Box-to-Box Engine' },
+  makelele: { role: 'Defensive Shield' },
+  busquets: { role: 'Defensive Shield' },
+  casemiro: { role: 'Defensive Shield' },
+  rodri: { role: 'Defensive Shield' },
+  kante: { role: 'Ball Winner' },
+  // Defence / attack corrections
+  cafu: { role: 'Attacking Fullback' },
+  lahm: { role: 'Defensive Fullback' },
+  vanbasten: { role: 'Complete Striker' },
+  ibra: { role: 'Complete Striker', secondaryRole: 'Box Finisher' },
+}
+
+// ---------------------------------------------------------------------------
+// Player database — strict eligibility + approved Final XI roles
+// ---------------------------------------------------------------------------
+// `role` (and optional `secondaryRole`) are normalised to the approved set;
+// `sourceRole` keeps the original descriptor for reference (not shown in the UI).
 function P(id, name, primaryPos, country, club, eligibleSlots, tags, rarity, role, era = 'legend') {
-  return { id, name, primaryPos, eligibleSlots, posType: posTypeOf(primaryPos), country, club, tags, rarity, role, era }
+  const override = ROLE_OVERRIDES[id] || {}
+  const finalRole = override.role || ROLE_MAP[role] || role
+  return {
+    id, name, primaryPos, eligibleSlots, posType: posTypeOf(primaryPos),
+    country, club, tags, rarity,
+    role: finalRole, secondaryRole: override.secondaryRole || null, sourceRole: role, era,
+  }
 }
 
 export const PLAYERS = [
@@ -119,18 +231,18 @@ export const PLAYERS = [
   P('ricardo', 'Ricardo', 'GK', 'Portugal', 'Porto', ['GK'], ['euro_legend'], 12, 'Goalkeeper'),
 
   // --- DEF ---
-  P('cafu', 'Cafu', 'RB', 'Brazil', 'Milan', ['RB', 'RWB', 'RM'], ['euro_legend'], 44, 'Wing-Back'),
+  P('cafu', 'Cafu', 'RB', 'Brazil', 'Milan', ['RB', 'RWB'], ['euro_legend'], 44, 'Wing-Back'),
   P('danialves', 'Dani Alves', 'RB', 'Brazil', 'Barcelona', ['RB', 'RWB'], ['barca_dna', 'serial_winner'], 49, 'Complete Wing-Back'),
   P('lahm', 'Philipp Lahm', 'RB', 'Germany', 'Bayern', ['RB'], ['euro_legend', 'world_cup_winner'], 47, 'Full-Back'),
-  P('zanetti', 'Javier Zanetti', 'RB', 'Argentina', 'Inter', ['RB', 'RWB', 'RM'], ['euro_legend', 'serial_winner'], 33, 'Full-Back'),
+  P('zanetti', 'Javier Zanetti', 'RB', 'Argentina', 'Inter', ['RB', 'RWB'], ['euro_legend', 'serial_winner'], 33, 'Full-Back'),
   P('cannavaro', 'Fabio Cannavaro', 'CB', 'Italy', 'Real Madrid', ['CB'], ['real_madrid_dna', 'world_cup_winner'], 55, 'Central Defender'),
-  P('robertocarlos', 'Roberto Carlos', 'LB', 'Brazil', 'Real Madrid', ['LB', 'LWB', 'LM'], ['real_madrid_dna', 'euro_legend'], 66, 'Complete Wing-Back'),
-  P('ashleycole', 'Ashley Cole', 'LB', 'England', 'Chelsea', ['LB', 'LWB', 'LM'], ['euro_legend'], 24, 'Full-Back'),
+  P('robertocarlos', 'Roberto Carlos', 'LB', 'Brazil', 'Real Madrid', ['LB', 'LWB'], ['real_madrid_dna', 'euro_legend'], 66, 'Complete Wing-Back'),
+  P('ashleycole', 'Ashley Cole', 'LB', 'England', 'Chelsea', ['LB', 'LWB'], ['euro_legend'], 24, 'Full-Back'),
   P('maldini', 'Paolo Maldini', 'CB', 'Italy', 'Milan', ['CB', 'LB', 'LWB'], ['euro_legend', 'serial_winner'], 71, 'Central Defender'),
   P('ramos', 'Sergio Ramos', 'CB', 'Spain', 'Real Madrid', ['CB'], ['real_madrid_dna', 'world_cup_winner', 'euro_final_scorer'], 68, 'Ball-Playing Defender'),
   P('puyol', 'Carles Puyol', 'CB', 'Spain', 'Barcelona', ['CB'], ['barca_dna', 'world_cup_winner'], 52, 'No-Nonsense Centre-Back'),
   P('beckenbauer', 'Franz Beckenbauer', 'CB', 'Germany', 'Bayern', ['CB'], ['euro_legend', 'world_cup_winner'], 57, 'Libero'),
-  P('vandijk', 'Virgil van Dijk', 'CB', 'Netherlands', 'Liverpool', ['CB'], ['euro_legend', 'euro_final_scorer'], 64, 'Ball-Playing Defender'),
+  P('vandijk', 'Virgil van Dijk', 'CB', 'Netherlands', 'Liverpool', ['CB'], ['euro_legend'], 64, 'Ball-Playing Defender'),
   P('pepe', 'Pepe', 'CB', 'Portugal', 'Real Madrid', ['CB'], ['real_madrid_dna', 'euro_legend'], 35, 'No-Nonsense Centre-Back'),
   P('desailly', 'Marcel Desailly', 'CB', 'France', 'Milan', ['CB'], ['euro_legend'], 26, 'No-Nonsense Centre-Back'),
   P('costacurta', 'Alessandro Costacurta', 'CB', 'Italy', 'Milan', ['CB'], ['euro_legend', 'serial_winner'], 18, 'Central Defender'),
@@ -164,13 +276,13 @@ export const PLAYERS = [
   P('ozil', 'Mesut Özil', 'CAM', 'Germany', 'Real Madrid', ['CAM'], ['real_madrid_dna', 'world_cup_winner'], 45, 'Advanced Playmaker'),
   P('kaka', 'Kaká', 'CAM', 'Brazil', 'Milan', ['CAM'], ['euro_legend', 'euro_final_scorer'], 63, 'Shadow Striker'),
   P('zidane', 'Zinédine Zidane', 'CAM', 'France', 'Real Madrid', ['CAM'], ['real_madrid_dna', 'euro_final_scorer', 'world_cup_winner'], 78, 'Advanced Playmaker'),
-  P('ronaldinho', 'Ronaldinho', 'CAM', 'Brazil', 'Barcelona', ['LW', 'CAM'], ['barca_dna', 'euro_final_scorer', 'played_with_messi'], 77, 'Trequartista'),
+  P('ronaldinho', 'Ronaldinho', 'CAM', 'Brazil', 'Barcelona', ['LW', 'CAM', 'LM'], ['barca_dna', 'euro_final_scorer', 'played_with_messi'], 77, 'Trequartista'),
   P('rivaldo', 'Rivaldo', 'CAM', 'Brazil', 'Barcelona', ['LW', 'CAM'], ['barca_dna', 'euro_final_scorer'], 42, 'Trequartista'),
   P('fabregas', 'Cesc Fàbregas', 'CAM', 'Spain', 'Barcelona', ['CM', 'CAM'], ['barca_dna', 'world_cup_winner', 'played_with_messi'], 32, 'Advanced Playmaker'),
 
   // --- Wide / ATT ---
-  P('robben', 'Arjen Robben', 'RW', 'Netherlands', 'Bayern', ['RW'], ['euro_legend', 'euro_final_scorer'], 60, 'Inverted Winger'),
-  P('ribery', 'Franck Ribéry', 'LW', 'France', 'Bayern', ['LW'], ['euro_legend', 'serial_winner'], 53, 'Winger'),
+  P('robben', 'Arjen Robben', 'RW', 'Netherlands', 'Bayern', ['RW', 'RM'], ['euro_legend', 'euro_final_scorer'], 60, 'Inverted Winger'),
+  P('ribery', 'Franck Ribéry', 'LW', 'France', 'Bayern', ['LW', 'LM'], ['euro_legend', 'serial_winner'], 53, 'Winger'),
   P('bale', 'Gareth Bale', 'RW', 'Wales', 'Real Madrid', ['RW', 'LW', 'RM', 'LM'], ['real_madrid_dna', 'euro_final_scorer'], 58, 'Inside Forward'),
   P('ronaldo', 'Cristiano Ronaldo', 'ST', 'Portugal', 'Real Madrid', ['LW', 'ST'], ['real_madrid_dna', 'euro_legend', 'euro_final_scorer', 'serial_winner'], 92, 'Inside Forward'),
   P('messi', 'Lionel Messi', 'RW', 'Argentina', 'Barcelona', ['RW', 'CAM'], ['barca_dna', 'euro_legend', 'euro_final_scorer', 'serial_winner', 'is_messi'], 95, 'False Nine'),
@@ -179,7 +291,7 @@ export const PLAYERS = [
   P('ibra', 'Zlatan Ibrahimović', 'ST', 'Sweden', 'Barcelona', ['ST'], ['barca_dna', 'serial_winner', 'played_with_messi'], 65, 'Target Forward'),
   P('inzaghi', 'Filippo Inzaghi', 'ST', 'Italy', 'Milan', ['ST'], ['euro_legend', 'euro_final_scorer'], 33, 'Poacher'),
   P('shevchenko', 'Andriy Shevchenko', 'ST', 'Ukraine', 'Milan', ['ST'], ['euro_legend', 'euro_final_scorer'], 51, 'Complete Forward'),
-  P('benzema', 'Karim Benzema', 'ST', 'France', 'Real Madrid', ['ST'], ['real_madrid_dna', 'euro_legend', 'euro_final_scorer', 'serial_winner'], 62, 'Complete Forward'),
+  P('benzema', 'Karim Benzema', 'ST', 'France', 'Real Madrid', ['ST'], ['real_madrid_dna', 'euro_legend', 'serial_winner'], 62, 'Complete Forward'),
   P('torres', 'Fernando Torres', 'ST', 'Spain', 'Liverpool', ['ST'], ['euro_legend', 'world_cup_winner'], 44, 'Advanced Forward'),
   P('owen', 'Michael Owen', 'ST', 'England', 'Liverpool', ['ST'], ['euro_legend'], 29, 'Poacher'),
   P('drogba', 'Didier Drogba', 'ST', 'Ivory Coast', 'Chelsea', ['ST'], ['euro_legend', 'euro_final_scorer'], 56, 'Target Forward'),
@@ -196,6 +308,13 @@ export const PLAYERS = [
   P('delpiero', 'Alessandro Del Piero', 'CAM', 'Italy', 'Juventus', ['CAM', 'ST'], ['euro_legend', 'euro_final_scorer', 'serial_winner'], 57, 'Shadow Striker'),
   P('raul', 'Raúl', 'ST', 'Spain', 'Real Madrid', ['ST'], ['real_madrid_dna', 'euro_legend', 'serial_winner'], 58, 'Advanced Forward'),
 
+  // --- GOAT / GOAT Candidate additions (Phase 2) ---
+  P('maradona', 'Diego Maradona', 'CAM', 'Argentina', 'Napoli', ['CAM', 'ST'], ['world_cup_winner', 'euro_legend'], 86, 'Trequartista'),
+  P('pele', 'Pelé', 'ST', 'Brazil', 'Santos', ['ST', 'CAM'], ['world_cup_winner'], 84, 'Complete Forward'),
+  P('nazario', 'Ronaldo Nazário', 'ST', 'Brazil', 'Real Madrid', ['ST'], ['real_madrid_dna', 'euro_legend', 'world_cup_winner'], 80, 'Advanced Forward'),
+  P('distefano', 'Alfredo Di Stéfano', 'ST', 'Argentina', 'Real Madrid', ['ST', 'CAM'], ['real_madrid_dna', 'euro_legend', 'euro_final_scorer'], 76, 'Complete Forward'),
+  P('platini', 'Michel Platini', 'CAM', 'France', 'Juventus', ['CAM', 'CM'], ['euro_legend', 'euro_final_scorer'], 74, 'Advanced Playmaker'),
+
   // ================= MODERN =================
   // --- GK ---
   P('neuer', 'Manuel Neuer', 'GK', 'Germany', 'Bayern', ['GK'], ['bayern_core', 'world_cup_winner', 'european_winner', 'big_game_player'], 64, 'Sweeper Keeper', 'modern'),
@@ -206,13 +325,13 @@ export const PLAYERS = [
   P('terstegen', 'Marc-André ter Stegen', 'GK', 'Germany', 'Barcelona', ['GK'], ['barca_modern'], 38, 'Sweeper Keeper', 'modern'),
 
   // --- DEF ---
-  P('carvajal', 'Dani Carvajal', 'RB', 'Spain', 'Real Madrid', ['RB', 'RWB', 'RM'], ['madrid_modern', 'european_winner', 'final_scorer'], 44, 'Wing-Back', 'modern'),
-  P('trent', 'Trent Alexander-Arnold', 'RB', 'England', 'Liverpool', ['RB', 'RWB', 'RM'], ['liverpool_core', 'premier_league_star', 'european_winner'], 56, 'Inverted Wing-Back', 'modern'),
+  P('carvajal', 'Dani Carvajal', 'RB', 'Spain', 'Real Madrid', ['RB', 'RWB'], ['madrid_modern', 'european_winner', 'final_scorer'], 44, 'Wing-Back', 'modern'),
+  P('trent', 'Trent Alexander-Arnold', 'RB', 'England', 'Liverpool', ['RB', 'RWB'], ['liverpool_core', 'premier_league_star', 'european_winner'], 56, 'Inverted Wing-Back', 'modern'),
   P('walker', 'Kyle Walker', 'RB', 'England', 'Man City', ['RB', 'RWB'], ['city_core', 'premier_league_star', 'european_winner'], 40, 'Full-Back', 'modern'),
-  P('hakimi', 'Achraf Hakimi', 'RB', 'Morocco', 'PSG', ['RB', 'RWB', 'RM'], ['psg_star', 'modern_icon'], 48, 'Complete Wing-Back', 'modern'),
-  P('marcelo', 'Marcelo', 'LB', 'Brazil', 'Real Madrid', ['LB', 'LWB', 'LM'], ['madrid_modern', 'european_winner', 'serial_winner'], 60, 'Complete Wing-Back', 'modern'),
-  P('alba', 'Jordi Alba', 'LB', 'Spain', 'Barcelona', ['LB', 'LWB', 'LM'], ['barca_modern', 'european_winner', 'world_cup_winner'], 50, 'Wing-Back', 'modern'),
-  P('robertson', 'Andrew Robertson', 'LB', 'Scotland', 'Liverpool', ['LB', 'LWB', 'LM'], ['liverpool_core', 'premier_league_star', 'european_winner'], 50, 'Wing-Back', 'modern'),
+  P('hakimi', 'Achraf Hakimi', 'RB', 'Morocco', 'PSG', ['RB', 'RWB'], ['psg_star', 'modern_icon'], 48, 'Complete Wing-Back', 'modern'),
+  P('marcelo', 'Marcelo', 'LB', 'Brazil', 'Real Madrid', ['LB', 'LWB'], ['madrid_modern', 'european_winner', 'serial_winner'], 60, 'Complete Wing-Back', 'modern'),
+  P('alba', 'Jordi Alba', 'LB', 'Spain', 'Barcelona', ['LB', 'LWB'], ['barca_modern', 'european_winner', 'world_cup_winner'], 50, 'Wing-Back', 'modern'),
+  P('robertson', 'Andrew Robertson', 'LB', 'Scotland', 'Liverpool', ['LB', 'LWB'], ['liverpool_core', 'premier_league_star', 'european_winner'], 50, 'Wing-Back', 'modern'),
   P('alaba', 'David Alaba', 'CB', 'Austria', 'Real Madrid', ['CB', 'LB'], ['madrid_modern', 'european_winner', 'serial_winner'], 46, 'Ball-Playing Defender', 'modern'),
   P('rudiger', 'Antonio Rüdiger', 'CB', 'Germany', 'Real Madrid', ['CB'], ['madrid_modern', 'european_winner'], 38, 'No-Nonsense Centre-Back', 'modern'),
   P('varane', 'Raphaël Varane', 'CB', 'France', 'Real Madrid', ['CB'], ['madrid_modern', 'world_cup_winner', 'european_winner', 'serial_winner'], 56, 'Central Defender', 'modern'),
@@ -255,6 +374,109 @@ export const PLAYERS = [
   P('mahrez', 'Riyad Mahrez', 'RW', 'Algeria', 'Man City', ['RW'], ['city_core', 'premier_league_star', 'european_winner'], 44, 'Inverted Winger', 'modern'),
   P('foden', 'Phil Foden', 'LW', 'England', 'Man City', ['LW', 'CAM', 'LM'], ['city_core', 'future_legend', 'premier_league_star', 'european_winner'], 56, 'Inside Forward', 'modern'),
 ]
+
+// ---------------------------------------------------------------------------
+// Aura tiers + verified Big Game Scorer set (Phase 2)
+// ---------------------------------------------------------------------------
+// VERIFIED STATS SOURCE POLICY
+// Evidence strings below are limited to widely-documented, uncontested career
+// facts — major honours and famous late-stage European final goals. We do not
+// cite precise per-match statistics, disputed records, or anything that cannot
+// be verified from mainstream football history. "European Cup final" is used as
+// the neutral, historical name for the top continental final (no competition
+// branding is referenced anywhere).
+
+// Three SEPARATE categories — never merged into one list.
+//  • GOAT Tier:        Messi, CR7, Maradona, Pelé           (+6 individual value)
+//  • GOAT Candidate:   Cruyff, Nazário, Zidane, ...         (+4 individual value)
+//  • Aura Icon:        Zlatan only, for now                 (cosmetic Infinity Aura)
+export const GOAT_IDS = new Set(['messi', 'ronaldo', 'maradona', 'pele'])
+export const GOAT_CANDIDATE_IDS = new Set(['cruyff', 'nazario', 'zidane', 'beckenbauer', 'distefano', 'ronaldinho', 'platini'])
+export const AURA_ICON_IDS = new Set(['ibra'])
+
+export function isGoat(p) { return GOAT_IDS.has(p.id) }
+export function isGoatCandidate(p) { return GOAT_CANDIDATE_IDS.has(p.id) }
+// Aura Icon is its own narrow category — Zlatan only. It is NOT the union of the
+// GOAT tiers.
+export function isAuraIcon(p) { return AURA_ICON_IDS.has(p.id) }
+
+// STRICT Big Game Scorer rule: a verified goal scored DURING a top-tier European
+// Cup final or semi-final (open play or in-match). Deliberately rare. Excluded:
+//  • second-tier European finals (e.g. Nazário 1998) — not the top competition
+//  • penalty-shootout conversions (e.g. Shevchenko 2003) — not a match goal
+//  • domestic-cup final goals (e.g. Gündoğan 2023 was an FA Cup, not the European final)
+//  • GOAT status / Ballon d'Or / league goals alone
+// Maradona and Pelé are GOAT Tier but never scored in a top European final, so
+// they are NOT Big Game Scorers.
+export const BIG_GAME_SCORERS = {
+  ronaldo: 'Scored in the 2008 and 2014 European Cup finals.',
+  messi: 'Scored in the 2009 and 2011 European Cup finals.',
+  zidane: 'Scored the winning volley in the 2002 European Cup final.',
+  ramos: 'Scored the 92nd-minute equaliser in the 2014 European Cup final.',
+  raul: 'Scored in the 2000 European Cup final.',
+  maldini: 'Scored the opening goal of the 2005 European Cup final.',
+  bale: 'Scored twice in the 2018 European Cup final.',
+  gerrard: 'Scored in the 2005 European Cup final comeback.',
+  etoo: 'Scored in the 2006 and 2009 European Cup finals.',
+  drogba: 'Scored the late equaliser in the 2012 European Cup final.',
+  inzaghi: 'Scored twice in the 2007 European Cup final.',
+  crespo: 'Scored twice in the 2005 European Cup final.',
+  neymar: 'Scored in the 2015 European Cup final.',
+  distefano: 'Scored in five consecutive European Cup finals (1956–1960).',
+  platini: 'Scored the winning goal in the 1985 European Cup final.',
+  vinicius: 'Scored the winning goal in the 2022 European Cup final.',
+  salah: 'Scored in the 2019 European Cup final.',
+  rodri: 'Scored the winning goal in the 2023 European Cup final.',
+  carvajal: 'Scored in the 2024 European Cup final.',
+}
+export function isBigGameScorer(p) {
+  return Object.prototype.hasOwnProperty.call(BIG_GAME_SCORERS, p.id)
+}
+
+// Special display badges. Infinity Aura is cosmetic (no gameplay bonus); Football
+// Icon is a status that grants Zlatan +2 individual value (see auraIndividual).
+export const SPECIAL_BADGES = {
+  pele: ['3× World Champion'],
+  ibra: ['Infinity Aura', 'Football Icon'],
+}
+
+// Individual aura value added to a player's own value (NOT a team synergy):
+//   GOAT Tier +6 · GOAT Candidate +4 · Football Icon status badge +2.
+// Infinity Aura is cosmetic and adds nothing.
+export function auraIndividual(p) {
+  let pts = 0
+  if (isGoat(p)) pts += 6
+  else if (isGoatCandidate(p)) pts += 4
+  if ((SPECIAL_BADGES[p.id] || []).includes('Football Icon')) pts += 2
+  return pts
+}
+
+export function auraLabel(p) {
+  if (isGoat(p)) return 'GOAT'
+  if (isGoatCandidate(p)) return 'GOAT Candidate'
+  return null
+}
+
+// All badges shown on a player card: aura tier, special badges, big-game scorer.
+export function playerBadges(p) {
+  const badges = []
+  const aura = auraLabel(p)
+  if (aura) badges.push(aura)
+  if (SPECIAL_BADGES[p.id]) badges.push(...SPECIAL_BADGES[p.id])
+  if (isBigGameScorer(p)) badges.push('Big Game Scorer')
+  return badges
+}
+
+// Player Guide text: why this role, and the verified evidence behind it.
+export function roleReasonText(p) {
+  const g = ROLE_GUIDE.find((r) => r.role === p.role)
+  return g ? g.line : ''
+}
+export function roleEvidenceText(p) {
+  if (BIG_GAME_SCORERS[p.id]) return BIG_GAME_SCORERS[p.id]
+  const honours = p.tags.map((t) => TAG_LABELS[t]).filter(Boolean)
+  return honours.length ? honours.join(' · ') : 'Recognised top-level performer.'
+}
 
 // ---------------------------------------------------------------------------
 // Scoring
@@ -315,19 +537,25 @@ const POS_TYPE_NAME = { GK: 'GK', DEF: 'DEF', MID: 'MID', ATT: 'ATT' }
 export function playerPoints(player) {
   const base = BASE_POINTS[player.posType]
   const tagSum = player.tags.reduce((acc, t) => acc + (TAG_POINTS[t] || 0), 0)
-  return base + tagSum
+  return base + tagSum + auraIndividual(player)
 }
 
 // Transparent breakdown for the "Why these points?" card.
 export function playerBreakdown(player) {
   const base = BASE_POINTS[player.posType]
   const traits = player.tags.map((t) => ({ label: TAG_LABELS[t] || t, pts: TAG_POINTS[t] || 0 }))
+  const extras = []
+  if (isGoat(player)) extras.push({ label: 'GOAT Tier', pts: 6 })
+  else if (isGoatCandidate(player)) extras.push({ label: 'GOAT Candidate', pts: 4 })
+  if ((SPECIAL_BADGES[player.id] || []).includes('Football Icon')) extras.push({ label: 'Football Icon', pts: 2 })
   return {
     basePos: POS_TYPE_NAME[player.posType],
     base,
     traits,
+    extras,
     role: player.role,
-    total: base + traits.reduce((a, x) => a + x.pts, 0),
+    secondaryRole: player.secondaryRole,
+    total: base + traits.reduce((a, x) => a + x.pts, 0) + extras.reduce((a, x) => a + x.pts, 0),
   }
 }
 
@@ -373,14 +601,16 @@ export function canPlay(player, slotLabel) {
 // ---------------------------------------------------------------------------
 // Role groups (tactical-role classification used by synergies + simulation)
 // ---------------------------------------------------------------------------
-const FINISHER_ROLES = ['Advanced Forward', 'Poacher', 'Target Forward', 'Pressing Forward', 'Complete Forward', 'Deep-Lying Forward', 'False Nine']
-const WIDE_ATT_ROLES = ['Inside Forward', 'Inverted Winger', 'Winger', 'Raumdeuter', 'Wide Playmaker']
-const ATT_CREATOR_ROLES = ['Attacking Midfielder', 'Trequartista', 'Shadow Striker', 'Advanced Playmaker', 'Roaming Playmaker', 'Wide Playmaker']
-const DEEP_PLAYMAKER_ROLES = ['Deep-Lying Playmaker', 'Regista']
-const BALLWINNER_ROLES = ['Ball-Winning Midfielder', 'Anchor', 'Defensive Midfielder', 'Half Back']
-const COMMANDING_CB_ROLES = ['Central Defender', 'No-Nonsense Centre-Back', 'Libero', 'Ball-Playing Defender']
-const BALLPLAYING_DEF_ROLES = ['Ball-Playing Defender', 'Libero']
-const BIGGAME_TRAITS = ['euro_final_scorer', 'final_scorer', 'big_game_player']
+// Final XI role groups (approved role names) used by synergies + simulation.
+const FINISHER_ROLES = ['Complete Striker', 'Box Finisher', 'Link-Up Striker', 'Big Game Scorer']
+const WIDE_ATT_ROLES = ['Inside Forward', 'Touchline Winger', 'Direct Runner']
+const ATT_CREATOR_ROLES = ['Creative Magician', 'Final Passer']
+const DEEP_PLAYMAKER_ROLES = ['Tempo Controller']
+const BALLWINNER_ROLES = ['Defensive Shield', 'Ball Winner'] // the Defensive Shield group
+const BOX_TO_BOX_ROLES = ['Box-to-Box Engine']
+const COMMANDING_CB_ROLES = ['Defensive Leader', 'Ball-Playing Defender']
+const BALLPLAYING_DEF_ROLES = ['Ball-Playing Defender']
+const FULLBACK_ROLES = ['Attacking Fullback', 'Defensive Fullback']
 
 function inRoles(p, list) {
   return list.includes(p.role)
@@ -398,7 +628,7 @@ export function computeBonuses(squad) {
   const bonuses = []
   const countTag = (tag) => players.filter((p) => p.tags.includes(tag)).length
   const someRole = (list) => players.some((p) => inRoles(p, list))
-  const hasBigGame = players.some((p) => p.tags.some((t) => BIGGAME_TRAITS.includes(t)))
+  const hasBigGame = players.some(isBigGameScorer)
 
   // chemistry (tag) bonuses
   if (countTag('real_madrid_dna') >= 3) bonuses.push({ name: 'Madrid DNA', pts: 10, kind: 'chem' })
@@ -419,14 +649,24 @@ export function computeBonuses(squad) {
   const topClub = Object.entries(clubCounts).find(([, n]) => n >= 4)
   if (topClub) bonuses.push({ name: `Club Spine (${topClub[0]})`, pts: 6, kind: 'chem' })
 
-  // role synergies
-  if (someRole(BALLWINNER_ROLES)) bonuses.push({ name: 'Ball-Winning Core', pts: 4, kind: 'role' })
-  if (someRole(DEEP_PLAYMAKER_ROLES) && someRole(BALLWINNER_ROLES)) bonuses.push({ name: 'Playmaker + Destroyer', pts: 6, kind: 'role' })
-  if (someRole(COMMANDING_CB_ROLES)) bonuses.push({ name: 'Defensive Leader', pts: 4, kind: 'role' })
-  if (hasBigGame) bonuses.push({ name: 'Big-Game Threat', pts: 5, kind: 'role' })
-  if (someRole(ATT_CREATOR_ROLES)) bonuses.push({ name: 'Creative Hub', pts: 4, kind: 'role' })
-  if (someRole(['Sweeper Keeper']) && someRole(BALLPLAYING_DEF_ROLES)) bonuses.push({ name: 'Sweeper Keeper + Ball-Playing CB', pts: 4, kind: 'role' })
+  // role synergies (Final XI language)
+  if (someRole(BALLWINNER_ROLES)) bonuses.push({ name: 'Defensive Shield', pts: 4, kind: 'role' })
+  if (someRole(DEEP_PLAYMAKER_ROLES) && someRole(BALLWINNER_ROLES)) bonuses.push({ name: 'Brain & Engine', pts: 6, kind: 'role' })
+  if (someRole(COMMANDING_CB_ROLES)) bonuses.push({ name: 'Back-Line General', pts: 4, kind: 'role' })
+  if (hasBigGame) bonuses.push({ name: 'Big Game Threat', pts: 5, kind: 'role' })
+  if (someRole(ATT_CREATOR_ROLES)) bonuses.push({ name: 'Creative Spark', pts: 4, kind: 'role' })
+  if (someRole(['Sweeper Keeper']) && someRole(BALLPLAYING_DEF_ROLES)) bonuses.push({ name: 'Modern Build-Up', pts: 4, kind: 'role' })
   if (someRole(FINISHER_ROLES) && someRole(WIDE_ATT_ROLES)) bonuses.push({ name: 'Complete Attack', pts: 5, kind: 'role' })
+
+  // aura team synergies — tightly capped so icons cannot run away with the rating.
+  // GOAT Aura: +3 for one GOAT, +4 for two or more (never above +4).
+  const goatCount = players.filter(isGoat).length
+  if (goatCount >= 2) bonuses.push({ name: 'GOAT Aura', pts: 4, kind: 'aura' })
+  else if (goatCount === 1) bonuses.push({ name: 'GOAT Aura', pts: 3, kind: 'aura' })
+  // Football Icon: +2 if at least one GOAT Candidate (never above +2). GOAT
+  // Candidates do NOT trigger GOAT Aura.
+  if (players.some(isGoatCandidate)) bonuses.push({ name: 'Football Icon', pts: 2, kind: 'aura' })
+  // Infinity Aura (Zlatan) is cosmetic — no team bonus.
 
   // modern-era bonuses
   const modernCount = players.filter((p) => p.era === 'modern').length
@@ -454,13 +694,15 @@ export function computeWeaknesses(squad) {
   const someRole = (list) => players.some((p) => inRoles(p, list))
   const countRole = (list) => players.filter((p) => inRoles(p, list)).length
   const hasTrueST = players.some((p) => p.primaryPos === 'ST')
-  const hasBigGame = players.some((p) => p.tags.some((t) => BIGGAME_TRAITS.includes(t)))
+  const hasBigGame = players.some(isBigGameScorer)
 
   // squad-shape weaknesses
   if (!hasTrueST) weaknesses.push({ name: 'No True Striker', desc: 'No natural No.9 to lead the line.', pts: -8, kind: 'squad' })
 
-  const hasCDM = squad.some((s) => s.slot === 'CDM' && s.player)
-  if (!hasCDM) weaknesses.push({ name: 'No Defensive Shield', desc: 'No holding midfielder screening the defence.', pts: -8, kind: 'squad' })
+  // Defensive Shield is defined by the role system: a Defensive Shield or Ball
+  // Winner in the XI, not merely a CDM slot being filled.
+  const hasShield = players.some((p) => BALLWINNER_ROLES.includes(p.role))
+  if (!hasShield) weaknesses.push({ name: 'No Defensive Shield', desc: 'No holding midfielder screening the defence.', pts: -8, kind: 'squad' })
 
   const gk = players.find((p) => p.posType === 'GK')
   if (gk && !gk.tags.includes('euro_legend') && !gk.tags.includes('serial_winner') && !gk.tags.includes('big_game_player')) {
@@ -556,9 +798,9 @@ export function tacticalIdentity(squad) {
 
   const playmakers = inList(ATT_CREATOR_ROLES) + inList(DEEP_PLAYMAKER_ROLES)
   const wideThreats = inList(WIDE_ATT_ROLES)
-  const bigGame = players.filter((p) => p.tags.some((t) => BIGGAME_TRAITS.includes(t))).length
+  const bigGame = players.filter(isBigGameScorer).length
   const defLeaders = inList(COMMANDING_CB_ROLES)
-  const stoppers = inList(['No-Nonsense Centre-Back'])
+  const stoppers = inList(['Defensive Leader'])
   const strongGK = players.some((p) => p.posType === 'GK' && (p.tags.includes('euro_legend') || p.tags.includes('serial_winner') || p.tags.includes('big_game_player')))
   const stars = players.filter((p) => playerPoints(p) >= 14).length
   const trueST = players.some((p) => p.primaryPos === 'ST')
@@ -620,17 +862,20 @@ export function winProbability(rating, difficulty = 'classic') {
 // ---------------------------------------------------------------------------
 // Cinematic simulation with match reports
 // ---------------------------------------------------------------------------
-function scorerWeight(p) {
+// lateStage = a European Semi-final or Final; only then does the strict Big Game
+// Scorer boost apply, per the verified late-stage rule.
+function scorerWeight(p, lateStage = false) {
   let w
   if (inRoles(p, FINISHER_ROLES)) w = 12
-  else if (p.role === 'Shadow Striker' || p.role === 'Trequartista') w = 8
+  else if (p.role === 'Creative Magician') w = 8
   else if (inRoles(p, WIDE_ATT_ROLES)) w = 9
-  else if (['Attacking Midfielder', 'Advanced Playmaker', 'Roaming Playmaker'].includes(p.role)) w = 5
+  else if (p.role === 'Final Passer') w = 5
+  else if (inRoles(p, BOX_TO_BOX_ROLES)) w = 3.5
   else if (p.posType === 'MID') w = 2.5
   else if (p.posType === 'DEF') w = 0.8
   else if (p.posType === 'GK') w = 0.02
   else w = 4
-  if (p.tags.some((t) => ['euro_final_scorer', 'final_scorer'].includes(t))) w += 4
+  if (isBigGameScorer(p)) { w += 4; if (lateStage) w += 5 } // strict, verified set
   if (p.tags.includes('big_game_player')) w += 2
   if (p.tags.includes('is_messi')) w += 8
   if (p.tags.includes('current_superstar')) w += 2
@@ -641,8 +886,8 @@ function assistWeight(p) {
   let w
   if (inRoles(p, ATT_CREATOR_ROLES) || inRoles(p, DEEP_PLAYMAKER_ROLES)) w = 10
   else if (inRoles(p, WIDE_ATT_ROLES)) w = 6
-  else if (['Box-to-Box Midfielder', 'Mezzala', 'Carrilero'].includes(p.role)) w = 5
-  else if (['Wing-Back', 'Complete Wing-Back', 'Inverted Wing-Back', 'Full-Back'].includes(p.role)) w = 4
+  else if (inRoles(p, BOX_TO_BOX_ROLES)) w = 5
+  else if (inRoles(p, FULLBACK_ROLES)) w = 4
   else if (inRoles(p, FINISHER_ROLES)) w = 3
   else if (p.posType === 'DEF') w = 1.2
   else if (p.posType === 'GK') w = 0.02
@@ -666,7 +911,25 @@ function weightedPick(rng, players, weightFn, excludeId) {
 
 const OPP_GOAL_LABELS = ['Opponent Striker', 'Opponent Winger', 'Opponent Midfielder', 'Set-piece header', 'Long-range strike', 'Counterattack finish']
 
-const shortName = (n) => n.split(' ').slice(-1)[0]
+// Explicit overrides for names where the algorithm can't produce the right
+// short form — e.g. "Cristiano Ronaldo" must be "CR7", not "Ronaldo".
+const SHORT_NAME_OVERRIDES = {
+  'Cristiano Ronaldo': 'CR7',
+}
+
+// Prefix-aware short display name: "Marco van Basten" → "van Basten",
+// "Kevin De Bruyne" → "De Bruyne", "Ángel Di María" → "Di María".
+// Works by walking backwards through name parts and collecting consecutive
+// lowercase-prefix words (van / de / del / di / der / den / le / la).
+export function shortDisplayName(name) {
+  if (SHORT_NAME_OVERRIDES[name]) return SHORT_NAME_OVERRIDES[name]
+  const PREFIXES = new Set(['van', 'de', 'del', 'di', 'der', 'den', 'le', 'la'])
+  const parts = name.split(' ')
+  if (parts.length <= 1) return name
+  let start = parts.length - 1
+  while (start > 0 && PREFIXES.has(parts[start - 1].toLowerCase())) start--
+  return parts.slice(start).join(' ')
+}
 
 export function ordinal(n) {
   const s = ['th', 'st', 'nd', 'rd']
@@ -676,7 +939,7 @@ export function ordinal(n) {
 
 // Build the goal timeline for a single match. `tallies` is a list of tally
 // objects (run-wide + phase-specific) that all get incremented.
-function buildGoals(rng, players, gf, ga, tallies) {
+function buildGoals(rng, players, gf, ga, tallies, lateStage = false) {
   const sides = [...Array(gf).fill('us'), ...Array(ga).fill('opp')]
   const minutes = sides.map(() => 1 + Math.floor(rng() * 90)).sort((a, b) => a - b)
   const shuffledSides = shuffle(sides, rng)
@@ -684,7 +947,7 @@ function buildGoals(rng, players, gf, ga, tallies) {
   for (let i = 0; i < minutes.length; i++) {
     const minute = minutes[i]
     if (shuffledSides[i] === 'us') {
-      const scorer = weightedPick(rng, players, scorerWeight)
+      const scorer = weightedPick(rng, players, (pp) => scorerWeight(pp, lateStage))
       const assistMaybe = rng() < 0.78 ? weightedPick(rng, players.filter((p) => p.posType !== 'GK'), assistWeight, scorer ? scorer.id : null) : null
       if (scorer) tallies.forEach((t) => { t.goals[scorer.id] = (t.goals[scorer.id] || 0) + 1 })
       if (assistMaybe) tallies.forEach((t) => { t.assists[assistMaybe.id] = (t.assists[assistMaybe.id] || 0) + 1 })
@@ -720,8 +983,12 @@ function topEntry(map, byId, key) {
 
 // A single decisive match (used for the Knockout Play-Off + every knockout
 // round). Returns the match object with an `eliminated` flag.
-function decisiveMatch(rng, p, rating, players, tallies, round) {
-  const opponent = OPPONENTS[Math.floor(rng() * OPPONENTS.length)]
+// usedOpponents (Set) ensures no team appears in two different KO rounds.
+function decisiveMatch(rng, p, rating, players, tallies, round, usedOpponents) {
+  const available = OPPONENTS.filter(o => !usedOpponents.has(o))
+  const pool = available.length > 0 ? available : OPPONENTS
+  const opponent = pool[Math.floor(rng() * pool.length)]
+  usedOpponents.add(opponent)
   const roll = rng()
   let result, mgf, mga, pens = null, eliminated = false
 
@@ -742,7 +1009,8 @@ function decisiveMatch(rng, p, rating, players, tallies, round) {
     eliminated = true
   }
 
-  const events = buildGoals(rng, players, mgf, mga, tallies)
+  const lateStage = round === 'Semi-final' || round === 'Final'
+  const events = buildGoals(rng, players, mgf, mga, tallies, lateStage)
   const stats = matchStats(rng, rating, mgf, players, events)
   const normalScore = `${mgf}-${mga}`
   const score = pens ? `${normalScore} (pens ${pens.score})` : normalScore
@@ -811,8 +1079,11 @@ export function simulate({ rating, difficulty = 'classic', squad, rng = Math.ran
   let exitStage = 'League Phase'
   const knockouts = []
 
+  // One Set for the entire run — guarantees every KO-round opponent is unique.
+  const usedKOOpponents = new Set()
+
   if (qualification === 'playoff') {
-    playoff = decisiveMatch(rng, p, rating, players, [tally], 'Knockout Play-Off')
+    playoff = decisiveMatch(rng, p, rating, players, [tally], 'Knockout Play-Off', usedKOOpponents)
     allMatches.push(playoff)
     if (playoff.eliminated) { eliminated = true; exitStage = 'Knockout Play-Off' }
   }
@@ -821,7 +1092,7 @@ export function simulate({ rating, difficulty = 'classic', squad, rng = Math.ran
   if (advancedToKO) {
     for (const round of ['Round of 16', 'Quarter-final', 'Semi-final', 'Final']) {
       if (eliminated) break
-      const m = decisiveMatch(rng, p, rating, players, [tally], round)
+      const m = decisiveMatch(rng, p, rating, players, [tally], round, usedKOOpponents)
       knockouts.push(m)
       allMatches.push(m)
       if (m.eliminated) { eliminated = true; exitStage = round }
@@ -870,15 +1141,24 @@ function bestWin(matches) {
 export function validatePlayerDB() {
   const problems = []
   const seen = new Set()
+  const ROLE_SET = new Set(ROLE_GUIDE.map((g) => g.role))
   for (const p of PLAYERS) {
     if (seen.has(p.id)) problems.push(`Duplicate id: ${p.id}`)
     seen.add(p.id)
+    // role + secondaryRole must be exactly approved Final XI roles
     if (!p.role) problems.push(`${p.id} missing role`)
+    else if (!ROLE_SET.has(p.role)) problems.push(`${p.id} role "${p.role}" not in approved list`)
+    if (p.secondaryRole && !ROLE_SET.has(p.secondaryRole)) problems.push(`${p.id} secondaryRole "${p.secondaryRole}" not in approved list`)
+    // a player labelled Big Game Scorer must actually be in the verified set
+    if ((p.role === 'Big Game Scorer' || p.secondaryRole === 'Big Game Scorer') && !isBigGameScorer(p)) {
+      problems.push(`${p.id} tagged Big Game Scorer without verified evidence`)
+    }
     if (!Array.isArray(p.eligibleSlots) || p.eligibleSlots.length === 0) problems.push(`${p.id} has no eligibleSlots`)
     if (!p.eligibleSlots.includes(p.primaryPos)) problems.push(`${p.id} primaryPos ${p.primaryPos} not in eligibleSlots`)
     for (const s of p.eligibleSlots) if (!ALL_SLOT_LABELS.includes(s)) problems.push(`${p.id} invalid slot ${s}`)
     if (!posTypeOf(p.primaryPos)) problems.push(`${p.id} bad primaryPos`)
   }
+
   // ensure every formation slot has >=3 eligible players in both pools
   for (const f of Object.values(FORMATIONS)) {
     for (const pool of ['legends', 'modern']) {
@@ -888,6 +1168,37 @@ export function validatePlayerDB() {
       }
     }
   }
+
+  // --- aura / GOAT-tier rules ---------------------------------------------
+  const byId = Object.fromEntries(PLAYERS.map((p) => [p.id, p]))
+  const mk = (ids) => ids.map((id) => ({ slot: byId[id]?.primaryPos, player: byId[id] })).filter((s) => s.player)
+  const auraPts = (squad, name) => (computeBonuses(squad).find((b) => b.name === name)?.pts || 0)
+
+  // Only Messi/CR7/Maradona/Pelé are GOAT Tier
+  const expectedGoats = ['messi', 'ronaldo', 'maradona', 'pele']
+  if (GOAT_IDS.size !== expectedGoats.length || !expectedGoats.every((id) => GOAT_IDS.has(id))) {
+    problems.push('GOAT_IDS must be exactly Messi, CR7, Maradona, Pelé')
+  }
+  // Zlatan must be neither GOAT Tier nor GOAT Candidate
+  if (isGoat(byId.ibra) || isGoatCandidate(byId.ibra)) problems.push('Zlatan must not be GOAT Tier or GOAT Candidate')
+  // Aura Icon list must be Zlatan only
+  if (AURA_ICON_IDS.size !== 1 || !AURA_ICON_IDS.has('ibra')) problems.push('Aura Icon list must be Zlatan only for now')
+  // GOAT Aura must never exceed +4 (test with all four GOATs)
+  if (auraPts(mk(expectedGoats), 'GOAT Aura') > 4) problems.push('GOAT Aura exceeds +4')
+  // GOAT Candidates must NOT trigger GOAT Aura
+  if (auraPts(mk([...GOAT_CANDIDATE_IDS]), 'GOAT Aura') > 0) problems.push('GOAT Candidates must not trigger GOAT Aura')
+  // Football Icon team synergy must never exceed +2
+  if (auraPts(mk([...GOAT_CANDIDATE_IDS]), 'Football Icon') > 2) problems.push('Football Icon synergy exceeds +2')
+  // Infinity Aura must give no gameplay team bonus (or at most +1)
+  if (auraPts(mk(['ibra']), 'Infinity Aura') > 1) problems.push('Infinity Aura must not give a gameplay bonus above +1')
+
+  // --- Big Game Scorer evidence quality -----------------------------------
+  for (const [id, ev] of Object.entries(BIG_GAME_SCORERS)) {
+    const low = ev.toLowerCase()
+    if (low.includes('shootout')) problems.push(`Big Game Scorer ${id} evidence references a penalty shootout`)
+    if (low.includes('second-tier') || low.includes('uefa cup')) problems.push(`Big Game Scorer ${id} evidence references a second-tier final`)
+  }
+
   return problems
 }
 
