@@ -1,7 +1,7 @@
 // Frontend-only share helpers: viral copy text + a text-only PNG share card.
 // No images, logos, badges, photos, or banned competition wording.
 
-import { shortDisplayName } from './data'
+import { squadDisplayName } from './data'
 
 // Common shape used by both the copy text and the PNG card.
 function ordinal(n) {
@@ -29,6 +29,7 @@ export function buildShareData({
   bestLegend,
   topScorer,
   topAssister,
+  squadNames = new Set(),
 }) {
   return {
     champion: result.champion,
@@ -40,10 +41,10 @@ export function buildShareData({
     rating: total,
     winPct,
     identity: config.identity,
-    mvp: mvp ? mvp.name : '—',
-    topScorer: topScorer ? `${shortDisplayName(topScorer.name)}, ${topScorer.goals} goals` : '—',
-    topAssister: topAssister ? `${shortDisplayName(topAssister.name)}, ${topAssister.assists} assists` : '—',
-    smart: smart ? `${shortDisplayName(smart.name)}, ${smart.rarity}% pick rate` : '—',
+    mvp: mvp ? squadDisplayName(mvp.name, squadNames) : '—',
+    topScorer: topScorer ? `${squadDisplayName(topScorer.name, squadNames)}, ${topScorer.goals} goals` : '—',
+    topAssister: topAssister ? `${squadDisplayName(topAssister.name, squadNames)}, ${topAssister.assists} assists` : '—',
+    smart: smart ? `${squadDisplayName(smart.name, squadNames)}, ${smart.rarity}% pick rate` : '—',
     bestBonus: best ? `${best.name} (+${best.pts})` : 'None',
     keyWeakness: weak ? weak.name : 'None',
     rerolls: `${rerollsUsed}/${totalRerolls}`,

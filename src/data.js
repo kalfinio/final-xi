@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 const POS_TYPE = {
   GK: 'GK',
-  RB: 'DEF', LB: 'DEF', CB: 'DEF', RWB: 'DEF', LWB: 'DEF',
+  RB: 'DEF', LB: 'DEF', CB: 'DEF', RWB: 'MID', LWB: 'MID',
   CDM: 'MID', CM: 'MID', CAM: 'MID', RM: 'MID', LM: 'MID',
   RW: 'ATT', LW: 'ATT', ST: 'ATT',
 }
@@ -83,7 +83,7 @@ export const FORMATIONS = {
   },
   '3-5-2': {
     name: '3-5-2',
-    slots: ['GK', 'CB', 'CB', 'CB', 'RWB', 'CM', 'CM', 'LWB', 'CDM', 'ST', 'ST'],
+    slots: ['GK', 'CB', 'CB', 'CB', 'LWB', 'CM', 'CDM', 'CM', 'RWB', 'ST', 'ST'],
   },
   '5-3-2': {
     name: '5-3-2',
@@ -114,8 +114,12 @@ export const ROLE_GUIDE = [
   // Defence
   { role: 'Defensive Leader', group: 'Defence', line: 'Marshals the back line — wins headers, blocks shots and organises everyone.' },
   { role: 'Ball-Playing Defender', group: 'Defence', line: 'A defender comfortable stepping out and building play from the back.' },
-  { role: 'Attacking Fullback', group: 'Defence', line: 'A flying wide defender who overlaps and delivers from the byline.' },
-  { role: 'Defensive Fullback', group: 'Defence', line: 'A disciplined wide defender who shuts down the flank first.' },
+  { role: 'Attacking Fullback', group: 'Defence', line: 'An aggressive wide defender who overlaps and gives attacking width.' },
+  { role: 'Balanced Fullback', group: 'Defence', line: 'A complete side defender who protects the flank and supports attacks.' },
+  { role: 'Defensive Fullback', group: 'Defence', line: 'A disciplined side defender who shuts down the flank first.' },
+  { role: 'Attacking Wingback', group: 'Defence', line: 'A wing-back who drives high up the touchline and creates width.' },
+  { role: 'Balanced Wingback', group: 'Defence', line: 'A wing-back who gives width while still recovering defensively.' },
+  { role: 'Defensive Wingback', group: 'Defence', line: 'A wing-back who plays wide but prioritizes defensive security.' },
   // Midfield
   { role: 'Defensive Shield', group: 'Midfield', line: 'The screen in front of the defence — protects the back line and recycles the ball.' },
   { role: 'Ball Winner', group: 'Midfield', line: 'A relentless tackler who hunts the ball and breaks up play.' },
@@ -199,7 +203,11 @@ const ROLE_OVERRIDES = {
   kante: { role: 'Ball Winner' },
   // Defence / attack corrections
   cafu: { role: 'Attacking Fullback' },
-  lahm: { role: 'Defensive Fullback' },
+  lahm: { role: 'Balanced Fullback' },
+  zanetti: { role: 'Balanced Fullback' },
+  carvajal: { role: 'Balanced Fullback' },
+  walker: { role: 'Balanced Fullback' },
+  robertson: { role: 'Balanced Fullback' },
   vanbasten: { role: 'Complete Striker' },
   ibra: { role: 'Complete Striker', secondaryRole: 'Box Finisher' },
 }
@@ -610,7 +618,7 @@ const BALLWINNER_ROLES = ['Defensive Shield', 'Ball Winner'] // the Defensive Sh
 const BOX_TO_BOX_ROLES = ['Box-to-Box Engine']
 const COMMANDING_CB_ROLES = ['Defensive Leader', 'Ball-Playing Defender']
 const BALLPLAYING_DEF_ROLES = ['Ball-Playing Defender']
-const FULLBACK_ROLES = ['Attacking Fullback', 'Defensive Fullback']
+const FULLBACK_ROLES = ['Attacking Fullback', 'Balanced Fullback', 'Defensive Fullback']
 
 function inRoles(p, list) {
   return list.includes(p.role)
@@ -888,9 +896,16 @@ const SIM = {
     'Knockout Play-Off': 0.00,
     'Round of 16': 0.03,
     'Quarter-final': 0.06,
-    'Semi-final': 0.09,
-    'Final': 0.12,
+    'Semi-final': 0.10,
+    'Final': 0.14,
   },
+  // League Phase seeding advantage — a higher finish earns an easier early
+  // knockout path (mainly the Round of 16), fading by the Quarter-final and
+  // gone by the Semi-final so the Final stays hard. Play-Off route can carry a
+  // small edge (9th–16th) or extra pressure (17th–24th).
+  SEED_R16: { top4: 0.07, top8: 0.045 },
+  SEED_QF: { top4: 0.03, top8: 0.01 },
+  SEED_PLAYOFF: { mid: 0.01, low: -0.02 }, // 9th–16th vs 17th–24th
   // League Phase position model (lower position number = better finish)
   LEAGUE_DRAW_BAND: 0.22,
   LEAGUE_POS_POINTS: 1.25,
@@ -993,21 +1008,61 @@ const OPP_GOAL_LABELS = ['Opponent Striker', 'Opponent Winger', 'Opponent Midfie
 // Explicit overrides for names where the algorithm can't produce the right
 // short form — e.g. "Cristiano Ronaldo" must be "CR7", not "Ronaldo".
 const SHORT_NAME_OVERRIDES = {
-  'Cristiano Ronaldo': 'CR7',
+  'Vinícius Jr': 'Vini Jr',
+  'Neymar Jr': 'Neymar Jr',
 }
+
+// Words that are suffixes, not surnames. If the algorithm produces one of
+// these alone it must walk back to include the preceding word instead.
+const _SUFFIXES = new Set(['jr', 'jr.', 'junior', 'júnior', 'filho', 'neto'])
+const _PREFIXES = new Set(['van', 'de', 'del', 'di', 'der', 'den', 'le', 'la'])
 
 // Prefix-aware short display name: "Marco van Basten" → "van Basten",
 // "Kevin De Bruyne" → "De Bruyne", "Ángel Di María" → "Di María".
 // Works by walking backwards through name parts and collecting consecutive
 // lowercase-prefix words (van / de / del / di / der / den / le / la).
+// Also guards against bare suffixes: "Vinícius Jr" → "Vini Jr" (via override),
+// and any unknown "X Jr" → "X Jr" rather than just "Jr".
 export function shortDisplayName(name) {
   if (SHORT_NAME_OVERRIDES[name]) return SHORT_NAME_OVERRIDES[name]
-  const PREFIXES = new Set(['van', 'de', 'del', 'di', 'der', 'den', 'le', 'la'])
   const parts = name.split(' ')
   if (parts.length <= 1) return name
   let start = parts.length - 1
-  while (start > 0 && PREFIXES.has(parts[start - 1].toLowerCase())) start--
-  return parts.slice(start).join(' ')
+  while (start > 0 && _PREFIXES.has(parts[start - 1].toLowerCase())) start--
+  const short = parts.slice(start).join(' ')
+  // If we ended up with only a suffix word, include the preceding word too.
+  if (_SUFFIXES.has(short.toLowerCase()) && start > 0) {
+    return parts.slice(start - 1).join(' ')
+  }
+  return short
+}
+
+// Slot-aware role label: fullbacks become wingback labels in RWB/LWB slots.
+// All other roles are returned unchanged.
+const _SIDE_BACK_STYLES = {
+  'Attacking Fullback': 'attacking',
+  'Balanced Fullback': 'balanced',
+  'Defensive Fullback': 'defensive',
+}
+const _WB_LABELS = {
+  attacking: 'Attacking Wingback',
+  balanced: 'Balanced Wingback',
+  defensive: 'Defensive Wingback',
+}
+export function slotAwareRole(player, slot) {
+  const style = _SIDE_BACK_STYLES[player.role]
+  if (!style) return player.role
+  return (slot === 'RWB' || slot === 'LWB') ? _WB_LABELS[style] : player.role
+}
+
+// Context-aware display: uses CR7/R9 only when both Ronaldos are in the same
+// finalized XI. Pass a Set<string> of player.name values for the squad.
+export function squadDisplayName(name, squadNames) {
+  if (squadNames.has('Cristiano Ronaldo') && squadNames.has('Ronaldo Nazário')) {
+    if (name === 'Cristiano Ronaldo') return 'CR7'
+    if (name === 'Ronaldo Nazário') return 'R9'
+  }
+  return shortDisplayName(name)
 }
 
 export function ordinal(n) {
@@ -1060,16 +1115,28 @@ function topEntry(map, byId, key) {
   return e ? { name: byId[e[0]].name, [key]: e[1] } : null
 }
 
+// League Phase finish → per-round seeding bonus. A top finish earns an easier
+// early path; the advantage fades by the Quarter-final and is gone from the
+// Semi-final onward so the Final stays hard.
+export function leagueSeedBonus(position, round) {
+  if (round === 'Knockout Play-Off') return position <= 16 ? SIM.SEED_PLAYOFF.mid : SIM.SEED_PLAYOFF.low
+  if (round === 'Round of 16') return position <= 4 ? SIM.SEED_R16.top4 : position <= 8 ? SIM.SEED_R16.top8 : 0
+  if (round === 'Quarter-final') return position <= 4 ? SIM.SEED_QF.top4 : position <= 8 ? SIM.SEED_QF.top8 : 0
+  return 0 // Semi-final / Final: no seeding bonus
+}
+
 // A single decisive match (used for the Knockout Play-Off + every knockout
 // round). Returns the match object with an `eliminated` flag.
 // usedOpponents (Set) ensures no team appears in two different KO rounds.
-function decisiveMatch(rng, baseProb, rating, players, tallies, round, usedOpponents) {
+// position = League Phase finish, used for the seeding advantage.
+function decisiveMatch(rng, baseProb, rating, players, tallies, round, usedOpponents, position) {
   const available = OPPONENTS.filter(o => !usedOpponents.has(o))
   const pool = available.length > 0 ? available : OPPONENTS
   const opponent = pool[Math.floor(rng() * pool.length)]
   usedOpponents.add(opponent)
-  // Opponent pressure rises each round; the Final is the hardest match.
-  const p = clamp(baseProb - (SIM.ROUND_PRESSURE[round] ?? 0), SIM.KO_PR_FLOOR, SIM.KO_PR_CEIL)
+  // Opponent pressure rises each round; the Final is the hardest match. A strong
+  // League Phase finish softens the early rounds via leagueSeedBonus.
+  const p = clamp(baseProb - (SIM.ROUND_PRESSURE[round] ?? 0) + leagueSeedBonus(position, round), SIM.KO_PR_FLOOR, SIM.KO_PR_CEIL)
   const roll = rng()
   let result, mgf, mga, pens = null, eliminated = false
 
@@ -1104,6 +1171,11 @@ export function outcomeLabel(result) {
   if (result.exitStage === 'Final') return 'Lost Final'
   if (result.exitStage === 'League Phase') return 'Eliminated in League Phase'
   if (result.exitStage === 'Knockout Play-Off') return 'Eliminated in Knockout Play-Off'
+  // A top-4 seed going out in the Round of 16 is an upset, not a normal exit.
+  const pos = result.leaguePhase?.position
+  if (result.exitStage === 'Round of 16' && pos && pos <= 4) {
+    return `Shock exit after finishing ${ordinal(pos)}`
+  }
   return `Eliminated in ${result.exitStage}`
 }
 
@@ -1165,7 +1237,7 @@ export function simulate({ rating, difficulty = 'classic', squad, rng = Math.ran
   const usedKOOpponents = new Set()
 
   if (qualification === 'playoff') {
-    playoff = decisiveMatch(rng, p, rating, players, [tally], 'Knockout Play-Off', usedKOOpponents)
+    playoff = decisiveMatch(rng, p, rating, players, [tally], 'Knockout Play-Off', usedKOOpponents, position)
     allMatches.push(playoff)
     if (playoff.eliminated) { eliminated = true; exitStage = 'Knockout Play-Off' }
   }
@@ -1174,7 +1246,7 @@ export function simulate({ rating, difficulty = 'classic', squad, rng = Math.ran
   if (advancedToKO) {
     for (const round of ['Round of 16', 'Quarter-final', 'Semi-final', 'Final']) {
       if (eliminated) break
-      const m = decisiveMatch(rng, p, rating, players, [tally], round, usedKOOpponents)
+      const m = decisiveMatch(rng, p, rating, players, [tally], round, usedKOOpponents, position)
       knockouts.push(m)
       allMatches.push(m)
       if (m.eliminated) { eliminated = true; exitStage = round }

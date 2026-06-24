@@ -60,3 +60,36 @@ for (const [name, squad] of Object.entries(SQUADS)) {
   }
   console.log('')
 }
+
+// --- Seeding test: R16 exit rate bucketed by actual League Phase finish -------
+// Pools runs from squads that finish across the table so each band is populated.
+const SEED_SQUADS = [SQUADS['strong balanced'], SQUADS['GOAT-heavy'], SQUADS['medium'], SQUADS['defensive']]
+const BANDS = [['1st–4th', 1, 4], ['5th–8th', 5, 8], ['9th–16th (PO)', 9, 16], ['17th–24th (PO)', 17, 24]]
+console.log('=== Seeding: R16 exit rate by League finish ===')
+for (const d of DIFFS) {
+  const bucket = BANDS.map(() => ({ n: 0, reachedR16: 0, r16Exit: 0, champ: 0 }))
+  for (const squad of SEED_SQUADS) {
+    const { total } = computeRating(squad)
+    for (let seed = 1; seed <= N; seed++) {
+      const r = simulate({ rating: total, difficulty: d, squad, rng: makeRng(seed * 40503 + 7) })
+      const pos = r.leaguePhase.position
+      const bi = BANDS.findIndex(([, lo, hi]) => pos >= lo && pos <= hi)
+      if (bi < 0) continue
+      const b = bucket[bi]
+      b.n++
+      if (r.champion) b.champ++
+      const reachedR16 = r.knockouts.length > 0 // played at least the R16
+      if (reachedR16) {
+        b.reachedR16++
+        if (r.exitStage === 'Round of 16') b.r16Exit++
+      }
+    }
+  }
+  console.log(`  ${d}:`)
+  BANDS.forEach(([label], i) => {
+    const b = bucket[i]
+    const rate = b.reachedR16 ? (b.r16Exit / b.reachedR16 * 100).toFixed(1) + '%' : '—'
+    const champ = b.n ? (b.champ / b.n * 100).toFixed(1) + '%' : '—'
+    console.log(`    ${label.padEnd(15)} n=${String(b.n).padStart(4)} | reachedR16 ${String(b.reachedR16).padStart(4)} | R16 exit ${rate.padStart(6)} | champ ${champ.padStart(6)}`)
+  })
+}
