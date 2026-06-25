@@ -306,11 +306,11 @@ function ToggleBtn({ open, onClick, children }) {
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
-export default function MatchCenter({ squad, feature, onFinish, teamName = 'Final XI' }) {
+export default function MatchCenter({ squad, feature, onFinish, teamName = 'Final XI', tactics = null }) {
   const players = useMemo(() => squad.map((s) => s.player).filter(Boolean), [squad])
   const timeline = useMemo(
-    () => buildMatchTimeline(feature.match, players, feature.stageLabel, teamName),
-    [feature, players, teamName],
+    () => buildMatchTimeline(feature.match, players, feature.stageLabel, teamName, tactics),
+    [feature, players, teamName, tactics],
   )
 
   const homeDots = useMemo(() => layoutHome(players), [players])
@@ -372,6 +372,9 @@ export default function MatchCenter({ squad, feature, onFinish, teamName = 'Fina
   const keyPlayer = timeline.potm ? shortDisplayName(timeline.potm) : null
   const oppStyle = timeline.opponentMeta ? `${timeline.away} are ${timeline.opponentMeta.style}` : null
   const verdictLine = matchVerdict(timeline)
+  // Rotate through the XI's tactical commentary as the clock advances.
+  const tacticalNotes = tactics?.liveNotes || []
+  const tacticalNote = tacticalNotes.length ? tacticalNotes[Math.floor(displayed / 18) % tacticalNotes.length] : null
 
   function restart() {
     setIdx(-1); setFinished(false); setDisplayed(0); setPlaying(true)
@@ -386,7 +389,8 @@ export default function MatchCenter({ squad, feature, onFinish, teamName = 'Fina
 
       <Scoreboard home={timeline.home} away={timeline.away} hg={hg} ag={ag} minute={displayed} stageLabel={timeline.stageLabel} finished={finished} />
 
-      {oppStyle && <p className="text-center text-[11px] text-secondary -mt-1.5 mb-3">{oppStyle}.</p>}
+      {oppStyle && <p className="text-center text-[11px] text-secondary -mt-1.5 mb-1">{oppStyle}.</p>}
+      {!finished && tacticalNote && <p className="text-center text-[11px] text-gold/75 mb-3">{tacticalNote}</p>}
 
       <Pitch homeDots={homeDots} awayDots={awayDots} ball={ball} pathPts={pathPts} active={active} activeDot={activeDot} flashKey={idx} />
 
@@ -427,6 +431,7 @@ export default function MatchCenter({ squad, feature, onFinish, teamName = 'Fina
               {timeline.pens && <span className="block text-xs mt-0.5">Penalty shootout: {timeline.pens.score} — {timeline.pens.won ? 'won' : 'lost'}</span>}
             </div>
             {verdictLine && <div className="text-base font-black text-gold tracking-tight mt-1">“{verdictLine}”</div>}
+            {tactics?.postNote && <div className="text-[11px] text-gold/70 mt-1 px-2">{tactics.postNote}</div>}
             {keyPlayer && <div className="text-[11px] text-secondary mt-0.5">Key player: <span className="text-primary font-semibold">{keyPlayer}</span></div>}
           </div>
 

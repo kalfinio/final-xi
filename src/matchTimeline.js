@@ -19,12 +19,13 @@ const OPP_LABELS = ['their striker', 'their winger', 'their forward', 'their pla
 
 // Turn a finished match object into a visual timeline.
 // `players` is the user's XI (array of player objects) for home flavour names.
-export function buildMatchTimeline(match, players, stageLabel = '', teamName = 'Final XI') {
+export function buildMatchTimeline(match, players, stageLabel = '', teamName = 'Final XI', tactics = null) {
   if (!match) return null
   const gf = match.gf ?? 0
   const ga = match.ga ?? 0
   const opponent = match.opponent || 'Opponent'
   const oppMeta = match.opponentMeta || null
+  const tf = tactics?.flags || {} // tactical flags → light, capped flavour only
   const squadNames = new Set(players.map((p) => p.name))
   const homeName = (n) => squadDisplayName(n, squadNames)
 
@@ -45,6 +46,8 @@ export function buildMatchTimeline(match, players, stageLabel = '', teamName = '
     const scorer = home ? homeName(e.scorer) : (e.scorer || 'their forward')
     const assister = home && e.assist ? homeName(e.assist) : null
     const lbl = e.label ? ` ${e.label}` : ''
+    // Big Game Scorer side → a touch of late-drama wording on late home goals.
+    const lateDrama = home && tf.bigGame && e.minute >= 75 ? ' — the big-game man delivers' : ''
     return {
       minute: e.minute,
       type: 'goal',
@@ -55,7 +58,7 @@ export function buildMatchTimeline(match, players, stageLabel = '', teamName = '
       assister,
       title: 'GOAL',
       description: home
-        ? (assister ? `${scorer} scores${lbl} — assist ${assister}` : `${scorer} scores${lbl} for ${teamName}`)
+        ? (assister ? `${scorer} scores${lbl} — assist ${assister}${lateDrama}` : `${scorer} scores${lbl} for ${teamName}${lateDrama}`)
         : `${scorer} scores for ${opponent}`,
       pitchZone: 'box',
     }
@@ -72,11 +75,14 @@ export function buildMatchTimeline(match, players, stageLabel = '', teamName = '
     const m = 3 + Math.floor(rng() * 88); used.add(m); return m
   }
 
+  // Base filler mix, nudged a little by the XI's tactical profile (capped: an
+  // attack-heavy/creative shape produces more chances/tempo events). This only
+  // shapes the *flavour* of filler events — never goals, score, or win odds.
   const TYPES = [
     { type: 'shot', w: 30 },
     { type: 'save', w: 24 },
-    { type: 'chance', w: 22 },
-    { type: 'momentum', w: 14 },
+    { type: 'chance', w: 22 + (tf.inPossStrong ? 6 : 0) + (tf.creators ? 4 : 0) },
+    { type: 'momentum', w: 14 + (tf.tempoControl ? 4 : 0) + (tf.inPossStrong ? 3 : 0) },
     { type: 'card', w: 7 },
     { type: 'substitution', w: 3 },
   ]
@@ -93,8 +99,13 @@ export function buildMatchTimeline(match, players, stageLabel = '', teamName = '
     let type = rollType()
     if (type === 'card' && cardGiven) type = 'shot'       // at most one booking
     if (type === 'substitution' && subGiven) type = 'chance' // at most one sub
+    // A compact, shielded XI concedes fewer clear opponent chances — some away
+    // shots/chances fizzle into a stalled attack instead.
     const home = rng() < 0.58 // tilt the visuals toward the user's team
     const team = home ? 'home' : 'away'
+    if (!home && (tf.outPossStrong || tf.defensiveShield) && (type === 'shot' || type === 'chance') && rng() < 0.5) {
+      type = 'momentum'
+    }
     const who = home ? homeAttacker() : awayAttacker()
     const minute = freeMinute()
     let ev
@@ -116,18 +127,31 @@ export function buildMatchTimeline(match, players, stageLabel = '', teamName = '
         pitchZone: 'box',
       }
     } else if (type === 'chance') {
+      // Tactical flavour: attacking fullbacks overload the wing; creators thread
+      // key passes; exposed XIs concede chances between the lines.
+      let homeDesc = `${who} carves out an opening`
+      if (tf.attackingFB && rng() < 0.5) homeDesc = `${who} overlaps and whips in a cross`
+      else if (tf.creators && rng() < 0.5) homeDesc = `${who} is slipped in by a clever key pass`
+      const awayDesc = tf.exposed && rng() < 0.5 ? `${opponent} find space in behind the fullbacks` : `${opponent} work a chance through ${who}`
       ev = {
         type, team, onTarget: false, countsShot: false,
         title: 'Chance created',
-        description: home ? `${who} carves out an opening` : `${opponent} work a chance through ${who}`,
-        pitchZone: pick(['rightMidfield', 'center', 'rightAttack']),
+        description: home ? homeDesc : awayDesc,
+        pitchZone: tf.attackingFB && home ? pick(['rightAttack', 'rightMidfield']) : pick(['rightMidfield', 'center', 'rightAttack']),
       }
     } else if (type === 'momentum') {
-      // Away momentum references the opponent's playing style when known.
+      // Home momentum reflects control style; away references opponent style or
+      // (if the XI is exposed) gaps opening up between the lines.
+      let homeDesc = `${teamName} seize control of the tempo`
+      if (tf.tempoControl && rng() < 0.6) homeDesc = `${teamName} are controlling possession through midfield`
+      else if (tf.attackingFB && rng() < 0.4) homeDesc = `${teamName} are overloading the final third out wide`
+      const awayDesc = tf.exposed && rng() < 0.45
+        ? `${opponent} are finding gaps between midfield and defense`
+        : (oppMeta ? `${opponent} are ${oppMeta.style}` : `${opponent} push for a foothold`)
       ev = {
         type, team, onTarget: false, countsShot: false,
         title: 'Momentum shift',
-        description: home ? `${teamName} seize control of the tempo` : (oppMeta ? `${opponent} are ${oppMeta.style}` : `${opponent} push for a foothold`),
+        description: home ? homeDesc : awayDesc,
         pitchZone: 'center',
       }
     } else if (type === 'card') {

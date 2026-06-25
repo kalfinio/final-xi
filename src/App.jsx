@@ -46,7 +46,9 @@ import {
 } from './data'
 import { buildShareData, buildShareText, downloadShareCard } from './share'
 import { pickFeatureMatch } from './matchTimeline'
+import { buildTactics } from './tactics'
 import MatchCenter from './MatchCenter'
+import TacticalPitch from './TacticalPitch'
 
 const TOTAL_REROLLS = 3
 
@@ -560,6 +562,7 @@ function BonusesScreen({ squad, config, rerollsUsed, onSimulate, initialTeamName
   const { base, bonusTotal, total, bonuses, weaknesses } = computeRating(squad)
   const identity = tacticalIdentity(squad)
   const [howOpen, setHowOpen] = useState(false)
+  const [tacticsOpen, setTacticsOpen] = useState(false)
   const [teamName, setTeamName] = useState(initialTeamName || DEFAULT_TEAM_NAME)
   const outlook = knockoutOutlook(squad, config.difficulty)
 
@@ -587,6 +590,16 @@ function BonusesScreen({ squad, config, rerollsUsed, onSimulate, initialTeamName
           <div><span className="text-primary font-semibold">Weakness Penalties</span> = squad balance problems</div>
           <div><span className="text-primary font-semibold">Final Rating</span> = player value + bonuses + role synergies − weaknesses</div>
           <div className="text-gold/80">A higher Final Rating lifts your odds — but pressure rises every round and the Final is the hardest match.</div>
+        </div>
+      )}
+
+      <button onClick={() => setTacticsOpen((o) => !o)} className="w-full flex items-center justify-between p-3 rounded-lg border border-border bg-surface text-left mb-6">
+        <span className="text-sm font-semibold">{tacticsOpen ? 'Hide Tactical Breakdown' : 'Show Tactical Breakdown'}</span>
+        <span className="text-secondary text-sm">{tacticsOpen ? '−' : '+'}</span>
+      </button>
+      {tacticsOpen && (
+        <div className="-mt-4 mb-6">
+          <TacticalPitch squad={squad} formation={config.formation} />
         </div>
       )}
 
@@ -734,7 +747,7 @@ function LeaguePhaseCard({ lp, squadNames }) {
   )
 }
 
-function SimulationScreen({ result, onFinish, squadNames, teamName }) {
+function SimulationScreen({ result, onFinish, squadNames, teamName, tactics }) {
   // Ordered stages: league summary → (play-off) → knockout rounds
   const stages = [{ kind: 'league', data: result.leaguePhase }]
   if (result.playoff) stages.push({ kind: 'ko', data: result.playoff })
@@ -754,7 +767,8 @@ function SimulationScreen({ result, onFinish, squadNames, teamName }) {
   return (
     <div className="max-w-xl mx-auto px-4 py-6 sm:py-8">
       <h2 className="text-2xl sm:text-3xl font-black text-gold text-center mb-1">European Run</h2>
-      {teamName && <p className="text-center text-secondary text-sm mb-2">{teamName}</p>}
+      {teamName && <p className="text-center text-secondary text-sm mb-1">{teamName}{tactics ? ` · ${tactics.identity}` : ''}</p>}
+      {tactics?.postNote && <p className="text-center text-[11px] text-gold/70 mb-2 px-4">{tactics.postNote}</p>}
       <div className="flex items-center justify-center gap-4 mb-6">
         {!done ? <button onClick={() => setShown(stages.length)} className="text-xs text-secondary hover:text-gold">Show full report ⏩</button> : <span className="text-xs text-secondary">Full report</span>}
         <button onClick={onFinish} className="text-xs text-secondary hover:text-gold">Skip to result ⏭</button>
@@ -779,7 +793,7 @@ function DetailRow({ label, value, accent }) {
   )
 }
 
-function ResultScreen({ squad, result, config, rerollsUsed, onPlayAgain, teamName }) {
+function ResultScreen({ squad, result, config, rerollsUsed, onPlayAgain, teamName, tactics }) {
   const { total } = computeRating(squad)
   const mvp = squadMVP(squad)
   const smart = smartestPick(squad)
@@ -820,7 +834,8 @@ function ResultScreen({ squad, result, config, rerollsUsed, onPlayAgain, teamNam
       {teamName && <div className="text-sm font-bold text-primary tracking-tight mb-1">{teamName}</div>}
       <h2 className={`text-2xl sm:text-3xl font-black mb-1 ${result.champion ? 'text-gold' : 'text-danger'}`}>{result.champion ? 'Won Europe!' : outcome}</h2>
       {verdict && <div className="text-lg sm:text-xl font-black text-gold tracking-tight mb-2">“{verdict}”</div>}
-      <p className="text-secondary mb-6 text-sm sm:text-base">{result.champion ? 'Your XI conquered the continent.' : 'The run ends here — but it was a story worth telling.'}</p>
+      <p className="text-secondary mb-2 text-sm sm:text-base">{result.champion ? 'Your XI conquered the continent.' : 'The run ends here — but it was a story worth telling.'}</p>
+      {tactics?.postNote && <p className="text-[12px] text-gold/70 mb-6 px-2">{tactics.postNote}</p>}
 
       <div className="p-4 sm:p-5 rounded-lg bg-card border border-border text-left mb-5">
         <DetailRow label="League Phase finish" value={`${ordinal(lp.position)} · ${lp.points} pts`} accent="text-gold" />
@@ -830,6 +845,7 @@ function ResultScreen({ squad, result, config, rerollsUsed, onPlayAgain, teamNam
         <DetailRow label="Early-round win chance" value={`${winPct}% → Final ${outlook.final}%`} />
         <DetailRow label="Difficulty" value={`${diffName} · ${outlook.finalDifficulty} final`} />
         <DetailRow label="Tactical identity" value={identity} accent="text-gold" />
+        {tactics && <DetailRow label="Tactical shape" value={`${tactics.inShape} in / ${tactics.outShape} out`} />}
         <DetailRow label="Key role synergy" value={roleSynergy ? `${roleSynergy.name} (+${roleSynergy.pts})` : '—'} accent={roleSynergy ? 'text-success' : 'text-secondary'} />
         <DetailRow label="Biggest weakness" value={weak ? weak.name : 'None'} accent={weak ? 'text-danger' : 'text-success'} />
         <DetailRow label="MVP" value={`${squadDisplayName(mvp.name, squadNames)} (${playerPoints(mvp)} pts)`} />
@@ -867,6 +883,7 @@ export default function App() {
   const [teamName, setTeamName] = useState(() => loadTeamName())
   const resultRef = useRef(null)
   const featureRef = useRef(null)
+  const tacticsRef = useRef(null)
 
   function startDraft(cfg) { setConfig(cfg); setScreen('draft') }
 
@@ -889,6 +906,8 @@ export default function App() {
       rng = makeRng(buildSimSeed({ dateKey: todayKey(), formation: config.formation, ids, slots, difficulty: config.difficulty, pool: config.pool, rerollsUsed }))
     }
     resultRef.current = simulate({ rating: total, difficulty: config.difficulty, squad, rng })
+    // Tactical read of the XI — flavours the Match Center, report and result.
+    tacticsRef.current = buildTactics(squad, config.formation)
     // Pick the run's headline match for the Live Match Center. If none can be
     // found, fall back to the existing text report screen directly.
     featureRef.current = pickFeatureMatch(resultRef.current)
@@ -909,7 +928,7 @@ export default function App() {
   }
 
   function reset() {
-    setConfig(null); setDraftedSquad(null); setSquad(null); setRerollsUsed(0); resultRef.current = null; featureRef.current = null; setScreen('intro')
+    setConfig(null); setDraftedSquad(null); setSquad(null); setRerollsUsed(0); resultRef.current = null; featureRef.current = null; tacticsRef.current = null; setScreen('intro')
   }
 
   return (
@@ -918,9 +937,9 @@ export default function App() {
       {screen === 'draft' && <DraftScreen config={config} onComplete={finishDraft} />}
       {screen === 'setxi' && <SetXIScreen config={config} draftedSquad={draftedSquad} onConfirm={confirmXI} />}
       {screen === 'bonuses' && <BonusesScreen squad={squad} config={config} rerollsUsed={rerollsUsed} onSimulate={runSimulation} initialTeamName={teamName} />}
-      {screen === 'matchcenter' && featureRef.current && <MatchCenter squad={squad} feature={featureRef.current} onFinish={onMatchCenterFinish} teamName={teamName} />}
-      {screen === 'sim' && <SimulationScreen result={resultRef.current} onFinish={onSimFinish} squadNames={new Set(squad.map(s => s.player.name))} teamName={teamName} />}
-      {screen === 'result' && <ResultScreen squad={squad} result={resultRef.current} config={config} rerollsUsed={rerollsUsed} onPlayAgain={reset} teamName={teamName} />}
+      {screen === 'matchcenter' && featureRef.current && <MatchCenter squad={squad} feature={featureRef.current} onFinish={onMatchCenterFinish} teamName={teamName} tactics={tacticsRef.current} />}
+      {screen === 'sim' && <SimulationScreen result={resultRef.current} onFinish={onSimFinish} squadNames={new Set(squad.map(s => s.player.name))} teamName={teamName} tactics={tacticsRef.current} />}
+      {screen === 'result' && <ResultScreen squad={squad} result={resultRef.current} config={config} rerollsUsed={rerollsUsed} onPlayAgain={reset} teamName={teamName} tactics={tacticsRef.current} />}
     </div>
   )
 }
