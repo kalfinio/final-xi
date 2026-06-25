@@ -17,6 +17,31 @@ function clamp(n, lo, hi) {
 // Generic opponent attacker labels (no real names — matches the sim's style).
 const OPP_LABELS = ['their striker', 'their winger', 'their forward', 'their playmaker', 'their midfielder', 'their wing-back']
 
+// Attach a zone-based "animation plan" to an event so the 2D viewer can play a
+// clear, tactical replay (build-up → final third → outcome) instead of random
+// ball movement. Zones are attack-relative; the viewer mirrors them for the away
+// team. Purely descriptive — never affects the result.
+function planAnim(e) {
+  const wide = e.id % 2 === 0 ? 'wideRight' : 'wideLeft'
+  const late = e.minute >= 85 && ['goal', 'save', 'shot', 'chance'].includes(e.type)
+  switch (e.type) {
+    case 'goal':
+      return { animType: 'goal', startZone: 'center', pathZones: ['opponentMidfield', wide, 'opponentBox'], endZone: 'goal', outcome: 'goal', visualLabel: 'GOAL', subLabel: null, lateDrama: late }
+    case 'save':
+      return { animType: 'save', startZone: 'center', pathZones: ['finalThird', 'opponentBox'], endZone: 'opponentBox', outcome: 'save', visualLabel: 'BIG SAVE', subLabel: 'Keeper denies it', lateDrama: late }
+    case 'shot':
+      return { animType: 'shot', startZone: 'center', pathZones: ['opponentMidfield', 'finalThird'], endZone: 'opponentBox', outcome: e.onTarget ? 'blocked' : 'miss', visualLabel: 'SHOT', subLabel: e.onTarget ? 'Saved' : 'Off target', lateDrama: late }
+    case 'chance':
+      return { animType: 'chance', startZone: 'center', pathZones: ['opponentMidfield', wide], endZone: 'finalThird', outcome: 'none', visualLabel: 'CHANCE', subLabel: 'Chance created', lateDrama: late }
+    case 'momentum':
+      return { animType: 'momentum_shift', startZone: 'center', pathZones: [], endZone: 'center', outcome: 'none', visualLabel: 'MOMENTUM SHIFT', subLabel: null, lateDrama: false, highlightZone: 'center' }
+    case 'card':
+      return { animType: 'card', startZone: 'center', pathZones: [], endZone: 'center', outcome: 'none', visualLabel: e.red ? 'RED CARD' : 'YELLOW CARD', subLabel: null, lateDrama: false, highlightZone: 'ownMidfield' }
+    default: // substitution
+      return { animType: 'substitution_impact', startZone: 'center', pathZones: [], endZone: 'center', outcome: 'none', visualLabel: 'ROLE IMPACT', subLabel: null, lateDrama: false, highlightZone: 'ownMidfield' }
+  }
+}
+
 // Turn a finished match object into a visual timeline.
 // `players` is the user's XI (array of player objects) for home flavour names.
 export function buildMatchTimeline(match, players, stageLabel = '', teamName = 'Final XI', tactics = null) {
@@ -175,9 +200,9 @@ export function buildMatchTimeline(match, players, stageLabel = '', teamName = '
     events.push({ minute, ...ev })
   }
 
-  // 3) Chronological order; give each event a stable id.
+  // 3) Chronological order; give each event a stable id + animation plan.
   events.sort((a, b) => a.minute - b.minute)
-  events.forEach((e, i) => { e.id = i })
+  events.forEach((e, i) => { e.id = i; e.anim = planAnim(e) })
 
   // 4) Final stat targets (the UI eases live stats toward these). Home numbers
   //    come straight from the simulation; away is synthesised deterministically.

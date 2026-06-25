@@ -45,10 +45,10 @@ import {
   roleEvidenceText,
 } from './data'
 import { buildShareData, buildShareText, downloadShareCard } from './share'
-import { pickFeatureMatch } from './matchTimeline'
 import { buildTactics } from './tactics'
 import MatchCenter from './MatchCenter'
 import TacticalPitch from './TacticalPitch'
+import { MatchHub, PostMatchCard, buildRunMatches, runRecord, mcStageLabel } from './RunFlow'
 
 const TOTAL_REROLLS = 3
 
@@ -771,12 +771,12 @@ function SimulationScreen({ result, onFinish, squadNames, teamName, tactics }) {
       {tactics?.postNote && <p className="text-center text-[11px] text-gold/70 mb-2 px-4">{tactics.postNote}</p>}
       <div className="flex items-center justify-center gap-4 mb-6">
         {!done ? <button onClick={() => setShown(stages.length)} className="text-xs text-secondary hover:text-gold">Show full report ⏩</button> : <span className="text-xs text-secondary">Full report</span>}
-        <button onClick={onFinish} className="text-xs text-secondary hover:text-gold">Skip to result ⏭</button>
+        <button onClick={onFinish} className="text-xs text-secondary hover:text-gold">Back to result ⏎</button>
       </div>
       <div className="space-y-3">
         {stages.slice(0, shown).map((st, i) => (st.kind === 'league' ? <LeaguePhaseCard key={i} lp={st.data} squadNames={squadNames} /> : <KOCard key={i} r={st.data} squadNames={squadNames} />))}
       </div>
-      {done && <div className="text-center mt-6"><Button onClick={onFinish} className="w-full sm:w-auto">See Result</Button></div>}
+      {done && <div className="text-center mt-6"><Button onClick={onFinish} className="w-full sm:w-auto">Back to Result</Button></div>}
     </div>
   )
 }
@@ -793,7 +793,7 @@ function DetailRow({ label, value, accent }) {
   )
 }
 
-function ResultScreen({ squad, result, config, rerollsUsed, onPlayAgain, teamName, tactics }) {
+function ResultScreen({ squad, result, config, rerollsUsed, onPlayAgain, onViewReport, teamName, tactics }) {
   const { total } = computeRating(squad)
   const mvp = squadMVP(squad)
   const smart = smartestPick(squad)
@@ -861,6 +861,12 @@ function ResultScreen({ squad, result, config, rerollsUsed, onPlayAgain, teamNam
 
       <div className="p-4 rounded-lg bg-surface border border-border text-left whitespace-pre-wrap font-mono text-xs mb-6 break-words">{shareText}</div>
 
+      {onViewReport && (
+        <div className="mb-3">
+          <button onClick={onViewReport} className="text-xs text-secondary hover:text-gold underline-offset-2 hover:underline">View full European Run report →</button>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row gap-3 justify-center">
         <Button onClick={copy} variant="ghost" className="w-full sm:w-auto">{copied ? 'Copied!' : 'Copy Share Text'}</Button>
         <Button onClick={() => downloadShareCard(shareData)} variant="ghost" className="w-full sm:w-auto">Download Share Card</Button>
@@ -881,9 +887,11 @@ export default function App() {
   const [rerollsUsed, setRerollsUsed] = useState(0)
   const [stats, setStats] = useState(() => loadStats())
   const [teamName, setTeamName] = useState(() => loadTeamName())
+  const [matchIndex, setMatchIndex] = useState(0)
   const resultRef = useRef(null)
-  const featureRef = useRef(null)
   const tacticsRef = useRef(null)
+  const runMatchesRef = useRef([])
+  const recordedRef = useRef(false)
 
   function startDraft(cfg) { setConfig(cfg); setScreen('draft') }
 
@@ -908,27 +916,45 @@ export default function App() {
     resultRef.current = simulate({ rating: total, difficulty: config.difficulty, squad, rng })
     // Tactical read of the XI — flavours the Match Center, report and result.
     tacticsRef.current = buildTactics(squad, config.formation)
-    // Pick the run's headline match for the Live Match Center. If none can be
-    // found, fall back to the existing text report screen directly.
-    featureRef.current = pickFeatureMatch(resultRef.current)
-    setScreen(featureRef.current ? 'matchcenter' : 'sim')
+    // Walk the run match-by-match. The simulation already decided every result.
+    runMatchesRef.current = buildRunMatches(resultRef.current)
+    recordedRef.current = false
+    setMatchIndex(0)
+    if (runMatchesRef.current.length) setScreen('hub')
+    else finishRun()
   }
 
-  // Match Center → either the full European Run report ('report') or straight
-  // to the result/share screen ('result'). Both ultimately record the game once.
-  function onMatchCenterFinish(target) {
-    if (target === 'report') setScreen('sim')
-    else onSimFinish()
+  // ---- European Run, match by match -------------------------------------
+  function watchMatch() { setScreen('watch') }
+  function quickSim() { setScreen('postmatch') }
+
+  // Continue from a finished match (watched or quick-simmed) to the next one,
+  // or to the final result if the whole run is over.
+  function continueRun() {
+    const next = matchIndex + 1
+    if (next < runMatchesRef.current.length) { setMatchIndex(next); setScreen('hub') }
+    else finishRun()
   }
 
-  function onSimFinish() {
-    const updated = recordGame({ result: resultRef.current, squad, formation: config.formation })
-    setStats(updated)
+  // Skip the rest of the run straight to the final result/share screen.
+  function simAll() { finishRun() }
+
+  // Record the game once, then show the final result/share screen.
+  function finishRun() {
+    if (!recordedRef.current) {
+      const updated = recordGame({ result: resultRef.current, squad, formation: config.formation })
+      setStats(updated)
+      recordedRef.current = true
+    }
     setScreen('result')
   }
 
+  function backToResult() { setScreen('result') }
+
   function reset() {
-    setConfig(null); setDraftedSquad(null); setSquad(null); setRerollsUsed(0); resultRef.current = null; featureRef.current = null; tacticsRef.current = null; setScreen('intro')
+    setConfig(null); setDraftedSquad(null); setSquad(null); setRerollsUsed(0)
+    resultRef.current = null; tacticsRef.current = null; runMatchesRef.current = []; recordedRef.current = false
+    setMatchIndex(0); setScreen('intro')
   }
 
   return (
@@ -937,9 +963,40 @@ export default function App() {
       {screen === 'draft' && <DraftScreen config={config} onComplete={finishDraft} />}
       {screen === 'setxi' && <SetXIScreen config={config} draftedSquad={draftedSquad} onConfirm={confirmXI} />}
       {screen === 'bonuses' && <BonusesScreen squad={squad} config={config} rerollsUsed={rerollsUsed} onSimulate={runSimulation} initialTeamName={teamName} />}
-      {screen === 'matchcenter' && featureRef.current && <MatchCenter squad={squad} feature={featureRef.current} onFinish={onMatchCenterFinish} teamName={teamName} tactics={tacticsRef.current} />}
-      {screen === 'sim' && <SimulationScreen result={resultRef.current} onFinish={onSimFinish} squadNames={new Set(squad.map(s => s.player.name))} teamName={teamName} tactics={tacticsRef.current} />}
-      {screen === 'result' && <ResultScreen squad={squad} result={resultRef.current} config={config} rerollsUsed={rerollsUsed} onPlayAgain={reset} teamName={teamName} tactics={tacticsRef.current} />}
+      {screen === 'hub' && runMatchesRef.current[matchIndex] && (
+        <MatchHub
+          item={runMatchesRef.current[matchIndex]}
+          teamName={teamName}
+          record={runRecord(runMatchesRef.current.slice(0, matchIndex))}
+          matchIndex={matchIndex}
+          total={runMatchesRef.current.length}
+          onWatch={watchMatch}
+          onQuick={quickSim}
+          onSimAll={simAll}
+        />
+      )}
+      {screen === 'watch' && runMatchesRef.current[matchIndex] && (
+        <MatchCenter
+          squad={squad}
+          feature={{ match: runMatchesRef.current[matchIndex].match, stageLabel: mcStageLabel(runMatchesRef.current[matchIndex]) }}
+          onContinue={continueRun}
+          isLast={matchIndex === runMatchesRef.current.length - 1}
+          teamName={teamName}
+          tactics={tacticsRef.current}
+        />
+      )}
+      {screen === 'postmatch' && runMatchesRef.current[matchIndex] && (
+        <PostMatchCard
+          squad={squad}
+          item={runMatchesRef.current[matchIndex]}
+          teamName={teamName}
+          tactics={tacticsRef.current}
+          isLast={matchIndex === runMatchesRef.current.length - 1}
+          onContinue={continueRun}
+        />
+      )}
+      {screen === 'sim' && <SimulationScreen result={resultRef.current} onFinish={backToResult} squadNames={new Set(squad.map(s => s.player.name))} teamName={teamName} tactics={tacticsRef.current} />}
+      {screen === 'result' && <ResultScreen squad={squad} result={resultRef.current} config={config} rerollsUsed={rerollsUsed} onPlayAgain={reset} onViewReport={() => setScreen('sim')} teamName={teamName} tactics={tacticsRef.current} />}
     </div>
   )
 }
