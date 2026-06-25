@@ -31,11 +31,13 @@ export function buildShareData({
   topAssister,
   squadNames = new Set(),
   verdict = '',
+  teamName = '',
 }) {
   return {
     champion: result.champion,
     resultLine: outcome,
     verdict,
+    team: teamName,
     leagueFinish: `${ordinal(league.position)}, ${league.points} pts`,
     pool: config.pool === 'legends' ? 'Legends Only' : 'Modern Mix',
     formation: config.formation,
@@ -63,7 +65,7 @@ export function buildShareData({
 export function buildShareText(d) {
   const trophy = d.champion ? '🏆' : '⚔️'
   const lines = [
-    `${trophy} Final XI — ${d.resultLine}`,
+    `${trophy} ${d.team || 'Final XI'} — ${d.resultLine}`,
   ]
   if (d.verdict) lines.push(`Verdict: ${d.verdict}`)
   lines.push(
@@ -110,7 +112,10 @@ export function downloadShareCard(d) {
 
   ctx.fillStyle = secondary
   ctx.font = '600 30px ui-sans-serif, system-ui, Segoe UI, Roboto, Arial, sans-serif'
-  ctx.fillText(d.isDaily ? `DAILY CHALLENGE · ${d.date}` : 'RANDOM RUN', padL, 252)
+  // Keep "Final XI" as the game brand above; personalise this line with the
+  // user's team name (safe, single-line, no layout change).
+  const runLabel = d.isDaily ? `DAILY CHALLENGE · ${d.date}` : 'RANDOM RUN'
+  ctx.fillText(d.team ? `${d.team.toUpperCase()} · ${runLabel}` : runLabel, padL, 252)
 
   ctx.fillStyle = d.champion ? gold : danger
   ctx.font = '700 60px ui-sans-serif, system-ui, Segoe UI, Roboto, Arial, sans-serif'

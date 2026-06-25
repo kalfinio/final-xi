@@ -1,0 +1,223 @@
+// Live Match Center — deterministic event-timeline generator.
+//
+// The existing simulation in data.js decides the real result (final score,
+// goal scorers, stats). This module ONLY visualizes one match: it takes a
+// finished match object and expands its goal list into 8–14 believable
+// minute-by-minute events (chances, shots, saves, momentum, cards). It never
+// changes the outcome — the timeline always ends on the same scoreline the
+// simulation already produced, and it consumes its own seeded RNG so the same
+// match always animates identically (Daily Challenge stays deterministic).
+
+import { makeRng, hashString, squadDisplayName } from './data'
+
+function clamp(n, lo, hi) {
+  return Math.max(lo, Math.min(hi, n))
+}
+
+// Generic opponent attacker labels (no real names — matches the sim's style).
+const OPP_LABELS = ['their striker', 'their winger', 'their forward', 'their playmaker', 'their midfielder', 'their wing-back']
+
+// Turn a finished match object into a visual timeline.
+// `players` is the user's XI (array of player objects) for home flavour names.
+export function buildMatchTimeline(match, players, stageLabel = '', teamName = 'Final XI') {
+  if (!match) return null
+  const gf = match.gf ?? 0
+  const ga = match.ga ?? 0
+  const opponent = match.opponent || 'Opponent'
+  const oppMeta = match.opponentMeta || null
+  const squadNames = new Set(players.map((p) => p.name))
+  const homeName = (n) => squadDisplayName(n, squadNames)
+
+  const goalMinutes = (match.events || []).map((e) => e.minute)
+  // Seed from stable match facts → identical animation on every replay.
+  const seed = hashString([opponent, match.score || `${gf}-${ga}`, stageLabel, goalMinutes.join(',')].join('|'))
+  const rng = makeRng(seed)
+  const pick = (arr) => arr[Math.floor(rng() * arr.length)]
+
+  const outfield = players.filter((p) => p.posType !== 'GK')
+  const gk = players.find((p) => p.posType === 'GK')
+  const homeAttacker = () => homeName(pick(outfield.length ? outfield : players).name)
+  const awayAttacker = () => pick(OPP_LABELS)
+
+  // 1) Real goals become 'goal' events (kept verbatim from the simulation).
+  const events = (match.events || []).map((e) => {
+    const home = e.side === 'us'
+    const scorer = home ? homeName(e.scorer) : (e.scorer || 'their forward')
+    const assister = home && e.assist ? homeName(e.assist) : null
+    const lbl = e.label ? ` ${e.label}` : ''
+    return {
+      minute: e.minute,
+      type: 'goal',
+      team: home ? 'home' : 'away',
+      onTarget: true,
+      countsShot: true,
+      scorer,
+      assister,
+      title: 'GOAL',
+      description: home
+        ? (assister ? `${scorer} scores${lbl} — assist ${assister}` : `${scorer} scores${lbl} for ${teamName}`)
+        : `${scorer} scores for ${opponent}`,
+      pitchZone: 'box',
+    }
+  })
+
+  // 2) Filler events to reach a believable 8–14 total.
+  const total = clamp(events.length + 6 + Math.floor(rng() * 4), 8, 14)
+  const used = new Set(goalMinutes)
+  function freeMinute() {
+    for (let k = 0; k < 24; k++) {
+      const m = 3 + Math.floor(rng() * 88)
+      if (!used.has(m)) { used.add(m); return m }
+    }
+    const m = 3 + Math.floor(rng() * 88); used.add(m); return m
+  }
+
+  const TYPES = [
+    { type: 'shot', w: 30 },
+    { type: 'save', w: 24 },
+    { type: 'chance', w: 22 },
+    { type: 'momentum', w: 14 },
+    { type: 'card', w: 7 },
+    { type: 'substitution', w: 3 },
+  ]
+  const totalW = TYPES.reduce((s, t) => s + t.w, 0)
+  function rollType() {
+    let r = rng() * totalW
+    for (const t of TYPES) { if ((r -= t.w) < 0) return t.type }
+    return 'shot'
+  }
+
+  let cardGiven = false
+  let subGiven = false
+  while (events.length < total) {
+    let type = rollType()
+    if (type === 'card' && cardGiven) type = 'shot'       // at most one booking
+    if (type === 'substitution' && subGiven) type = 'chance' // at most one sub
+    const home = rng() < 0.58 // tilt the visuals toward the user's team
+    const team = home ? 'home' : 'away'
+    const who = home ? homeAttacker() : awayAttacker()
+    const minute = freeMinute()
+    let ev
+
+    if (type === 'shot') {
+      const onT = rng() < 0.45
+      ev = {
+        type, team, onTarget: onT, countsShot: true,
+        title: onT ? 'Shot on target' : 'Shot off target',
+        description: home ? `${who} ${onT ? 'forces a save' : 'fires just wide'}` : `${who} ${onT ? 'tests the keeper' : 'drags it wide'}`,
+        pitchZone: pick(['rightAttack', 'box', 'rightMidfield']),
+      }
+    } else if (type === 'save') {
+      const keeper = home ? `${opponent} keeper` : (gk ? homeName(gk.name) : 'the keeper')
+      ev = {
+        type, team, onTarget: true, countsShot: true,
+        title: 'Big save',
+        description: `${who} is denied — ${keeper} stands tall`,
+        pitchZone: 'box',
+      }
+    } else if (type === 'chance') {
+      ev = {
+        type, team, onTarget: false, countsShot: false,
+        title: 'Chance created',
+        description: home ? `${who} carves out an opening` : `${opponent} work a chance through ${who}`,
+        pitchZone: pick(['rightMidfield', 'center', 'rightAttack']),
+      }
+    } else if (type === 'momentum') {
+      // Away momentum references the opponent's playing style when known.
+      ev = {
+        type, team, onTarget: false, countsShot: false,
+        title: 'Momentum shift',
+        description: home ? `${teamName} seize control of the tempo` : (oppMeta ? `${opponent} are ${oppMeta.style}` : `${opponent} push for a foothold`),
+        pitchZone: 'center',
+      }
+    } else if (type === 'card') {
+      cardGiven = true
+      const red = rng() < 0.12
+      ev = {
+        type, team, onTarget: false, countsShot: false, red,
+        title: red ? 'Red card' : 'Yellow card',
+        description: home ? `${teamName} booked for a tactical foul` : `${opponent} ${red ? 'reduced to ten men' : 'shown a yellow'}`,
+        pitchZone: pick(['leftMidfield', 'center']),
+      }
+    } else { // substitution
+      subGiven = true
+      ev = {
+        type, team, onTarget: false, countsShot: false,
+        title: 'Substitution',
+        description: home ? `${teamName} freshen things up` : `${opponent} make a change`,
+        pitchZone: 'leftMidfield',
+      }
+    }
+    events.push({ minute, ...ev })
+  }
+
+  // 3) Chronological order; give each event a stable id.
+  events.sort((a, b) => a.minute - b.minute)
+  events.forEach((e, i) => { e.id = i })
+
+  // 4) Final stat targets (the UI eases live stats toward these). Home numbers
+  //    come straight from the simulation; away is synthesised deterministically.
+  const hShots = match.stats?.shots ?? Math.max(gf, 6)
+  const hSot = Math.max(match.stats?.shotsOnTarget ?? Math.max(gf, 3), gf)
+  const hPoss = match.stats?.possession ?? 52
+  // Stronger opponents generate a touch more away threat (gentle, capped).
+  const strengthFactor = oppMeta ? clamp(0.82 + (oppMeta.strength - 72) / 70, 0.82, 1.2) : 1
+  const aShots = clamp(Math.round(hShots * (0.5 + rng() * 0.4) * strengthFactor), Math.max(ga, 3), hShots + 4)
+  const aSot = clamp(Math.round(Math.max(ga, aShots * (0.3 + rng() * 0.2))), ga, aShots)
+
+  return {
+    home: teamName,
+    away: opponent,
+    gf, ga,
+    stageLabel,
+    opponentMeta: oppMeta,
+    potm: match.stats?.potm || null,
+    pens: match.pens || null,
+    result: match.result,
+    events,
+    finalStats: {
+      home: { shots: hShots, sot: hSot, possession: hPoss },
+      away: { shots: aShots, sot: aSot, possession: 100 - hPoss },
+    },
+  }
+}
+
+// A short, deterministic one-line verdict for the featured match.
+export function matchVerdict(tl) {
+  if (!tl) return ''
+  const { gf, ga, result, pens } = tl
+  if (pens) return pens.won ? 'Survived the shootout' : 'Heartbreak on penalties'
+  const diff = gf - ga
+  if (diff > 0 || result === 'win') return diff >= 3 ? 'Statement victory' : diff === 1 ? 'Hard-fought win' : 'Composed win'
+  if (diff < 0 || result === 'loss') return diff <= -3 ? 'Outclassed on the night' : diff === -1 ? 'Narrow defeat' : 'Beaten on the night'
+  return 'Honours even'
+}
+
+// Choose the single most narratively important match of a finished run to
+// feature in the Match Center.
+export function pickFeatureMatch(result) {
+  if (!result) return null
+  const kos = result.knockouts || []
+  // The Final, whether won or lost, is the headline match.
+  if (kos.length && (result.champion || result.exitStage === 'Final')) {
+    return { match: kos[kos.length - 1], stageLabel: 'Final' }
+  }
+  // Otherwise the match the run died in.
+  const elimKO = [...kos].reverse().find((m) => m.eliminated)
+  if (elimKO) return { match: elimKO, stageLabel: elimKO.round }
+  if (result.playoff && result.playoff.eliminated) return { match: result.playoff, stageLabel: 'Knockout Play-Off' }
+  // Survived deep but data quirk — show the last knockout played.
+  if (kos.length) return { match: kos[kos.length - 1], stageLabel: kos[kos.length - 1].round }
+  if (result.playoff) return { match: result.playoff, stageLabel: 'Knockout Play-Off' }
+  // Eliminated in the League Phase — show the most eventful league match.
+  const lps = result.leaguePhase?.matches || []
+  if (lps.length) {
+    let best = null
+    lps.forEach((m) => {
+      const s = (m.result === 'win' ? 10 : m.result === 'draw' ? 3 : 0) + m.gf + m.ga
+      if (!best || s > best._s) best = { m, _s: s }
+    })
+    return { match: best.m, stageLabel: `League Phase · Matchday ${best.m.matchNo}` }
+  }
+  return null
+}

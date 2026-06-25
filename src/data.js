@@ -867,10 +867,47 @@ export function tacticalIdentity(squad) {
 // ---------------------------------------------------------------------------
 // Win probability
 // ---------------------------------------------------------------------------
+// Fictional European elite clubs — recognizable archetypes, legally distinct.
+// No real club names, logos, or competition branding. `strength` (~72–91) tiers
+// the pool (elite → underdog); `style` feeds Match Center commentary. The pool
+// mean sits near OPP_BASELINE so the strength modifier stays net-neutral overall.
 export const OPPONENTS = [
-  'Bayern Munich', 'Real Madrid', 'Liverpool', 'PSG', 'Manchester City',
-  'Chelsea', 'Barcelona', 'Inter Milan', 'Juventus', 'Atlético Madrid',
-  'Ajax', 'Borussia Dortmund', 'Porto', 'Roma', 'Napoli', 'AC Milan',
+  // Elite (88–91)
+  { id: 'chamartin', name: 'Chamartín FC', region: 'Spain', archetype: 'elite', strength: 91, style: 'oozing big-game pedigree', nickname: 'Los Reyes', abbr: 'CHA' },
+  { id: 'manchester-sky', name: 'Manchester Sky', region: 'England', archetype: 'technical', strength: 90, style: 'patiently controlling the ball', nickname: 'The Skyliners' },
+  { id: 'catalan-kings', name: 'Catalan Kings', region: 'Catalonia', archetype: 'technical', strength: 89, style: 'trying to control possession', nickname: 'The Kings' },
+  { id: 'bavarian-giants', name: 'Bavarian Giants', region: 'Germany', archetype: 'physical', strength: 89, style: 'pressing with power', nickname: 'Die Riesen' },
+  { id: 'paris-tower', name: 'Paris Tower FC', region: 'France', archetype: 'attacking', strength: 88, style: 'relying on individual quality', nickname: 'Les Royaux' },
+  { id: 'mersey-reds', name: 'Mersey Reds', region: 'England', archetype: 'pressing', strength: 88, style: 'pressing high and hard', nickname: 'The Reds' },
+  // Strong (84–87)
+  { id: 'london-blues', name: 'London Blues', region: 'England', archetype: 'elite', strength: 86, style: 'soaking pressure then striking', nickname: 'The Blues' },
+  { id: 'naples-blues', name: 'Naples Blues', region: 'Italy', archetype: 'attacking', strength: 85, style: 'attacking with flair', nickname: 'Gli Azzurri' },
+  { id: 'milano-blue', name: 'Milano Blue', region: 'Italy', archetype: 'defensive', strength: 85, style: 'defending in a compact block', nickname: 'I Blu' },
+  { id: 'north-london-gunners', name: 'North London Gunners', region: 'England', archetype: 'attacking', strength: 85, style: 'playing quick attacking football', nickname: 'The North Bank' },
+  { id: 'ruhr-yellows', name: 'Ruhr Yellows', region: 'Germany', archetype: 'pressing', strength: 84, style: 'pressing behind a roaring crowd', nickname: 'Die Gelben' },
+  { id: 'turin-stripes', name: 'Turin Stripes', region: 'Italy', archetype: 'defensive', strength: 84, style: 'sitting deep and compact', nickname: 'The Stripes' },
+  // Mid (78–83)
+  { id: 'north-london-spurs', name: 'North London Spurs', region: 'England', archetype: 'attacking', strength: 82, style: 'breaking quickly in transition', nickname: 'The Lilywhites' },
+  { id: 'milano-reds', name: 'Milano Reds', region: 'Italy', archetype: 'technical', strength: 82, style: 'building patiently from the back', nickname: 'I Rossi' },
+  { id: 'lisbon-eagles', name: 'Lisbon Eagles', region: 'Portugal', archetype: 'attacking', strength: 81, style: 'attacking with technical flair', nickname: 'As Águias' },
+  { id: 'roman-wolves', name: 'Roman Wolves', region: 'Italy', archetype: 'physical', strength: 80, style: 'battling for every ball', nickname: 'I Lupi' },
+  { id: 'porto-dragons', name: 'Porto Dragons', region: 'Portugal', archetype: 'underdog', strength: 80, style: 'dangerous on the counter', nickname: 'Os Dragões' },
+  { id: 'amsterdam-lancers', name: 'Amsterdam Lancers', region: 'Netherlands', archetype: 'technical', strength: 80, style: 'playing fluid total football', nickname: 'De Lansiers' },
+  { id: 'andalusian-reds', name: 'Andalusian Reds', region: 'Spain', archetype: 'defensive', strength: 79, style: 'staying organized and patient', nickname: 'Los Rojos' },
+  { id: 'basque-lions', name: 'Basque Lions', region: 'Basque Country', archetype: 'physical', strength: 79, style: 'pressing with relentless intensity', nickname: 'Los Leones' },
+  { id: 'eindhoven-lights', name: 'Eindhoven Lights', region: 'Netherlands', archetype: 'pressing', strength: 78, style: 'pressing in waves', nickname: 'De Lichten' },
+  // Underdog (72–77)
+  { id: 'salzburg-bulls', name: 'Salzburg Bulls', region: 'Austria', archetype: 'pressing', strength: 77, style: 'pressing relentlessly', nickname: 'Die Bullen' },
+  { id: 'glasgow-hoops', name: 'Glasgow Hoops', region: 'Scotland', archetype: 'underdog', strength: 76, style: 'feeding off a roaring crowd', nickname: 'The Hoops' },
+  { id: 'belgian-royals', name: 'Belgian Royals', region: 'Belgium', archetype: 'technical', strength: 76, style: 'knocking it around neatly', nickname: 'Les Royaux Belges' },
+  { id: 'istanbul-eagles', name: 'Istanbul Eagles', region: 'Turkey', archetype: 'attacking', strength: 76, style: 'attacking with tempo', nickname: 'Kartallar' },
+  { id: 'lisbon-lions', name: 'Lisbon Lions', region: 'Portugal', archetype: 'underdog', strength: 75, style: 'fighting for everything', nickname: 'Os Leões' },
+  { id: 'french-riviera', name: 'French Riviera FC', region: 'France', archetype: 'underdog', strength: 75, style: 'playing fearless football', nickname: 'Les Aiglons' },
+  { id: 'istanbul-lions', name: 'Istanbul Lions', region: 'Turkey', archetype: 'physical', strength: 75, style: 'riding a wall of noise', nickname: 'Aslanlar' },
+  { id: 'zagreb-blues', name: 'Zagreb Blues', region: 'Croatia', archetype: 'technical', strength: 74, style: 'passing through the lines', nickname: 'Modri' },
+  { id: 'piraeus-reds', name: 'Piraeus Reds', region: 'Greece', archetype: 'defensive', strength: 74, style: 'sitting in and countering', nickname: 'Erythrolefkoi' },
+  { id: 'prague-royals', name: 'Prague Royals', region: 'Czechia', archetype: 'underdog', strength: 73, style: 'running hard all game', nickname: 'Královská' },
+  { id: 'athens-greens', name: 'Athens Greens', region: 'Greece', archetype: 'defensive', strength: 73, style: 'defending deep in numbers', nickname: 'Oi Prasinoi' },
 ]
 
 export const DIFFICULTIES = {
@@ -927,6 +964,13 @@ const SIM = {
   LEAGUE_NUDGE_LO: -7,
   LEAGUE_NUDGE_HI: 6,
   LEAGUE_JITTER: 9,       // (rng-0.5) * JITTER
+  // Opponent strength → a small, net-neutral win-probability nudge. A baseline
+  // opponent (strength = OPP_BASELINE) is zero; tougher clubs shave a little off
+  // your odds, underdogs add a little. Capped tight so balance is preserved and
+  // the pool mean (~81) keeps the league phase roughly neutral on aggregate.
+  OPP_BASELINE: 80,
+  OPP_SCALE: 0.003,
+  OPP_DELTA_CAP: 0.045,
 }
 
 // Strength rating → neutral per-match win probability (no weaknesses / pressure).
@@ -964,6 +1008,39 @@ export function knockoutOutlook(squad, difficulty = 'classic') {
   const pressure = final >= 60 ? 'Moderate' : final >= 50 ? 'High' : 'Severe'
   const eliteScale = { casual: 'Competitive', classic: 'Elite', legendary: 'Brutal' }
   return { r16, final, pressure, finalDifficulty: eliteScale[difficulty] || 'Elite' }
+}
+
+// Opponent strength → a small, capped, baseline-centred win-probability delta.
+// Net-neutral across the pool so overall balance is preserved.
+function oppProbDelta(opp) {
+  if (!opp || typeof opp.strength !== 'number') return 0
+  return clamp((SIM.OPP_BASELINE - opp.strength) * SIM.OPP_SCALE, -SIM.OPP_DELTA_CAP, SIM.OPP_DELTA_CAP)
+}
+
+// Knockout opponent-selection bias: later rounds favour stronger clubs, so the
+// run feels like it builds toward facing the giants. League phase uses a flat
+// weight (full mix of tiers). Pure ranking only — does not change match odds
+// beyond the (small) oppProbDelta the chosen club already carries.
+const KO_OPP_EXP = { 'Knockout Play-Off': 1, 'Round of 16': 2, 'Quarter-final': 3, 'Semi-final': 4, 'Final': 6 }
+function koOppWeight(round) {
+  const exp = KO_OPP_EXP[round] ?? 2
+  return (opp) => Math.pow(opp.strength / 70, exp)
+}
+
+// Pick an opponent object, avoiding ids already used. `weightFn` biases the draw
+// (default: uniform). Consumes exactly one rng() call, keeping determinism.
+function pickOpponent(rng, usedIds, weightFn = () => 1) {
+  const avail = OPPONENTS.filter((o) => !usedIds.has(o.id))
+  const pool = avail.length ? avail : OPPONENTS
+  const weights = pool.map(weightFn)
+  const total = weights.reduce((a, b) => a + b, 0)
+  let r = rng() * total
+  let chosen = pool[pool.length - 1]
+  for (let i = 0; i < pool.length; i++) {
+    if ((r -= weights[i]) < 0) { chosen = pool[i]; break }
+  }
+  usedIds.add(chosen.id)
+  return chosen
 }
 
 // ---------------------------------------------------------------------------
@@ -1194,13 +1271,13 @@ export function leagueSeedBonus(position, round) {
 // usedOpponents (Set) ensures no team appears in two different KO rounds.
 // position = League Phase finish, used for the seeding advantage.
 function decisiveMatch(rng, baseProb, rating, players, tallies, round, usedOpponents, position) {
-  const available = OPPONENTS.filter(o => !usedOpponents.has(o))
-  const pool = available.length > 0 ? available : OPPONENTS
-  const opponent = pool[Math.floor(rng() * pool.length)]
-  usedOpponents.add(opponent)
+  // Later rounds bias toward stronger clubs, so the run builds toward the giants.
+  const opp = pickOpponent(rng, usedOpponents, koOppWeight(round))
+  const opponent = opp.name
   // Opponent pressure rises each round; the Final is the hardest match. A strong
-  // League Phase finish softens the early rounds via leagueSeedBonus.
-  const p = clamp(baseProb - (SIM.ROUND_PRESSURE[round] ?? 0) + leagueSeedBonus(position, round), SIM.KO_PR_FLOOR, SIM.KO_PR_CEIL)
+  // League Phase finish softens the early rounds via leagueSeedBonus. The chosen
+  // club's strength adds a small, capped nudge on top.
+  const p = clamp(baseProb - (SIM.ROUND_PRESSURE[round] ?? 0) + leagueSeedBonus(position, round) + oppProbDelta(opp), SIM.KO_PR_FLOOR, SIM.KO_PR_CEIL)
   const roll = rng()
   let result, mgf, mga, pens = null, eliminated = false
 
@@ -1226,7 +1303,7 @@ function decisiveMatch(rng, baseProb, rating, players, tallies, round, usedOppon
   const stats = matchStats(rng, rating, mgf, players, events)
   const normalScore = `${mgf}-${mga}`
   const score = pens ? `${normalScore} (pens ${pens.score})` : normalScore
-  return { type: 'ko', round, opponent, result, score, normalScore, pens, stats, events, gf: mgf, ga: mga, eliminated }
+  return { type: 'ko', round, opponent, opponentMeta: opp, result, score, normalScore, pens, stats, events, gf: mgf, ga: mga, eliminated }
 }
 
 // Map an internal exit stage to a public outcome label.
@@ -1302,19 +1379,21 @@ export function simulate({ rating, difficulty = 'classic', squad, rng = Math.ran
 
   // ---- League Phase: 8 matches ----
   const leagueMatches = []
+  const leagueOppUsed = new Set()   // 8 distinct league opponents from the pool
   let lw = 0, ld = 0, ll = 0, lgf = 0, lga = 0
   for (let i = 0; i < 8; i++) {
-    const opponent = OPPONENTS[Math.floor(rng() * OPPONENTS.length)]
+    const opp = pickOpponent(rng, leagueOppUsed) // flat weight = full tier mix
+    const pMatch = clamp(p + oppProbDelta(opp), SIM.KO_PR_FLOOR, SIM.KO_PR_CEIL)
     const home = rng() < 0.5
     const roll = rng()
     let result, mgf, mga, points
-    if (roll < p) { result = 'win'; mgf = 1 + Math.floor(rng() * 3); mga = Math.floor(rng() * mgf); points = 3; lw++ }
-    else if (roll < p + SIM.LEAGUE_DRAW_BAND) { result = 'draw'; mgf = Math.floor(rng() * 2); mga = mgf; points = 1; ld++ }
+    if (roll < pMatch) { result = 'win'; mgf = 1 + Math.floor(rng() * 3); mga = Math.floor(rng() * mgf); points = 3; lw++ }
+    else if (roll < pMatch + SIM.LEAGUE_DRAW_BAND) { result = 'draw'; mgf = Math.floor(rng() * 2); mga = mgf; points = 1; ld++ }
     else { result = 'loss'; mga = 1 + Math.floor(rng() * 2); mgf = Math.floor(rng() * mga); points = 0; ll++ }
     lgf += mgf; lga += mga
     const events = buildGoals(rng, players, mgf, mga, [tally, leagueTally])
     const stats = matchStats(rng, rating, mgf, players, events)
-    const match = { type: 'league', matchNo: i + 1, opponent, home, score: `${mgf}-${mga}`, result, points, events, stats, gf: mgf, ga: mga }
+    const match = { type: 'league', matchNo: i + 1, opponent: opp.name, opponentMeta: opp, home, score: `${mgf}-${mga}`, result, points, events, stats, gf: mgf, ga: mga }
     leagueMatches.push(match)
     allMatches.push(match)
   }
@@ -1490,6 +1569,34 @@ export function validateXI(squad, formation) {
 // localStorage stats
 // ---------------------------------------------------------------------------
 const STATS_KEY = 'finalxi.stats.v1'
+const TEAM_NAME_KEY = 'finalxi.teamName.v1'
+
+export const DEFAULT_TEAM_NAME = 'Final XI FC'
+export const TEAM_NAME_MAX = 24
+
+// Trim, collapse whitespace, strip control characters, and cap the length.
+// Falls back to the default if nothing usable remains.
+export function sanitizeTeamName(raw) {
+  if (typeof raw !== 'string') return DEFAULT_TEAM_NAME
+  // eslint-disable-next-line no-control-regex
+  const cleaned = raw.replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim().slice(0, TEAM_NAME_MAX)
+  return cleaned || DEFAULT_TEAM_NAME
+}
+
+export function loadTeamName() {
+  try {
+    const raw = localStorage.getItem(TEAM_NAME_KEY)
+    return raw ? sanitizeTeamName(raw) : DEFAULT_TEAM_NAME
+  } catch {
+    return DEFAULT_TEAM_NAME
+  }
+}
+
+export function saveTeamName(name) {
+  const clean = sanitizeTeamName(name)
+  try { localStorage.setItem(TEAM_NAME_KEY, clean) } catch { /* ignore */ }
+  return clean
+}
 
 const DEFAULT_STATS = {
   gamesPlayed: 0, trophies: 0, finalsReached: 0, bestRating: 0,

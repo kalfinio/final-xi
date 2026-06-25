@@ -100,14 +100,61 @@ body {
   transform: scale(0.97);
 }
 
+/* ---------------------------------------------------------------------------
+   Live Match Center — pitch + ticker animations.
+--------------------------------------------------------------------------- */
+@keyframes fxFlash {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+  18% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); }
+  72% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.02); }
+}
+
+@keyframes fxDotPulse {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50% { opacity: 0.9; transform: scale(1.7); }
+}
+
+@keyframes fxPathDash {
+  to { stroke-dashoffset: 0; }
+}
+
+/* The big "GOAL"/"SAVE" call-out that pops on the pitch. */
+.fx-flash {
+  animation: fxFlash 1.5s ease forwards;
+}
+/* Glow ring under the active player dot. */
+.fx-dot-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: fxDotPulse 1.1s ease-in-out infinite;
+}
+/* The active attacking path draws itself in. */
+.fx-path {
+  stroke-dasharray: 120;
+  stroke-dashoffset: 120;
+  animation: fxPathDash 0.7s ease forwards;
+}
+/* The ball eases between zone coordinates. */
+.fx-ball {
+  transition: transform 0.7s cubic-bezier(0.33, 0.66, 0.4, 1);
+}
+
 /* Reduced-motion: disable all entrance/loop animation and movement. */
 @media (prefers-reduced-motion: reduce) {
   .fx-in,
   .fx-badge-pulse,
-  .fx-row-in {
+  .fx-row-in,
+  .fx-flash,
+  .fx-dot-pulse,
+  .fx-path {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
+  }
+  .fx-path { stroke-dashoffset: 0 !important; }
+  .fx-ball {
+    transition: none !important;
   }
   .fx-lift,
   .fx-press {
