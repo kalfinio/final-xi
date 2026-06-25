@@ -30,10 +30,12 @@ export function buildShareData({
   topScorer,
   topAssister,
   squadNames = new Set(),
+  verdict = '',
 }) {
   return {
     champion: result.champion,
     resultLine: outcome,
+    verdict,
     leagueFinish: `${ordinal(league.position)}, ${league.points} pts`,
     pool: config.pool === 'legends' ? 'Legends Only' : 'Modern Mix',
     formation: config.formation,
@@ -62,13 +64,16 @@ export function buildShareText(d) {
   const trophy = d.champion ? '🏆' : '⚔️'
   const lines = [
     `${trophy} Final XI — ${d.resultLine}`,
+  ]
+  if (d.verdict) lines.push(`Verdict: ${d.verdict}`)
+  lines.push(
     `League Phase: ${d.leagueFinish}`,
     `Rating: ${d.rating} | Identity: ${d.identity}`,
     `MVP: ${d.mvp}`,
     `Top scorer: ${d.topScorer}`,
     `Top assister: ${d.topAssister}`,
     `Difficulty: ${d.difficulty} | Rerolls: ${d.rerolls}`,
-  ]
+  )
   if (d.isDaily) lines.push(`Daily Challenge: ${d.date}`)
   lines.push('#FinalXI')
   return lines.join('\n')
@@ -111,11 +116,18 @@ export function downloadShareCard(d) {
   ctx.font = '700 60px ui-sans-serif, system-ui, Segoe UI, Roboto, Arial, sans-serif'
   ctx.fillText(d.resultLine, padL, 360)
 
+  // Dramatic verdict subtitle — the run's one-line headline.
+  if (d.verdict) {
+    ctx.fillStyle = gold
+    ctx.font = '700 40px ui-sans-serif, system-ui, Segoe UI, Roboto, Arial, sans-serif'
+    ctx.fillText(`“${d.verdict}”`, padL, 414)
+  }
+
   ctx.strokeStyle = '#2a2a2a'
   ctx.lineWidth = 2
   ctx.beginPath()
-  ctx.moveTo(padL, 400)
-  ctx.lineTo(W - padL, 400)
+  ctx.moveTo(padL, 452)
+  ctx.lineTo(W - padL, 452)
   ctx.stroke()
 
   // Compact, not overcrowded — the headline stats only.
@@ -132,8 +144,8 @@ export function downloadShareCard(d) {
     ['Rerolls used', d.rerolls, primary],
   ]
 
-  let y = 470
-  const step = 104
+  let y = 512
+  const step = 100
   for (const [label, value, color] of rows) {
     ctx.fillStyle = secondary
     ctx.font = '500 28px ui-sans-serif, system-ui, Segoe UI, Roboto, Arial, sans-serif'

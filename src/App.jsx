@@ -21,6 +21,7 @@ import {
   simulate,
   ordinal,
   outcomeLabel,
+  runVerdict,
   validateXI,
   posTypeOf,
   makeRng,
@@ -136,7 +137,7 @@ function HowToPlay() {
       <HowToStep n={5} title="Draft your XI">For each position, pick 1 of 3 players. You have 3 rerolls — each refreshes only the current position.</HowToStep>
       <HowToStep n={6} title="Set Your XI">Rearrange players into their real eligible positions (e.g. Messi can move between RW and CAM). Illegal moves are blocked.</HowToStep>
       <HowToStep n={7} title="Build your rating">Base points + traits + chemistry + role synergies − weaknesses. A higher Final Rating improves your European Run odds.</HowToStep>
-      <HowToStep n={8} title="Simulate the European Run">Play the League Phase. Finish top 8 for a direct Round of 16; 9th–24th means a Knockout Play-Off; 25th–36th is eliminated. Survive the knockouts to Win Europe.</HowToStep>
+      <HowToStep n={8} title="Simulate the European Run">Play the League Phase. Finish top 8 for a direct Round of 16; 9th–24th means a Knockout Play-Off; 25th–36th is eliminated. Survive the knockouts to Conquer Europe.</HowToStep>
       <HowToStep n={9} title="Share your result">Copy your result, download your share card, then try to beat your best run.</HowToStep>
       <div className="pt-1 border-t border-border text-xs text-gold/80">Scoring in one sentence: Final Rating = player value + traits + chemistry + role synergies − weaknesses.</div>
     </div>
@@ -166,9 +167,12 @@ function RoleGuide() {
 }
 
 function IntroScreen({ onStart, stats }) {
+  // Brand-new players (no recorded games) start on Casual so a first run isn't
+  // brutal before they learn roles/synergies. Returning users keep Classic.
+  const firstTime = !stats?.gamesPlayed
   const [formation, setFormation] = useState(null)
   const [mode, setMode] = useState('random')
-  const [difficulty, setDifficulty] = useState('classic')
+  const [difficulty, setDifficulty] = useState(firstTime ? 'casual' : 'classic')
   const [pool, setPool] = useState('modern')
   const [howOpen, setHowOpen] = useState(false)
   const [roleOpen, setRoleOpen] = useState(false)
@@ -218,6 +222,7 @@ function IntroScreen({ onStart, stats }) {
             </button>
           ))}
         </div>
+        {firstTime && <p className="fx-in fx-d3 text-[11px] text-secondary -mt-3 mb-5">New? Casual is recommended for your first run.</p>}
 
         <div className="fx-in fx-d4 mb-6">
           <button onClick={() => setHowOpen((o) => !o)} className="w-full flex items-center justify-between p-3 rounded-lg border border-border bg-surface text-left">
@@ -769,6 +774,7 @@ function ResultScreen({ squad, result, config, rerollsUsed, onPlayAgain }) {
 
   const lp = result.leaguePhase
   const outcome = outcomeLabel(result)
+  const verdict = runVerdict(result, squad)
   const squadNames = new Set(squad.map(s => s.player.name))
 
   const shareData = buildShareData({
@@ -776,7 +782,7 @@ function ResultScreen({ squad, result, config, rerollsUsed, onPlayAgain }) {
     league: { position: lp.position, points: lp.points },
     mvp, smart, best, weak, rerollsUsed, totalRerolls: TOTAL_REROLLS, date: todayKey(),
     era, bestModern, bestLegend, topScorer: result.topScorer, topAssister: result.topAssister,
-    squadNames,
+    squadNames, verdict,
   })
   const shareText = buildShareText(shareData)
 
@@ -789,6 +795,7 @@ function ResultScreen({ squad, result, config, rerollsUsed, onPlayAgain }) {
       <div className="text-6xl sm:text-7xl mb-3">{result.champion ? '🏆' : '🗡️'}</div>
       <div className="flex justify-center mb-2"><ModeBadge mode={config.mode} /></div>
       <h2 className={`text-2xl sm:text-3xl font-black mb-1 ${result.champion ? 'text-gold' : 'text-danger'}`}>{result.champion ? 'Won Europe!' : outcome}</h2>
+      {verdict && <div className="text-lg sm:text-xl font-black text-gold tracking-tight mb-2">“{verdict}”</div>}
       <p className="text-secondary mb-6 text-sm sm:text-base">{result.champion ? 'Your XI conquered the continent.' : 'The run ends here — but it was a story worth telling.'}</p>
 
       <div className="p-4 sm:p-5 rounded-lg bg-card border border-border text-left mb-5">

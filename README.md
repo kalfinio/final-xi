@@ -1,6 +1,6 @@
 # Final XI
 
-**Draft 11 legends. Win Europe.**
+**Draft 11 legends. Conquer Europe.**
 
 Final XI is a browser game where you draft a squad of football icons into a
 formation, arrange them into their real positions, build chemistry and tactical
