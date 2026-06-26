@@ -242,31 +242,3 @@ export function matchVerdict(tl) {
   return 'Honours even'
 }
 
-// Choose the single most narratively important match of a finished run to
-// feature in the Match Center.
-export function pickFeatureMatch(result) {
-  if (!result) return null
-  const kos = result.knockouts || []
-  // The Final, whether won or lost, is the headline match.
-  if (kos.length && (result.champion || result.exitStage === 'Final')) {
-    return { match: kos[kos.length - 1], stageLabel: 'Final' }
-  }
-  // Otherwise the match the run died in.
-  const elimKO = [...kos].reverse().find((m) => m.eliminated)
-  if (elimKO) return { match: elimKO, stageLabel: elimKO.round }
-  if (result.playoff && result.playoff.eliminated) return { match: result.playoff, stageLabel: 'Knockout Play-Off' }
-  // Survived deep but data quirk — show the last knockout played.
-  if (kos.length) return { match: kos[kos.length - 1], stageLabel: kos[kos.length - 1].round }
-  if (result.playoff) return { match: result.playoff, stageLabel: 'Knockout Play-Off' }
-  // Eliminated in the League Phase — show the most eventful league match.
-  const lps = result.leaguePhase?.matches || []
-  if (lps.length) {
-    let best = null
-    lps.forEach((m) => {
-      const s = (m.result === 'win' ? 10 : m.result === 'draw' ? 3 : 0) + m.gf + m.ga
-      if (!best || s > best._s) best = { m, _s: s }
-    })
-    return { match: best.m, stageLabel: `League Phase · Matchday ${best.m.matchNo}` }
-  }
-  return null
-}

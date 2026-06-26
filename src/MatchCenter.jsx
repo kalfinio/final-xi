@@ -315,12 +315,15 @@ function computeStats(resolved, timeline, prog, hg, ag) {
   const aSot = Math.max(ease(fs.away.sot), ag, cOnT('away'))
   const hPoss = Math.round(50 + (fs.home.possession - 50) * prog)
   const big = (team) => resolved.filter((e) => e.team === team && (e.type === 'goal' || e.type === 'save' || e.type === 'chance')).length
-  const saves = (keeper) => resolved.filter((e) => e.type === 'save' && e.team === (keeper === 'home' ? 'away' : 'home')).length
   const att = (team) => resolved.filter((e) => e.team === team && ['goal', 'shot', 'save', 'chance'].includes(e.type)).length
   const totalAtt = att('home') + att('away') || 1
+  // A keeper's saves are the opponent's on-target shots that did not score —
+  // keeps Saves logically consistent with Shots on target and Goals.
+  const hSaves = Math.max(0, aSot - ag)
+  const aSaves = Math.max(0, hSot - hg)
   return {
     hShots, aShots, hSot, aSot, hPoss, aPoss: 100 - hPoss,
-    hBig: big('home'), aBig: big('away'), hSaves: saves('home'), aSaves: saves('away'),
+    hBig: big('home'), aBig: big('away'), hSaves, aSaves,
     momentumHome: Math.round((att('home') / totalAtt) * 100),
   }
 }
@@ -515,7 +518,7 @@ export default function MatchCenter({ squad, feature, onContinue, isLast = false
             <div className="flex items-center gap-1">
               {[1, 2, 4].map((s) => (<ControlBtn key={s} active={speed === s} onClick={() => setSpeed(s)}>x{s}</ControlBtn>))}
             </div>
-            <button onClick={() => { setPlaying(false); setFinished(true) }} className="ml-1 px-3 py-1.5 rounded-md text-xs font-bold border border-border bg-card text-secondary hover:text-gold fx-press">Skip to end ⏭</button>
+            <button onClick={() => { setPlaying(false); setFinished(true) }} className="ml-1 px-3 py-1.5 rounded-md text-xs font-bold border border-border bg-card text-secondary hover:text-gold fx-press">Skip to end</button>
           </>
         ) : (
           <ControlBtn active={false} onClick={restart}>↻ Replay</ControlBtn>

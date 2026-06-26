@@ -109,10 +109,10 @@ export function MatchHub({ item, teamName, record, matchIndex, total, onWatch, o
       </div>
 
       <div className="flex flex-col gap-3">
-        <RunBtn onClick={onWatch} className="w-full">▶ Watch Match</RunBtn>
+        <RunBtn onClick={onWatch} className="w-full">Watch Match</RunBtn>
         <div className="flex flex-col sm:flex-row gap-3">
-          <RunBtn onClick={onQuick} variant="ghost" className="w-full sm:flex-1">⏩ Quick Sim</RunBtn>
-          <RunBtn onClick={onSimAll} variant="surface" className="w-full sm:flex-1">⏭ Sim All to Final Result</RunBtn>
+          <RunBtn onClick={onQuick} variant="ghost" className="w-full sm:flex-1">Quick Sim</RunBtn>
+          <RunBtn onClick={onSimAll} variant="surface" className="w-full sm:flex-1">Sim All</RunBtn>
         </div>
       </div>
     </div>

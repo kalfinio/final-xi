@@ -863,7 +863,7 @@ function ResultScreen({ squad, result, config, rerollsUsed, onPlayAgain, onViewR
 
       {onViewReport && (
         <div className="mb-3">
-          <button onClick={onViewReport} className="text-xs text-secondary hover:text-gold underline-offset-2 hover:underline">View full European Run report →</button>
+          <button onClick={onViewReport} className="text-xs text-secondary hover:text-gold underline-offset-2 hover:underline">View European Run report →</button>
         </div>
       )}
 
