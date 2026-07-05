@@ -78,7 +78,7 @@ function RunBtn({ children, onClick, variant = 'gold', className = '' }) {
 // ---------------------------------------------------------------------------
 // Match Hub — shown before every match.
 // ---------------------------------------------------------------------------
-export function MatchHub({ item, teamName, record, matchIndex, total, onWatch, onQuick, onSimAll }) {
+export function MatchHub({ item, teamName, record, matchIndex, total, firstTime, onWatch, onQuick, onSimAll }) {
   const { stage, label } = stageDisplay(item)
   const meta = item.match.opponentMeta
   const diff = predictedDifficulty(item)
@@ -108,11 +108,24 @@ export function MatchHub({ item, teamName, record, matchIndex, total, onWatch, o
         <span className="text-secondary">Goals </span><span className="font-bold text-primary">{record.gf}–{record.ga}</span>
       </div>
 
+      {firstTime && matchIndex === 0 && (
+        <p className="text-[11px] text-gold/75 text-center mb-3">Recommended: Watch one match first, then Quick Sim league matches for a faster run.</p>
+      )}
+
       <div className="flex flex-col gap-3">
-        <RunBtn onClick={onWatch} className="w-full">Watch Match</RunBtn>
+        <div>
+          <RunBtn onClick={onWatch} className="w-full">Watch Match</RunBtn>
+          <p className="text-[10px] text-secondary text-center mt-1">Watch the 2D simulation play out.</p>
+        </div>
         <div className="flex flex-col sm:flex-row gap-3">
-          <RunBtn onClick={onQuick} variant="ghost" className="w-full sm:flex-1">Quick Sim</RunBtn>
-          <RunBtn onClick={onSimAll} variant="surface" className="w-full sm:flex-1">Sim All</RunBtn>
+          <div className="sm:flex-1">
+            <RunBtn onClick={onQuick} variant="ghost" className="w-full">Quick Sim</RunBtn>
+            <p className="text-[10px] text-secondary text-center mt-1">Instantly simulate this match.</p>
+          </div>
+          <div className="sm:flex-1">
+            <RunBtn onClick={onSimAll} variant="surface" className="w-full">Sim All</RunBtn>
+            <p className="text-[10px] text-secondary text-center mt-1">Finish the run, go to the final result.</p>
+          </div>
         </div>
       </div>
     </div>

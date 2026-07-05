@@ -175,6 +175,28 @@ function RoleGuide() {
   )
 }
 
+// First-run onboarding modal — a concise 4-step explainer.
+const HOWTO_KEY = 'finalxi.howToPlaySeen.v1'
+
+function HowToPlayModal({ onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70" onClick={onClose}>
+      <div className="relative w-full max-w-md max-h-[88vh] overflow-y-auto rounded-xl bg-card border border-gold/30 p-5 sm:p-6 fx-in" onClick={(e) => e.stopPropagation()}>
+        <button onClick={onClose} aria-label="Close" className="absolute top-2.5 right-3 text-secondary hover:text-gold text-2xl leading-none fx-press">×</button>
+        <h2 className="text-xl font-black text-gold mb-1">Welcome to Final XI</h2>
+        <p className="text-xs text-secondary mb-4">The whole game in four steps.</p>
+        <div className="space-y-3 mb-5">
+          <HowToStep n={1} title="Draft your XI">For each position, pick 1 of 3 players. You get 3 rerolls to refresh the current choice.</HowToStep>
+          <HowToStep n={2} title="Build chemistry">Roles, eras, GOAT aura and tactical balance combine into your Final Rating.</HowToStep>
+          <HowToStep n={3} title="Name & plan">Name your team, then open Tactical Breakdown to see your in / out-of-possession shape.</HowToStep>
+          <HowToStep n={4} title="Play the European Run">Go match by match — Watch Match, Quick Sim, or Sim All to the final result.</HowToStep>
+        </div>
+        <button onClick={onClose} className="w-full px-5 py-3 rounded-md font-semibold fx-press bg-gold text-black hover:bg-gold/90">Got it — Start Drafting</button>
+      </div>
+    </div>
+  )
+}
+
 function IntroScreen({ onStart, stats }) {
   // Brand-new players (no recorded games) start on Casual so a first run isn't
   // brutal before they learn roles/synergies. Returning users keep Classic.
@@ -185,15 +207,25 @@ function IntroScreen({ onStart, stats }) {
   const [pool, setPool] = useState('modern')
   const [howOpen, setHowOpen] = useState(false)
   const [roleOpen, setRoleOpen] = useState(false)
+  // Auto-show the onboarding modal only the first time the game is opened.
+  const [showModal, setShowModal] = useState(() => {
+    try { return !localStorage.getItem(HOWTO_KEY) } catch { return false }
+  })
+  function closeModal() {
+    try { localStorage.setItem(HOWTO_KEY, '1') } catch { /* ignore */ }
+    setShowModal(false)
+  }
   const fav = favoriteFormation(stats)
 
   return (
     <div className="relative">
+      {showModal && <HowToPlayModal onClose={closeModal} />}
       <IntroBackdrop />
       <div className="relative z-10 max-w-3xl mx-auto px-4 py-8 sm:py-10">
         <div className="text-center mb-7 sm:mb-8">
           <h1 className="fx-in text-4xl sm:text-5xl font-black tracking-tight text-gold mb-2">Final XI</h1>
           <p className="fx-in fx-d1 text-secondary text-base sm:text-lg">Draft 11 legends. Conquer Europe.</p>
+          <button onClick={() => setShowModal(true)} className="fx-in fx-d1 mt-2 text-xs text-gold/80 hover:text-gold underline-offset-2 hover:underline">How to Play</button>
         </div>
 
         <div className="fx-in fx-d2 grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
@@ -235,7 +267,7 @@ function IntroScreen({ onStart, stats }) {
 
         <div className="fx-in fx-d4 mb-6">
           <button onClick={() => setHowOpen((o) => !o)} className="w-full flex items-center justify-between p-3 rounded-lg border border-border bg-surface text-left">
-            <span className="text-sm font-semibold">How to Play</span>
+            <span className="text-sm font-semibold">Detailed Guide</span>
             <span className="text-secondary text-sm">{howOpen ? '−' : '+'}</span>
           </button>
           {howOpen && <HowToPlay />}
@@ -578,6 +610,15 @@ function BonusesScreen({ squad, config, rerollsUsed, onSimulate, initialTeamName
         <StatBox label="Total" value={total} accent="text-gold" />
       </div>
 
+      {/* Plain-English meaning of this screen — quick clarity for new players. */}
+      <div className="mb-6 p-3 rounded-lg bg-card border border-border text-xs text-secondary space-y-1">
+        <div className="text-[10px] uppercase tracking-widest text-gold/80 mb-1">What this means</div>
+        <div><span className="text-primary font-semibold">Rating</span> = squad quality + chemistry bonuses.</div>
+        <div><span className="text-primary font-semibold">Strengths</span> help your European Run.</div>
+        <div><span className="text-primary font-semibold">Weaknesses</span> can show up in match commentary.</div>
+        <div><span className="text-primary font-semibold">Tactics</span> shape match events and your tactical notes.</div>
+      </div>
+
       <button onClick={() => setHowOpen((o) => !o)} className="w-full flex items-center justify-between p-3 rounded-lg border border-border bg-surface text-left mb-6">
         <span className="text-sm font-semibold">How rating works</span>
         <span className="text-secondary text-sm">{howOpen ? '−' : '+'}</span>
@@ -593,10 +634,11 @@ function BonusesScreen({ squad, config, rerollsUsed, onSimulate, initialTeamName
         </div>
       )}
 
-      <button onClick={() => setTacticsOpen((o) => !o)} className="w-full flex items-center justify-between p-3 rounded-lg border border-border bg-surface text-left mb-6">
+      <button onClick={() => setTacticsOpen((o) => !o)} className="w-full flex items-center justify-between p-3 rounded-lg border border-border bg-surface text-left mb-1">
         <span className="text-sm font-semibold">{tacticsOpen ? 'Hide Tactical Breakdown' : 'Show Tactical Breakdown'}</span>
         <span className="text-secondary text-sm">{tacticsOpen ? '−' : '+'}</span>
       </button>
+      <p className="text-[11px] text-secondary px-1 mb-6">Shows how your XI behaves in and out of possession.</p>
       {tacticsOpen && (
         <div className="-mt-4 mb-6">
           <TacticalPitch squad={squad} formation={config.formation} />
@@ -636,7 +678,7 @@ function BonusesScreen({ squad, config, rerollsUsed, onSimulate, initialTeamName
           placeholder={DEFAULT_TEAM_NAME}
           className="w-full px-4 py-3 rounded-lg bg-card border border-border text-center text-primary font-semibold focus:outline-none focus:border-gold"
         />
-        <p className="text-[11px] text-secondary text-center mt-1.5">Up to {TEAM_NAME_MAX} characters · used across your Match Center and result.</p>
+        <p className="text-[11px] text-secondary text-center mt-1.5">Used in the Match Center and share card · up to {TEAM_NAME_MAX} characters.</p>
       </div>
 
       <div className="text-center">
@@ -970,6 +1012,7 @@ export default function App() {
           record={runRecord(runMatchesRef.current.slice(0, matchIndex))}
           matchIndex={matchIndex}
           total={runMatchesRef.current.length}
+          firstTime={!stats?.gamesPlayed}
           onWatch={watchMatch}
           onQuick={quickSim}
           onSimAll={simAll}
