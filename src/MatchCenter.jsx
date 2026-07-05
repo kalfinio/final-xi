@@ -1,11 +1,19 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { shortDisplayName } from './data'
 import { buildMatchTimeline, matchVerdict } from './matchTimeline'
+import { projectHomeDots, layoutAwayDots } from './sequenceEngine'
 
 // ---------------------------------------------------------------------------
-// Zone-based football (no physics). Coordinates are attack-relative on a 100×64
-// pitch — the home team attacks toward +x; away events are mirrored. The ball
-// only moves while an event is playing, then rests at the centre spot.
+// 2D Match Center (Phase 2): participant-based sequence playback.
+//
+// Home markers come from the tactics.js role/formation marker model (projected
+// by sequenceEngine — one positional source, shared with TacticalPitch's data).
+// Shot-like events carry `event.seq` (real-XI touches); the animator plays them
+// touch by touch: highlight actor → move ball → action text → next actor.
+// Involved players move to their touch positions, one or two nearby defenders
+// react, the keeper adjusts on shots, everyone eases back to shape afterwards.
+// No physics — simple, readable movement only. Momentum/card/substitution
+// events still use the legacy zone plan (no ball, no participants).
 // ---------------------------------------------------------------------------
 const ZONES = {
   ownBox: { x: 9, y: 32 },
@@ -25,61 +33,110 @@ function zonePt(zone, team) {
 }
 function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y) }
 
-// Per-event timings (ms @ x1). Goals/saves/late drama linger longer.
+// Per-event playback plan. Sequence events: one stop per touch → outcome →
+// rest. Legacy (no-ball) events keep the Phase 1 zone plan.
 function buildPlan(e) {
+  if (e.seq) {
+    const seq = e.seq
+    const a = e.anim || {}
+    const dramatic = e.type === 'goal' || e.type === 'save' || !!a.lateDrama
+    const outcomeMs = e.type === 'goal' ? 1800 : e.type === 'save' ? 1450 : a.lateDrama ? 1150 : 880
+    const stops = seq.touches.map((t, i) => ({
+      point: t.at,
+      hold: i === 0 ? 640 : 720,
+      kind: 'touch',
+      touchIdx: i,
+      text: t.text,
+      actorKey: t.playerId != null ? `h${t.playerId}` : `a${t.awayNum}`,
+    }))
+    const outcomeFrame = stops.length
+    stops.push({ point: seq.outcome.at, hold: outcomeMs, kind: 'outcome' })
+    stops.push({ point: zonePt('center', e.team), hold: dramatic ? 680 : 460, kind: 'rest' })
+    const pathPts = [...seq.touches.map((t) => `${t.at.x},${t.at.y}`), `${seq.outcome.at.x},${seq.outcome.at.y}`].join(' ')
+    return {
+      seq, stops, outcomeFrame, noBall: false, dramatic,
+      lateDrama: !!a.lateDrama, animType: a.animType || e.type,
+      label: a.visualLabel, sub: a.subLabel, endPoint: seq.outcome.at, pathPts,
+      highlightZone: null,
+    }
+  }
+  // Legacy zone plan — momentum / card / substitution (no ball, no actors).
   const a = e.anim
   const team = e.team
-  const noBall = a.animType === 'momentum_shift' || a.animType === 'substitution_impact' || a.animType === 'card'
-  const pts = noBall
-    ? [zonePt('center', team), zonePt('center', team)]
-    : [a.startZone, ...a.pathZones, a.endZone].map((z) => zonePt(z, team))
-
-  const dramatic = a.outcome === 'goal' || a.outcome === 'save' || a.lateDrama
-  const buildMs = 460
-  const moveMs = dramatic ? 560 : 620
-  const outcomeMs = a.outcome === 'goal' ? 1800 : a.outcome === 'save' ? 1450 : noBall ? 1050 : a.lateDrama ? 1150 : 820
-  const restMs = dramatic ? 680 : 460
-
-  const stops = [{ point: pts[0], hold: buildMs, kind: 'build' }]
-  for (let i = 1; i < pts.length; i++) stops.push({ point: pts[i], hold: moveMs, kind: 'move' })
+  const noBall = true
+  const pts = [zonePt('center', team), zonePt('center', team)]
+  const stops = [{ point: pts[0], hold: 460, kind: 'build' }]
   const outcomeFrame = stops.length
-  stops.push({ point: pts[pts.length - 1], hold: outcomeMs, kind: 'outcome' })
-  stops.push({ point: zonePt('center', team), hold: restMs, kind: 'rest' })
-
-  // Pixel path for the gold pass/shot line (build → outcome, excludes rest).
-  const pathPts = noBall ? null : pts.map((p) => `${p.x},${p.y}`).join(' ')
-  return { stops, outcomeFrame, noBall, dramatic, lateDrama: a.lateDrama, animType: a.animType, label: a.visualLabel, sub: a.subLabel, endPoint: pts[pts.length - 1], pathPts, highlightZone: a.highlightZone }
-}
-
-// Lay out the user's XI (left half, attacking right), numbered 1..11.
-function layoutHome(players) {
-  const lines = { GK: [], DEF: [], MID: [], ATT: [] }
-  players.forEach((p) => { (lines[p.posType] || lines.MID).push(p) })
-  const xByType = { GK: 7, DEF: 21, MID: 36, ATT: 47 }
-  const dots = []
-  let n = 0
-  for (const t of ['GK', 'DEF', 'MID', 'ATT']) {
-    const arr = lines[t]
-    arr.forEach((p, i) => {
-      const y = arr.length === 1 ? 32 : 9 + i * (46 / (arr.length - 1))
-      dots.push({ x: xByType[t], y, id: p.id, side: 'home', gk: t === 'GK', num: ++n })
-    })
+  stops.push({ point: pts[pts.length - 1], hold: 1050, kind: 'outcome' })
+  stops.push({ point: zonePt('center', team), hold: 460, kind: 'rest' })
+  return {
+    seq: null, stops, outcomeFrame, noBall, dramatic: false, lateDrama: false,
+    animType: a.animType, label: a.visualLabel, sub: a.subLabel,
+    endPoint: pts[pts.length - 1], pathPts: null, highlightZone: a.highlightZone,
   }
-  return dots
 }
 
-// Generic opponent shape (mirrored on the right half), numbered 1..11.
-function layoutAway() {
-  const shape = [{ t: 'GK', n: 1, x: 93 }, { t: 'DEF', n: 4, x: 79 }, { t: 'MID', n: 3, x: 64 }, { t: 'ATT', n: 3, x: 53 }]
-  const dots = []
-  let n = 0
-  shape.forEach((line) => {
-    for (let i = 0; i < line.n; i++) {
-      const y = line.n === 1 ? 32 : 9 + i * (46 / (line.n - 1))
-      dots.push({ x: line.x, y, side: 'away', gk: line.t === 'GK', num: ++n })
+// Displayed marker positions for the current frame: involved players at their
+// touch spots, uninvolved attackers lean toward their in-possession shape,
+// 1–2 nearest defenders react to the ball, keeper adjusts on shots, and
+// everyone returns to base on rest/finish.
+function displayDots(baseHome, baseAway, plan, frame, finished) {
+  const home = baseHome.map((d) => ({ ...d }))
+  const away = baseAway.map((d) => ({ ...d }))
+  const stop = plan?.stops?.[frame]
+  if (!plan?.seq || finished || !stop || stop.kind === 'rest') return { home, away }
+
+  const seq = plan.seq
+  const atOutcome = frame >= plan.outcomeFrame
+  const curTouch = atOutcome ? seq.touches.length - 1 : Math.min(frame, seq.touches.length - 1)
+  const ball = stop.point
+
+  // Involved players: at (or pre-moving toward) their touch positions.
+  seq.touches.forEach((t, i) => {
+    if (i > curTouch + 1) return
+    if (t.playerId != null) {
+      const d = home.find((x) => x.id === t.playerId)
+      if (d) { d.x = t.at.x; d.y = t.at.y }
+    } else if (t.awayNum != null) {
+      const d = away.find((x) => x.num === t.awayNum)
+      if (d) { d.x = t.at.x; d.y = t.at.y }
     }
   })
-  return dots
+
+  const attacking = seq.team
+  const involved = new Set(seq.touches.slice(0, curTouch + 2).map((t) => (t.playerId != null ? `h${t.playerId}` : `a${t.awayNum}`)))
+
+  if (attacking === 'home') {
+    // Uninvolved home attackers/mids lean into the in-possession shape.
+    home.forEach((d) => {
+      if (d.gk || involved.has(`h${d.id}`)) return
+      d.x = (d.x + d.possX) / 2
+      d.y = (d.y + d.possY) / 2
+    })
+    // Two nearest away outfielders shift toward the ball; keeper adjusts on shots.
+    reactDefenders(away, ball, atOutcome, plan)
+  } else {
+    reactDefenders(home, ball, atOutcome, plan)
+  }
+  return { home, away }
+}
+
+function reactDefenders(defs, ball, atOutcome, plan) {
+  const outfield = defs.filter((d) => !d.gk)
+  outfield
+    .map((d) => ({ d, dd: dist(d, ball) }))
+    .sort((a, b) => a.dd - b.dd)
+    .slice(0, 2)
+    .forEach(({ d, dd }) => {
+      if (dd < 1) return
+      const k = Math.min(3.2, dd) / dd
+      d.x += (ball.x - d.x) * k * 0.4
+      d.y += (ball.y - d.y) * k * 0.4
+    })
+  const gk = defs.find((d) => d.gk)
+  if (gk && atOutcome && plan.seq && ['goal', 'save', 'shot_on', 'shot_off'].includes(plan.seq.outcome.type)) {
+    gk.y = Math.max(24, Math.min(40, ball.y))
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -119,7 +176,7 @@ const TYPE_META = {
   substitution: { label: 'ROLE IMPACT', cls: 'text-secondary border-border bg-surface' },
 }
 
-function Spotlight({ active, homeName, awayName, atOutcome, momentumHome }) {
+function Spotlight({ active, homeName, awayName, atOutcome, momentumHome, liveAction }) {
   if (!active) {
     return (
       <div className="rounded-lg bg-card border border-border px-3 py-2.5 mb-2 text-center">
@@ -139,7 +196,8 @@ function Spotlight({ active, homeName, awayName, atOutcome, momentumHome }) {
         {active.anim?.lateDrama && <span className="px-2 py-0.5 rounded text-[10px] font-black tracking-wide border text-red-200 border-red-400/50 bg-red-500/15">LATE DRAMA</span>}
         <span className={`text-xs font-bold truncate ${isHome ? 'text-primary' : 'text-blue-300'}`}>{teamLabel}</span>
       </div>
-      <div className="text-xs text-secondary leading-snug">{active.description}</div>
+      {/* Live play-by-play during the sequence; the resolved story at the outcome. */}
+      <div className="text-xs text-secondary leading-snug">{!atOutcome && liveAction ? liveAction : active.description}</div>
       {active.type === 'momentum' && (
         <div className="mt-1.5 h-1.5 rounded-full bg-bg overflow-hidden flex">
           <div className="h-full bg-gold transition-all duration-700" style={{ width: `${momentumHome}%` }} />
@@ -153,19 +211,18 @@ function Spotlight({ active, homeName, awayName, atOutcome, momentumHome }) {
 // ---------------------------------------------------------------------------
 // Pitch — larger, clearer, event-driven.
 // ---------------------------------------------------------------------------
-function Dot({ d, active, dim, keeper }) {
+function Dot({ d, active, keeper, dim }) {
   const fill = d.gk ? (d.side === 'home' ? '#c9a84c' : '#f87171') : (d.side === 'home' ? '#f5f5f5' : '#3b82f6')
-  const numFill = d.side === 'home' && !d.gk ? '#0c1a10' : '#0c1a10'
   return (
-    <g opacity={dim ? 0.45 : 1}>
-      {(active || keeper) && <circle className="fx-dot-pulse" cx={d.x} cy={d.y} r="3.3" fill="none" stroke="#c9a84c" strokeWidth="0.6" />}
-      <circle cx={d.x} cy={d.y} r="2.1" fill={fill} stroke="#0c1a10" strokeWidth="0.4" />
-      <text x={d.x} y={d.y + 0.8} textAnchor="middle" fontSize="2.1" fontWeight="700" fill={numFill}>{d.num}</text>
+    <g className="fx-dotm" style={{ transform: `translate(${d.x}px, ${d.y}px)` }} opacity={dim ? 0.45 : 1}>
+      {(active || keeper) && <circle className="fx-dot-pulse" cx="0" cy="0" r="3.3" fill="none" stroke="#c9a84c" strokeWidth="0.6" />}
+      <circle cx="0" cy="0" r="2.1" fill={fill} stroke="#0c1a10" strokeWidth="0.4" />
+      <text x="0" y="0.8" textAnchor="middle" fontSize="2.1" fontWeight="700" fill="#0c1a10">{d.num}</text>
     </g>
   )
 }
 
-function Pitch({ homeDots, awayDots, ball, moveDur, pathPts, activeTeam, activeDotId, keeperDotId, overlay, goalFlash, drama, highlight, ballMoving, eventKey }) {
+function Pitch({ homeDots, awayDots, ball, moveDur, pathPts, activeTeam, activeKey, keeperSide, overlay, goalFlash, drama, highlight, ballMoving, eventKey }) {
   return (
     <div className="relative rounded-lg overflow-hidden border border-border mb-2" style={{ background: '#0c1a10' }}>
       <svg viewBox="0 0 100 64" className="w-full block" style={{ aspectRatio: '100 / 64' }}>
@@ -215,8 +272,8 @@ function Pitch({ homeDots, awayDots, ball, moveDur, pathPts, activeTeam, activeD
         )}
 
         {/* dots */}
-        {awayDots.map((d) => <Dot key={`a${d.num}`} d={d} active={activeTeam === 'away' && d.num === activeDotId} keeper={d.gk && keeperDotId === 'away'} dim={activeTeam === 'home'} />)}
-        {homeDots.map((d) => <Dot key={`h${d.num}`} d={d} active={activeTeam === 'home' && d.num === activeDotId} keeper={d.gk && keeperDotId === 'home'} dim={activeTeam === 'away'} />)}
+        {awayDots.map((d) => <Dot key={`a${d.num}`} d={d} active={activeKey === `a${d.num}`} keeper={d.gk && keeperSide === 'away'} dim={activeTeam === 'home'} />)}
+        {homeDots.map((d) => <Dot key={`h${d.id}`} d={d} active={activeKey === `h${d.id}`} keeper={d.gk && keeperSide === 'home'} dim={activeTeam === 'away'} />)}
 
         {/* goal-mouth flash */}
         {goalFlash && (
@@ -310,8 +367,11 @@ function ControlBtn({ active, onClick, children, className = '' }) {
 // timeline.finalStats (the canonical MatchDetail values), FLOORED by the
 // resolved-event counts and CAPPED at the canonical totals. The timeline's
 // budget accounting guarantees resolved counts never exceed those totals, and
-// at full time (prog = 1) every number equals MatchDetail exactly. Exported
-// for the cross-view consistency tests.
+// at full time (prog = 1) every number equals MatchDetail exactly. Big
+// chances are now event-driven too: sequences carry canonical big-chance
+// flags (assigned within the detail.bigChances budget), so most stat changes
+// are explained by a resolved sequence; the eased floor only covers the
+// residual un-visualized share. Exported for the cross-view tests.
 export function computeStats(resolved, timeline, prog, hg, ag) {
   const fs = timeline.finalStats
   const ease = (v) => Math.round(v * prog)
@@ -321,16 +381,16 @@ export function computeStats(resolved, timeline, prog, hg, ag) {
   const cOnT = (team) => resolved.filter((e) => e.team === team && e.countsShot && e.onTarget).length
   // resolved saves BY a team = opponent's resolved on-target shots that didn't score
   const cSaves = (team) => resolved.filter((e) => e.team !== team && e.countsShot && e.onTarget && e.type !== 'goal').length
+  // resolved big chances = sequences flagged within the canonical budget
+  const cBig = (team) => resolved.filter((e) => e.team === team && e.big).length
   const hShots = live(fs.home.shots, cShot('home'))
   const aShots = live(fs.away.shots, cShot('away'))
   const hSot = live(fs.home.sot, Math.max(hg, cOnT('home')))
   const aSot = live(fs.away.sot, Math.max(ag, cOnT('away')))
   const hSaves = live(fs.home.saves, cSaves('home'))
   const aSaves = live(fs.away.saves, cSaves('away'))
-  // big chances have no 1:1 timeline events — pure eased progression, floored
-  // by resolved goals (a goal is always a big chance).
-  const hBig = live(fs.home.bigChances, hg)
-  const aBig = live(fs.away.bigChances, ag)
+  const hBig = live(fs.home.bigChances, cBig('home'))
+  const aBig = live(fs.away.bigChances, cBig('away'))
   const hPoss = Math.round(50 + (fs.home.possession - 50) * prog)
   // momentum is visual flair (not a canonical hard stat) — unchanged.
   const att = (team) => resolved.filter((e) => e.team === team && ['goal', 'shot', 'save', 'chance'].includes(e.type)).length
@@ -418,12 +478,13 @@ const OUTCOME_OVERLAY = {
 export default function MatchCenter({ squad, feature, onContinue, isLast = false, teamName = 'Final XI', tactics = null }) {
   const players = useMemo(() => squad.map((s) => s.player).filter(Boolean), [squad])
   const timeline = useMemo(
-    () => buildMatchTimeline(feature.match, players, feature.stageLabel, teamName, tactics),
-    [feature, players, teamName, tactics],
+    () => buildMatchTimeline(feature.match, players, feature.stageLabel, teamName, tactics, squad),
+    [feature, players, teamName, tactics, squad],
   )
   const events = timeline.events
-  const homeDots = useMemo(() => layoutHome(players), [players])
-  const awayDots = useMemo(() => layoutAway(), [])
+  // Home shape: tactics.js role/formation markers projected onto the 2D pitch.
+  const baseHome = useMemo(() => projectHomeDots(squad, tactics?.flags?.exposed ? 0.4 : 1), [squad, tactics])
+  const baseAway = useMemo(() => layoutAwayDots(), [])
   const plans = useMemo(() => events.map(buildPlan), [events])
 
   const [idx, setIdx] = useState(-1)   // -1 = kick-off
@@ -460,8 +521,9 @@ export default function MatchCenter({ squad, feature, onContinue, isLast = false
   const plan = active ? plans[idx] : null
   const clampedFrame = plan ? Math.min(frame, plan.stops.length - 1) : 0
   const atOutcome = plan ? clampedFrame >= plan.outcomeFrame : false
-  const ball = plan ? plan.stops[clampedFrame].point : zonePt('center', 'home')
-  const moveDur = plan ? Math.min(plan.stops[clampedFrame].hold, 700) / speed : 500
+  const curStop = plan ? plan.stops[clampedFrame] : null
+  const ball = curStop ? curStop.point : zonePt('center', 'home')
+  const moveDur = curStop ? Math.min(curStop.hold, 700) / speed : 500
 
   // Resolved = events whose outcome has fired → drives score, ticker, stats.
   // When finished (naturally or via Skip), everything is fully resolved.
@@ -470,15 +532,19 @@ export default function MatchCenter({ squad, feature, onContinue, isLast = false
   const hg = resolved.filter((e) => e.type === 'goal' && e.team === 'home').length
   const ag = resolved.filter((e) => e.type === 'goal' && e.team === 'away').length
 
-  // Active / keeper dot highlight for the current event.
-  const { activeDotId, keeperDotId } = useMemo(() => {
-    if (!active || !plan) return { activeDotId: null, keeperDotId: null }
-    const pool = active.team === 'home' ? homeDots : awayDots
-    let near = pool[0]
-    pool.forEach((d) => { if (dist(d, plan.endPoint) < dist(near, plan.endPoint)) near = d })
-    const keeper = (plan.animType === 'goal' || plan.animType === 'save') ? (active.team === 'home' ? 'away' : 'home') : null
-    return { activeDotId: plan.noBall ? null : near.num, keeperDotId: keeper }
-  }, [idx, active, plan, homeDots, awayDots])
+  // Marker positions for this frame (sequence movement + defensive reaction).
+  const { home: homeDots, away: awayDots } = useMemo(
+    () => displayDots(baseHome, baseAway, plan, clampedFrame, finished),
+    [baseHome, baseAway, plan, clampedFrame, finished],
+  )
+
+  // Active actor + keeper highlight for the current frame.
+  const activeKey = !finished && curStop?.kind === 'touch' ? curStop.actorKey
+    : !finished && atOutcome && plan?.seq ? plan.stops[plan.outcomeFrame - 1]?.actorKey
+    : null
+  const keeperSide = !finished && atOutcome && plan?.seq && ['goal', 'save', 'shot_on'].includes(plan.seq.outcome.type)
+    ? (active.team === 'home' ? 'away' : 'home')
+    : null
 
   const minute = finished ? 90 : (active ? active.minute : (resolved.length ? events[resolved.length - 1].minute : 0))
   const prog = Math.min(1, (finished ? 90 : (active ? active.minute : 0)) / 90)
@@ -493,10 +559,11 @@ export default function MatchCenter({ squad, feature, onContinue, isLast = false
   const overlay = (active && atOutcome)
     ? { ...(OUTCOME_OVERLAY[active.type] || OUTCOME_OVERLAY.substitution), sub: plan.sub, key: `${idx}` }
     : null
-  const goalFlash = (active && atOutcome && plan.animType === 'goal') ? active.team : null
+  const goalFlash = (active && atOutcome && active.type === 'goal') ? active.team : null
   const drama = !!(active && plan?.lateDrama && !finished)
   const highlight = (active && plan?.highlightZone && !finished) ? zonePt(plan.highlightZone, active.team) : null
   const ballMoving = !!(plan && !plan.noBall && clampedFrame >= 1)
+  const liveAction = !finished && curStop?.kind === 'touch' ? curStop.text : null
 
   function restart() { setIdx(-1); setFrame(0); setFinished(false); setPlaying(true) }
 
@@ -512,13 +579,13 @@ export default function MatchCenter({ squad, feature, onContinue, isLast = false
       {oppStyle && <p className="text-center text-[11px] text-secondary -mt-1.5 mb-1">{oppStyle}.</p>}
       {!finished && tacticalNote && <p className="text-center text-[11px] text-gold/75 mb-2">{tacticalNote}</p>}
 
-      {!finished && <Spotlight active={active} homeName={timeline.home} awayName={timeline.away} atOutcome={atOutcome} momentumHome={stats.momentumHome} />}
+      {!finished && <Spotlight active={active} homeName={timeline.home} awayName={timeline.away} atOutcome={atOutcome} momentumHome={stats.momentumHome} liveAction={liveAction} />}
 
       <Pitch
         homeDots={homeDots} awayDots={awayDots}
         ball={ball} moveDur={moveDur} pathPts={plan?.pathPts}
         activeTeam={active && !finished ? active.team : null}
-        activeDotId={activeDotId} keeperDotId={keeperDotId}
+        activeKey={activeKey} keeperSide={keeperSide}
         overlay={finished ? null : overlay} goalFlash={finished ? null : goalFlash}
         drama={drama} highlight={highlight} ballMoving={ballMoving && !finished}
         eventKey={idx}

@@ -32,6 +32,7 @@
 import { makeRng, combineSeed } from './seedUtils'
 import { squadDisplayName } from './data'
 import { buildMatchDetail, matchVerdict } from './matchEngine'
+import { attachSequences } from './sequenceEngine'
 
 // Single canonical verdict helper lives in matchEngine.js; re-exported here so
 // existing imports (MatchCenter, RunFlow) keep working and every screen shows
@@ -72,7 +73,9 @@ function planAnim(e) {
 
 // Turn a finished match object into a visual timeline constrained by its
 // canonical MatchDetail. `players` is the user's XI for home flavour names.
-export function buildMatchTimeline(match, players, stageLabel = '', teamName = 'Final XI', tactics = null) {
+// `squad` ([{slot, player}]) enables formation-aware participant sequences;
+// when absent, slots are approximated from each player's primary position.
+export function buildMatchTimeline(match, players, stageLabel = '', teamName = 'Final XI', tactics = null, squad = null) {
   if (!match) return null
   const gf = match.gf ?? 0
   const ga = match.ga ?? 0
@@ -246,6 +249,13 @@ export function buildMatchTimeline(match, players, stageLabel = '', teamName = '
   // 3) Chronological order; give each event a stable id + animation plan.
   events.sort((a, b) => a.minute - b.minute)
   events.forEach((e, i) => { e.id = i; e.anim = planAnim(e) })
+
+  // 3b) Participant-based possession sequences (Phase 2). Deterministic per
+  // event (presentationSeed + event id); decorates shot-like highlights with
+  // real-XI touches + canonical big-chance flags. Never changes budgets,
+  // scores, or stats.
+  const seqSquad = squad || players.map((p) => ({ slot: p.primaryPos, player: p }))
+  attachSequences(events, { detail, squad: seqSquad, nameOf: homeName, teamName, opponent })
 
   // 4) Final stat targets = the canonical MatchDetail totals, verbatim. The UI
   //    eases live stats toward these and lands exactly on them at full time.

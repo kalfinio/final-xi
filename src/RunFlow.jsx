@@ -158,7 +158,7 @@ export function PostMatchCard({ squad, item, teamName, tactics, isLast, onContin
   const players = useMemo(() => squad.map((s) => s.player).filter(Boolean), [squad])
   const { stage } = stageDisplay(item)
   const m = item.match
-  const tl = useMemo(() => buildMatchTimeline(m, players, mcStageLabel(item), teamName, tactics), [m, players, item, teamName, tactics])
+  const tl = useMemo(() => buildMatchTimeline(m, players, mcStageLabel(item), teamName, tactics, squad), [m, players, item, teamName, tactics, squad])
   const [open, setOpen] = useState(false)
 
   // Canonical MatchDetail values (verdict + key player), same source as the
