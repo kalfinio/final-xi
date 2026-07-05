@@ -721,15 +721,28 @@ function EventsTimeline({ events, squadNames }) {
   )
 }
 
-function StatsGrid({ stats, squadNames }) {
+// Reads the canonical MatchDetail (match.detail.finalStats / keyPlayer) — the
+// same source the Match Center and Post Match Card use. Legacy match.stats is
+// only a fallback for matches without detail.
+function StatsGrid({ match, squadNames }) {
+  const d = match.detail
+  const home = d?.finalStats?.home
+  const s = match.stats || {}
+  const poss = home?.possession ?? s.possession
+  const shots = home?.shots ?? s.shots
+  const sot = home?.shotsOnTarget ?? s.shotsOnTarget
+  const xg = home?.xg ?? s.xg
+  const saves = home?.saves ?? s.saves
+  const fouls = home?.fouls ?? s.fouls
+  const potm = d?.keyPlayer ?? s.potm
   return (
     <div className="grid grid-cols-3 gap-1.5 text-[11px]">
-      <Stat label="Poss" value={`${stats.possession}%`} />
-      <Stat label="Shots" value={`${stats.shotsOnTarget}/${stats.shots}`} />
-      <Stat label="xG" value={stats.xg} />
-      <Stat label="Saves" value={stats.saves} />
-      <Stat label="Fouls" value={stats.fouls} />
-      <Stat label="MotM" value={squadDisplayName(String(stats.potm), squadNames)} />
+      <Stat label="Poss" value={`${poss}%`} />
+      <Stat label="Shots" value={`${sot}/${shots}`} />
+      <Stat label="xG" value={xg} />
+      <Stat label="Saves" value={saves} />
+      <Stat label="Fouls" value={fouls} />
+      <Stat label="MotM" value={squadDisplayName(String(potm), squadNames)} />
     </div>
   )
 }
@@ -744,7 +757,7 @@ function KOCard({ r, squadNames }) {
       </div>
       <div className="text-sm text-secondary mb-2">vs {r.opponent} — <span className={RESULT_STYLE[r.result]}>{r.result.startsWith('pens') ? (r.pens.won ? 'Won on penalties' : 'Lost on penalties') : r.result === 'win' ? 'Win' : 'Knocked out'}</span>{r.pens && r.pens.hero ? ` · ${r.pens.hero}` : ''}</div>
       <EventsTimeline events={r.events} squadNames={squadNames} />
-      <StatsGrid stats={r.stats} squadNames={squadNames} />
+      <StatsGrid match={r} squadNames={squadNames} />
     </div>
   )
 }
@@ -758,7 +771,7 @@ function LeagueMatchCard({ m, squadNames }) {
         <span className={`font-bold text-sm shrink-0 ${RESULT_STYLE[m.result]}`}>{m.score} · {m.points}pt</span>
       </div>
       <EventsTimeline events={m.events} squadNames={squadNames} />
-      <StatsGrid stats={m.stats} squadNames={squadNames} />
+      <StatsGrid match={m} squadNames={squadNames} />
     </div>
   )
 }
@@ -949,13 +962,19 @@ export default function App() {
     const clean = saveTeamName(rawName)   // sanitize + persist last used
     setTeamName(clean)
     const { total } = computeRating(squad)
+    // runSeed feeds only the canonical MatchDetail presentation layer (stats /
+    // timelines). Daily: same seed as the sim → fully deterministic details.
+    // Random runs: one random seed fixed for the whole run.
     let rng = Math.random
+    let runSeed = Math.floor(Math.random() * 4294967296) >>> 0
     if (config.mode === 'daily') {
       const ids = squad.map((s) => s.player.id)
       const slots = squad.map((s) => s.slot)
-      rng = makeRng(buildSimSeed({ dateKey: todayKey(), formation: config.formation, ids, slots, difficulty: config.difficulty, pool: config.pool, rerollsUsed }))
+      const seed = buildSimSeed({ dateKey: todayKey(), formation: config.formation, ids, slots, difficulty: config.difficulty, pool: config.pool, rerollsUsed })
+      rng = makeRng(seed)
+      runSeed = seed
     }
-    resultRef.current = simulate({ rating: total, difficulty: config.difficulty, squad, rng })
+    resultRef.current = simulate({ rating: total, difficulty: config.difficulty, squad, rng, runSeed })
     // Tactical read of the XI — flavours the Match Center, report and result.
     tacticsRef.current = buildTactics(squad, config.formation)
     // Walk the run match-by-match. The simulation already decided every result.

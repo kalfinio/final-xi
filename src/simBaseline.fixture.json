@@ -1,0 +1,3678 @@
+{
+  "capturedAt": "pre-phase1",
+  "runs": [
+    {
+      "config": {
+        "formation": "4-3-3",
+        "difficulty": "classic",
+        "pool": "modern"
+      },
+      "seed": 12345,
+      "offset": 0,
+      "rating": 228,
+      "squad": [
+        {
+          "slot": "GK",
+          "id": "casillas"
+        },
+        {
+          "slot": "RB",
+          "id": "cafu"
+        },
+        {
+          "slot": "CB",
+          "id": "cannavaro"
+        },
+        {
+          "slot": "CB",
+          "id": "maldini"
+        },
+        {
+          "slot": "LB",
+          "id": "robertocarlos"
+        },
+        {
+          "slot": "CM",
+          "id": "pirlo"
+        },
+        {
+          "slot": "CM",
+          "id": "gattuso"
+        },
+        {
+          "slot": "CM",
+          "id": "deschamps"
+        },
+        {
+          "slot": "RW",
+          "id": "robben"
+        },
+        {
+          "slot": "ST",
+          "id": "ronaldo"
+        },
+        {
+          "slot": "LW",
+          "id": "ronaldinho"
+        }
+      ],
+      "expected": {
+        "exitStage": "Final",
+        "champion": true,
+        "position": 1,
+        "points": 20,
+        "topScorer": {
+          "name": "Cristiano Ronaldo",
+          "goals": 7
+        },
+        "topAssister": {
+          "name": "Arjen Robben",
+          "assists": 8
+        },
+        "matches": [
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Athens Greens",
+            "score": "3-1",
+            "result": "win",
+            "scorers": [
+              "Ronaldinho",
+              "Cristiano Ronaldo",
+              "Arjen Robben"
+            ],
+            "assists": [
+              "Andrea Pirlo",
+              "Ronaldinho"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "London Blues",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Ronaldinho"
+            ],
+            "assists": [
+              "Roberto Carlos"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Piraeus Reds",
+            "score": "3-1",
+            "result": "win",
+            "scorers": [
+              "Roberto Carlos",
+              "Andrea Pirlo",
+              "Arjen Robben"
+            ],
+            "assists": [
+              "Arjen Robben",
+              "Roberto Carlos",
+              "Andrea Pirlo"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Chamartín FC",
+            "score": "2-0",
+            "result": "win",
+            "scorers": [
+              "Ronaldinho",
+              "Ronaldinho"
+            ],
+            "assists": [
+              "Arjen Robben",
+              "Cristiano Ronaldo"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Andalusian Reds",
+            "score": "1-1",
+            "result": "draw",
+            "scorers": [
+              "Arjen Robben"
+            ],
+            "assists": [],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Milano Blue",
+            "score": "3-2",
+            "result": "win",
+            "scorers": [
+              "Andrea Pirlo",
+              "Cristiano Ronaldo",
+              "Cristiano Ronaldo"
+            ],
+            "assists": [
+              "Arjen Robben",
+              "Cafu",
+              "Arjen Robben"
+            ],
+            "oppGoals": 2
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "French Riviera FC",
+            "score": "3-2",
+            "result": "win",
+            "scorers": [
+              "Cristiano Ronaldo",
+              "Cristiano Ronaldo",
+              "Arjen Robben"
+            ],
+            "assists": [
+              "Cafu",
+              "Arjen Robben",
+              "Ronaldinho"
+            ],
+            "oppGoals": 2
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Zagreb Blues",
+            "score": "1-1",
+            "result": "draw",
+            "scorers": [
+              "Andrea Pirlo"
+            ],
+            "assists": [
+              "Cristiano Ronaldo"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "ko",
+            "round": "Round of 16",
+            "opponent": "Andalusian Reds",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Andrea Pirlo"
+            ],
+            "assists": [
+              "Arjen Robben"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "ko",
+            "round": "Quarter-final",
+            "opponent": "North London Spurs",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Paolo Maldini"
+            ],
+            "assists": [
+              "Cristiano Ronaldo"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "ko",
+            "round": "Semi-final",
+            "opponent": "Lisbon Eagles",
+            "score": "3-0",
+            "result": "win",
+            "scorers": [
+              "Paolo Maldini",
+              "Cristiano Ronaldo",
+              "Arjen Robben"
+            ],
+            "assists": [
+              "Arjen Robben",
+              "Roberto Carlos",
+              "Ronaldinho"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "ko",
+            "round": "Final",
+            "opponent": "Milano Reds",
+            "score": "3-2",
+            "result": "win",
+            "scorers": [
+              "Ronaldinho",
+              "Ronaldinho",
+              "Cristiano Ronaldo"
+            ],
+            "assists": [
+              "Cafu",
+              "Arjen Robben",
+              "Roberto Carlos"
+            ],
+            "oppGoals": 2
+          }
+        ]
+      }
+    },
+    {
+      "config": {
+        "formation": "4-3-3",
+        "difficulty": "classic",
+        "pool": "modern"
+      },
+      "seed": 777,
+      "offset": 1,
+      "rating": 210,
+      "squad": [
+        {
+          "slot": "GK",
+          "id": "buffon"
+        },
+        {
+          "slot": "RB",
+          "id": "danialves"
+        },
+        {
+          "slot": "CB",
+          "id": "maldini"
+        },
+        {
+          "slot": "CB",
+          "id": "ramos"
+        },
+        {
+          "slot": "LB",
+          "id": "ashleycole"
+        },
+        {
+          "slot": "CM",
+          "id": "gattuso"
+        },
+        {
+          "slot": "CM",
+          "id": "deschamps"
+        },
+        {
+          "slot": "CM",
+          "id": "xabialonso"
+        },
+        {
+          "slot": "RW",
+          "id": "bale"
+        },
+        {
+          "slot": "ST",
+          "id": "henry"
+        },
+        {
+          "slot": "LW",
+          "id": "rivaldo"
+        }
+      ],
+      "expected": {
+        "exitStage": "Round of 16",
+        "champion": false,
+        "position": 3,
+        "points": 21,
+        "topScorer": {
+          "name": "Gareth Bale",
+          "goals": 3
+        },
+        "topAssister": {
+          "name": "Dani Alves",
+          "assists": 3
+        },
+        "matches": [
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Salzburg Bulls",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Gareth Bale"
+            ],
+            "assists": [
+              "Thierry Henry"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Piraeus Reds",
+            "score": "3-2",
+            "result": "win",
+            "scorers": [
+              "Thierry Henry",
+              "Thierry Henry",
+              "Thierry Henry"
+            ],
+            "assists": [
+              "Xabi Alonso",
+              "Dani Alves",
+              "Xabi Alonso"
+            ],
+            "oppGoals": 2
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Prague Royals",
+            "score": "0-2",
+            "result": "loss",
+            "scorers": [],
+            "assists": [],
+            "oppGoals": 2
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Lisbon Eagles",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Gareth Bale"
+            ],
+            "assists": [
+              "Rivaldo"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Istanbul Eagles",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Xabi Alonso"
+            ],
+            "assists": [
+              "Rivaldo"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "French Riviera FC",
+            "score": "2-1",
+            "result": "win",
+            "scorers": [
+              "Gareth Bale",
+              "Rivaldo"
+            ],
+            "assists": [
+              "Dani Alves"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Andalusian Reds",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Paolo Maldini"
+            ],
+            "assists": [
+              "Rivaldo"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Porto Dragons",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Rivaldo"
+            ],
+            "assists": [
+              "Dani Alves"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "ko",
+            "round": "Round of 16",
+            "opponent": "Catalan Kings",
+            "score": "0-0 (pens 5-4)",
+            "result": "pens-loss",
+            "scorers": [],
+            "assists": [],
+            "oppGoals": 0
+          }
+        ]
+      }
+    },
+    {
+      "config": {
+        "formation": "4-3-3",
+        "difficulty": "classic",
+        "pool": "modern"
+      },
+      "seed": 20260705,
+      "offset": 2,
+      "rating": 249,
+      "squad": [
+        {
+          "slot": "GK",
+          "id": "schmeichel"
+        },
+        {
+          "slot": "RB",
+          "id": "lahm"
+        },
+        {
+          "slot": "CB",
+          "id": "ramos"
+        },
+        {
+          "slot": "CB",
+          "id": "puyol"
+        },
+        {
+          "slot": "LB",
+          "id": "maldini"
+        },
+        {
+          "slot": "CM",
+          "id": "deschamps"
+        },
+        {
+          "slot": "CM",
+          "id": "xabialonso"
+        },
+        {
+          "slot": "CM",
+          "id": "yaya"
+        },
+        {
+          "slot": "RW",
+          "id": "messi"
+        },
+        {
+          "slot": "ST",
+          "id": "etoo"
+        },
+        {
+          "slot": "LW",
+          "id": "ribery"
+        }
+      ],
+      "expected": {
+        "exitStage": "Quarter-final",
+        "champion": false,
+        "position": 1,
+        "points": 22,
+        "topScorer": {
+          "name": "Samuel Eto'o",
+          "goals": 5
+        },
+        "topAssister": {
+          "name": "Yaya Touré",
+          "assists": 5
+        },
+        "matches": [
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "London Blues",
+            "score": "3-1",
+            "result": "win",
+            "scorers": [
+              "Franck Ribéry",
+              "Xabi Alonso",
+              "Lionel Messi"
+            ],
+            "assists": [
+              "Philipp Lahm",
+              "Yaya Touré",
+              "Yaya Touré"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "North London Gunners",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Samuel Eto'o"
+            ],
+            "assists": [
+              "Franck Ribéry"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Paris Tower FC",
+            "score": "3-1",
+            "result": "win",
+            "scorers": [
+              "Lionel Messi",
+              "Xabi Alonso",
+              "Philipp Lahm"
+            ],
+            "assists": [
+              "Xabi Alonso",
+              "Lionel Messi",
+              "Lionel Messi"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Salzburg Bulls",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Samuel Eto'o"
+            ],
+            "assists": [
+              "Yaya Touré"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Mersey Reds",
+            "score": "3-1",
+            "result": "win",
+            "scorers": [
+              "Xabi Alonso",
+              "Franck Ribéry",
+              "Samuel Eto'o"
+            ],
+            "assists": [
+              "Lionel Messi",
+              "Xabi Alonso"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Chamartín FC",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Lionel Messi"
+            ],
+            "assists": [
+              "Franck Ribéry"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Belgian Royals",
+            "score": "2-0",
+            "result": "win",
+            "scorers": [
+              "Franck Ribéry",
+              "Samuel Eto'o"
+            ],
+            "assists": [
+              "Yaya Touré",
+              "Franck Ribéry"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Lisbon Lions",
+            "score": "0-0",
+            "result": "draw",
+            "scorers": [],
+            "assists": [],
+            "oppGoals": 0
+          },
+          {
+            "kind": "ko",
+            "round": "Round of 16",
+            "opponent": "Roman Wolves",
+            "score": "3-2",
+            "result": "win",
+            "scorers": [
+              "Lionel Messi",
+              "Xabi Alonso",
+              "Samuel Eto'o"
+            ],
+            "assists": [
+              "Xabi Alonso",
+              "Yaya Touré"
+            ],
+            "oppGoals": 2
+          },
+          {
+            "kind": "ko",
+            "round": "Quarter-final",
+            "opponent": "Ruhr Yellows",
+            "score": "1-2",
+            "result": "loss",
+            "scorers": [
+              "Sergio Ramos"
+            ],
+            "assists": [
+              "Xabi Alonso"
+            ],
+            "oppGoals": 2
+          }
+        ]
+      }
+    },
+    {
+      "config": {
+        "formation": "4-4-2",
+        "difficulty": "casual",
+        "pool": "legends"
+      },
+      "seed": 12345,
+      "offset": 0,
+      "rating": 235,
+      "squad": [
+        {
+          "slot": "GK",
+          "id": "casillas"
+        },
+        {
+          "slot": "RB",
+          "id": "cafu"
+        },
+        {
+          "slot": "CB",
+          "id": "cannavaro"
+        },
+        {
+          "slot": "CB",
+          "id": "maldini"
+        },
+        {
+          "slot": "LB",
+          "id": "robertocarlos"
+        },
+        {
+          "slot": "RM",
+          "id": "robben"
+        },
+        {
+          "slot": "CM",
+          "id": "pirlo"
+        },
+        {
+          "slot": "CM",
+          "id": "gattuso"
+        },
+        {
+          "slot": "LM",
+          "id": "ronaldinho"
+        },
+        {
+          "slot": "ST",
+          "id": "ronaldo"
+        },
+        {
+          "slot": "ST",
+          "id": "henry"
+        }
+      ],
+      "expected": {
+        "exitStage": "Semi-final",
+        "champion": false,
+        "position": 2,
+        "points": 22,
+        "topScorer": {
+          "name": "Thierry Henry",
+          "goals": 5
+        },
+        "topAssister": {
+          "name": "Cristiano Ronaldo",
+          "assists": 4
+        },
+        "matches": [
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Athens Greens",
+            "score": "3-1",
+            "result": "win",
+            "scorers": [
+              "Thierry Henry",
+              "Cristiano Ronaldo",
+              "Andrea Pirlo"
+            ],
+            "assists": [
+              "Andrea Pirlo",
+              "Cristiano Ronaldo"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "London Blues",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Thierry Henry"
+            ],
+            "assists": [
+              "Arjen Robben"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Piraeus Reds",
+            "score": "3-1",
+            "result": "win",
+            "scorers": [
+              "Arjen Robben",
+              "Ronaldinho",
+              "Cafu"
+            ],
+            "assists": [
+              "Cristiano Ronaldo"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Belgian Royals",
+            "score": "2-0",
+            "result": "win",
+            "scorers": [
+              "Thierry Henry",
+              "Andrea Pirlo"
+            ],
+            "assists": [
+              "Ronaldinho",
+              "Thierry Henry"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Eindhoven Lights",
+            "score": "3-2",
+            "result": "win",
+            "scorers": [
+              "Paolo Maldini",
+              "Arjen Robben",
+              "Cristiano Ronaldo"
+            ],
+            "assists": [
+              "Arjen Robben",
+              "Roberto Carlos"
+            ],
+            "oppGoals": 2
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Ruhr Yellows",
+            "score": "2-0",
+            "result": "win",
+            "scorers": [
+              "Gennaro Gattuso",
+              "Cristiano Ronaldo"
+            ],
+            "assists": [
+              "Arjen Robben"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Milano Reds",
+            "score": "1-1",
+            "result": "draw",
+            "scorers": [
+              "Ronaldinho"
+            ],
+            "assists": [
+              "Roberto Carlos"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Roman Wolves",
+            "score": "3-0",
+            "result": "win",
+            "scorers": [
+              "Ronaldinho",
+              "Thierry Henry",
+              "Thierry Henry"
+            ],
+            "assists": [
+              "Cristiano Ronaldo",
+              "Cristiano Ronaldo",
+              "Roberto Carlos"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "ko",
+            "round": "Round of 16",
+            "opponent": "Piraeus Reds",
+            "score": "1-1 (pens 5-3)",
+            "result": "pens-win",
+            "scorers": [
+              "Arjen Robben"
+            ],
+            "assists": [
+              "Andrea Pirlo"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "ko",
+            "round": "Quarter-final",
+            "opponent": "Eindhoven Lights",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Roberto Carlos"
+            ],
+            "assists": [
+              "Cafu"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "ko",
+            "round": "Semi-final",
+            "opponent": "Manchester Sky",
+            "score": "0-1",
+            "result": "loss",
+            "scorers": [],
+            "assists": [],
+            "oppGoals": 1
+          }
+        ]
+      }
+    },
+    {
+      "config": {
+        "formation": "4-4-2",
+        "difficulty": "casual",
+        "pool": "legends"
+      },
+      "seed": 777,
+      "offset": 1,
+      "rating": 189,
+      "squad": [
+        {
+          "slot": "GK",
+          "id": "buffon"
+        },
+        {
+          "slot": "RB",
+          "id": "danialves"
+        },
+        {
+          "slot": "CB",
+          "id": "maldini"
+        },
+        {
+          "slot": "CB",
+          "id": "ramos"
+        },
+        {
+          "slot": "LB",
+          "id": "ashleycole"
+        },
+        {
+          "slot": "RM",
+          "id": "bale"
+        },
+        {
+          "slot": "CM",
+          "id": "gattuso"
+        },
+        {
+          "slot": "CM",
+          "id": "deschamps"
+        },
+        {
+          "slot": "LM",
+          "id": "ribery"
+        },
+        {
+          "slot": "ST",
+          "id": "henry"
+        },
+        {
+          "slot": "ST",
+          "id": "etoo"
+        }
+      ],
+      "expected": {
+        "exitStage": "Final",
+        "champion": false,
+        "position": 6,
+        "points": 20,
+        "topScorer": {
+          "name": "Samuel Eto'o",
+          "goals": 7
+        },
+        "topAssister": {
+          "name": "Gareth Bale",
+          "assists": 6
+        },
+        "matches": [
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Salzburg Bulls",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Gareth Bale"
+            ],
+            "assists": [
+              "Thierry Henry"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Piraeus Reds",
+            "score": "3-2",
+            "result": "win",
+            "scorers": [
+              "Thierry Henry",
+              "Thierry Henry",
+              "Thierry Henry"
+            ],
+            "assists": [
+              "Gareth Bale",
+              "Dani Alves",
+              "Gareth Bale"
+            ],
+            "oppGoals": 2
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Prague Royals",
+            "score": "1-1",
+            "result": "draw",
+            "scorers": [
+              "Samuel Eto'o"
+            ],
+            "assists": [
+              "Gareth Bale"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Mersey Reds",
+            "score": "2-1",
+            "result": "win",
+            "scorers": [
+              "Samuel Eto'o",
+              "Samuel Eto'o"
+            ],
+            "assists": [
+              "Franck Ribéry"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Istanbul Eagles",
+            "score": "3-1",
+            "result": "win",
+            "scorers": [
+              "Gareth Bale",
+              "Samuel Eto'o",
+              "Gareth Bale"
+            ],
+            "assists": [
+              "Thierry Henry",
+              "Gareth Bale"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Catalan Kings",
+            "score": "2-0",
+            "result": "win",
+            "scorers": [
+              "Paolo Maldini",
+              "Thierry Henry"
+            ],
+            "assists": [
+              "Thierry Henry"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Basque Lions",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Gareth Bale"
+            ],
+            "assists": [
+              "Franck Ribéry"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Lisbon Lions",
+            "score": "1-1",
+            "result": "draw",
+            "scorers": [
+              "Franck Ribéry"
+            ],
+            "assists": [
+              "Dani Alves"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "ko",
+            "round": "Round of 16",
+            "opponent": "Athens Greens",
+            "score": "2-0",
+            "result": "win",
+            "scorers": [
+              "Sergio Ramos",
+              "Gareth Bale"
+            ],
+            "assists": [
+              "Franck Ribéry",
+              "Franck Ribéry"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "ko",
+            "round": "Quarter-final",
+            "opponent": "Chamartín FC",
+            "score": "3-1",
+            "result": "win",
+            "scorers": [
+              "Samuel Eto'o",
+              "Samuel Eto'o",
+              "Thierry Henry"
+            ],
+            "assists": [
+              "Gareth Bale",
+              "Gareth Bale"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "ko",
+            "round": "Semi-final",
+            "opponent": "Istanbul Eagles",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Samuel Eto'o"
+            ],
+            "assists": [],
+            "oppGoals": 0
+          },
+          {
+            "kind": "ko",
+            "round": "Final",
+            "opponent": "Milano Blue",
+            "score": "1-2",
+            "result": "loss",
+            "scorers": [
+              "Thierry Henry"
+            ],
+            "assists": [
+              "Franck Ribéry"
+            ],
+            "oppGoals": 2
+          }
+        ]
+      }
+    },
+    {
+      "config": {
+        "formation": "4-4-2",
+        "difficulty": "casual",
+        "pool": "legends"
+      },
+      "seed": 20260705,
+      "offset": 2,
+      "rating": 227,
+      "squad": [
+        {
+          "slot": "GK",
+          "id": "schmeichel"
+        },
+        {
+          "slot": "RB",
+          "id": "lahm"
+        },
+        {
+          "slot": "CB",
+          "id": "ramos"
+        },
+        {
+          "slot": "CB",
+          "id": "puyol"
+        },
+        {
+          "slot": "LB",
+          "id": "maldini"
+        },
+        {
+          "slot": "RM",
+          "id": "eusebio"
+        },
+        {
+          "slot": "CM",
+          "id": "deschamps"
+        },
+        {
+          "slot": "CM",
+          "id": "xabialonso"
+        },
+        {
+          "slot": "LM",
+          "id": "bale"
+        },
+        {
+          "slot": "ST",
+          "id": "etoo"
+        },
+        {
+          "slot": "ST",
+          "id": "ibra"
+        }
+      ],
+      "expected": {
+        "exitStage": "Semi-final",
+        "champion": false,
+        "position": 1,
+        "points": 24,
+        "topScorer": {
+          "name": "Samuel Eto'o",
+          "goals": 7
+        },
+        "topAssister": {
+          "name": "Xabi Alonso",
+          "assists": 11
+        },
+        "matches": [
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "London Blues",
+            "score": "3-1",
+            "result": "win",
+            "scorers": [
+              "Zlatan Ibrahimović",
+              "Eusébio",
+              "Gareth Bale"
+            ],
+            "assists": [
+              "Philipp Lahm",
+              "Xabi Alonso",
+              "Xabi Alonso"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "North London Gunners",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Samuel Eto'o"
+            ],
+            "assists": [
+              "Zlatan Ibrahimović"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Paris Tower FC",
+            "score": "3-1",
+            "result": "win",
+            "scorers": [
+              "Gareth Bale",
+              "Eusébio",
+              "Philipp Lahm"
+            ],
+            "assists": [
+              "Xabi Alonso",
+              "Xabi Alonso",
+              "Xabi Alonso"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Salzburg Bulls",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Samuel Eto'o"
+            ],
+            "assists": [
+              "Xabi Alonso"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Mersey Reds",
+            "score": "3-1",
+            "result": "win",
+            "scorers": [
+              "Eusébio",
+              "Zlatan Ibrahimović",
+              "Zlatan Ibrahimović"
+            ],
+            "assists": [
+              "Xabi Alonso",
+              "Didier Deschamps",
+              "Xabi Alonso"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Basque Lions",
+            "score": "2-0",
+            "result": "win",
+            "scorers": [
+              "Zlatan Ibrahimović",
+              "Samuel Eto'o"
+            ],
+            "assists": [
+              "Gareth Bale",
+              "Gareth Bale"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Catalan Kings",
+            "score": "2-1",
+            "result": "win",
+            "scorers": [
+              "Samuel Eto'o",
+              "Samuel Eto'o"
+            ],
+            "assists": [
+              "Xabi Alonso",
+              "Zlatan Ibrahimović"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Glasgow Hoops",
+            "score": "3-2",
+            "result": "win",
+            "scorers": [
+              "Gareth Bale",
+              "Eusébio",
+              "Samuel Eto'o"
+            ],
+            "assists": [
+              "Xabi Alonso",
+              "Xabi Alonso"
+            ],
+            "oppGoals": 2
+          },
+          {
+            "kind": "ko",
+            "round": "Round of 16",
+            "opponent": "Prague Royals",
+            "score": "1-1 (pens 4-2)",
+            "result": "pens-win",
+            "scorers": [
+              "Xabi Alonso"
+            ],
+            "assists": [
+              "Zlatan Ibrahimović"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "ko",
+            "round": "Quarter-final",
+            "opponent": "Milano Reds",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Samuel Eto'o"
+            ],
+            "assists": [
+              "Zlatan Ibrahimović"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "ko",
+            "round": "Semi-final",
+            "opponent": "Andalusian Reds",
+            "score": "0-1",
+            "result": "loss",
+            "scorers": [],
+            "assists": [],
+            "oppGoals": 1
+          }
+        ]
+      }
+    },
+    {
+      "config": {
+        "formation": "4-2-3-1",
+        "difficulty": "legendary",
+        "pool": "modern"
+      },
+      "seed": 12345,
+      "offset": 0,
+      "rating": 234,
+      "squad": [
+        {
+          "slot": "GK",
+          "id": "casillas"
+        },
+        {
+          "slot": "RB",
+          "id": "cafu"
+        },
+        {
+          "slot": "CB",
+          "id": "cannavaro"
+        },
+        {
+          "slot": "CB",
+          "id": "maldini"
+        },
+        {
+          "slot": "LB",
+          "id": "robertocarlos"
+        },
+        {
+          "slot": "CDM",
+          "id": "makelele"
+        },
+        {
+          "slot": "CDM",
+          "id": "pirlo"
+        },
+        {
+          "slot": "RW",
+          "id": "robben"
+        },
+        {
+          "slot": "CAM",
+          "id": "iniesta"
+        },
+        {
+          "slot": "LW",
+          "id": "ronaldinho"
+        },
+        {
+          "slot": "ST",
+          "id": "ronaldo"
+        }
+      ],
+      "expected": {
+        "exitStage": "Round of 16",
+        "champion": false,
+        "position": 2,
+        "points": 22,
+        "topScorer": {
+          "name": "Cristiano Ronaldo",
+          "goals": 5
+        },
+        "topAssister": {
+          "name": "Andrea Pirlo",
+          "assists": 3
+        },
+        "matches": [
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Athens Greens",
+            "score": "3-1",
+            "result": "win",
+            "scorers": [
+              "Cristiano Ronaldo",
+              "Ronaldinho",
+              "Arjen Robben"
+            ],
+            "assists": [
+              "Arjen Robben",
+              "Cristiano Ronaldo"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "London Blues",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Cristiano Ronaldo"
+            ],
+            "assists": [
+              "Andrea Pirlo"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Piraeus Reds",
+            "score": "3-1",
+            "result": "win",
+            "scorers": [
+              "Andrea Pirlo",
+              "Andrés Iniesta",
+              "Cafu"
+            ],
+            "assists": [
+              "Ronaldinho"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Belgian Royals",
+            "score": "2-0",
+            "result": "win",
+            "scorers": [
+              "Cristiano Ronaldo",
+              "Arjen Robben"
+            ],
+            "assists": [
+              "Andrés Iniesta",
+              "Cristiano Ronaldo"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Eindhoven Lights",
+            "score": "3-2",
+            "result": "win",
+            "scorers": [
+              "Paolo Maldini",
+              "Arjen Robben",
+              "Ronaldinho"
+            ],
+            "assists": [
+              "Andrea Pirlo",
+              "Roberto Carlos"
+            ],
+            "oppGoals": 2
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Ruhr Yellows",
+            "score": "2-0",
+            "result": "win",
+            "scorers": [
+              "Arjen Robben",
+              "Ronaldinho"
+            ],
+            "assists": [
+              "Andrea Pirlo"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Milano Reds",
+            "score": "1-1",
+            "result": "draw",
+            "scorers": [
+              "Andrés Iniesta"
+            ],
+            "assists": [
+              "Roberto Carlos"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Roman Wolves",
+            "score": "3-0",
+            "result": "win",
+            "scorers": [
+              "Arjen Robben",
+              "Cristiano Ronaldo",
+              "Cristiano Ronaldo"
+            ],
+            "assists": [
+              "Ronaldinho",
+              "Ronaldinho",
+              "Roberto Carlos"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "ko",
+            "round": "Round of 16",
+            "opponent": "Piraeus Reds",
+            "score": "0-2",
+            "result": "loss",
+            "scorers": [],
+            "assists": [],
+            "oppGoals": 2
+          }
+        ]
+      }
+    },
+    {
+      "config": {
+        "formation": "4-2-3-1",
+        "difficulty": "legendary",
+        "pool": "modern"
+      },
+      "seed": 777,
+      "offset": 1,
+      "rating": 200,
+      "squad": [
+        {
+          "slot": "GK",
+          "id": "buffon"
+        },
+        {
+          "slot": "RB",
+          "id": "danialves"
+        },
+        {
+          "slot": "CB",
+          "id": "maldini"
+        },
+        {
+          "slot": "CB",
+          "id": "ramos"
+        },
+        {
+          "slot": "LB",
+          "id": "ashleycole"
+        },
+        {
+          "slot": "CDM",
+          "id": "pirlo"
+        },
+        {
+          "slot": "CDM",
+          "id": "gattuso"
+        },
+        {
+          "slot": "RW",
+          "id": "bale"
+        },
+        {
+          "slot": "CAM",
+          "id": "gerrard"
+        },
+        {
+          "slot": "LW",
+          "id": "rivaldo"
+        },
+        {
+          "slot": "ST",
+          "id": "henry"
+        }
+      ],
+      "expected": {
+        "exitStage": "Knockout Play-Off",
+        "champion": false,
+        "position": 11,
+        "points": 19,
+        "topScorer": {
+          "name": "Gareth Bale",
+          "goals": 2
+        },
+        "topAssister": {
+          "name": "Rivaldo",
+          "assists": 3
+        },
+        "matches": [
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Salzburg Bulls",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Gareth Bale"
+            ],
+            "assists": [
+              "Rivaldo"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Piraeus Reds",
+            "score": "3-2",
+            "result": "win",
+            "scorers": [
+              "Steven Gerrard",
+              "Rivaldo",
+              "Rivaldo"
+            ],
+            "assists": [
+              "Andrea Pirlo",
+              "Dani Alves",
+              "Andrea Pirlo"
+            ],
+            "oppGoals": 2
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Prague Royals",
+            "score": "0-2",
+            "result": "loss",
+            "scorers": [],
+            "assists": [],
+            "oppGoals": 2
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Lisbon Eagles",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Gareth Bale"
+            ],
+            "assists": [
+              "Rivaldo"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Istanbul Eagles",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Andrea Pirlo"
+            ],
+            "assists": [
+              "Rivaldo"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "French Riviera FC",
+            "score": "2-1",
+            "result": "win",
+            "scorers": [
+              "Steven Gerrard",
+              "Thierry Henry"
+            ],
+            "assists": [
+              "Paolo Maldini"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "North London Spurs",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Thierry Henry"
+            ],
+            "assists": [
+              "Andrea Pirlo"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Amsterdam Lancers",
+            "score": "0-0",
+            "result": "draw",
+            "scorers": [],
+            "assists": [],
+            "oppGoals": 0
+          },
+          {
+            "kind": "ko",
+            "round": "Knockout Play-Off",
+            "opponent": "Mersey Reds",
+            "score": "0-2",
+            "result": "loss",
+            "scorers": [],
+            "assists": [],
+            "oppGoals": 2
+          }
+        ]
+      }
+    },
+    {
+      "config": {
+        "formation": "4-2-3-1",
+        "difficulty": "legendary",
+        "pool": "modern"
+      },
+      "seed": 20260705,
+      "offset": 2,
+      "rating": 222,
+      "squad": [
+        {
+          "slot": "GK",
+          "id": "schmeichel"
+        },
+        {
+          "slot": "RB",
+          "id": "lahm"
+        },
+        {
+          "slot": "CB",
+          "id": "ramos"
+        },
+        {
+          "slot": "CB",
+          "id": "puyol"
+        },
+        {
+          "slot": "LB",
+          "id": "maldini"
+        },
+        {
+          "slot": "CDM",
+          "id": "gattuso"
+        },
+        {
+          "slot": "CDM",
+          "id": "deschamps"
+        },
+        {
+          "slot": "RW",
+          "id": "messi"
+        },
+        {
+          "slot": "CAM",
+          "id": "lampard"
+        },
+        {
+          "slot": "LW",
+          "id": "ribery"
+        },
+        {
+          "slot": "ST",
+          "id": "etoo"
+        }
+      ],
+      "expected": {
+        "exitStage": "Round of 16",
+        "champion": false,
+        "position": 1,
+        "points": 21,
+        "topScorer": {
+          "name": "Lionel Messi",
+          "goals": 6
+        },
+        "topAssister": {
+          "name": "Frank Lampard",
+          "assists": 4
+        },
+        "matches": [
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "London Blues",
+            "score": "3-1",
+            "result": "win",
+            "scorers": [
+              "Samuel Eto'o",
+              "Lionel Messi",
+              "Franck Ribéry"
+            ],
+            "assists": [
+              "Philipp Lahm",
+              "Gennaro Gattuso",
+              "Philipp Lahm"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Lisbon Lions",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Lionel Messi"
+            ],
+            "assists": [],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Paris Tower FC",
+            "score": "3-1",
+            "result": "win",
+            "scorers": [
+              "Lionel Messi",
+              "Lionel Messi",
+              "Philipp Lahm"
+            ],
+            "assists": [
+              "Frank Lampard",
+              "Frank Lampard",
+              "Frank Lampard"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Eindhoven Lights",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Samuel Eto'o"
+            ],
+            "assists": [
+              "Lionel Messi"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Mersey Reds",
+            "score": "3-1",
+            "result": "win",
+            "scorers": [
+              "Lionel Messi",
+              "Samuel Eto'o",
+              "Samuel Eto'o"
+            ],
+            "assists": [
+              "Frank Lampard",
+              "Lionel Messi"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Chamartín FC",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Lionel Messi"
+            ],
+            "assists": [
+              "Samuel Eto'o"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Glasgow Hoops",
+            "score": "2-0",
+            "result": "win",
+            "scorers": [
+              "Samuel Eto'o",
+              "Franck Ribéry"
+            ],
+            "assists": [
+              "Lionel Messi",
+              "Samuel Eto'o"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Istanbul Eagles",
+            "score": "0-1",
+            "result": "loss",
+            "scorers": [],
+            "assists": [],
+            "oppGoals": 1
+          },
+          {
+            "kind": "ko",
+            "round": "Round of 16",
+            "opponent": "Piraeus Reds",
+            "score": "0-1",
+            "result": "loss",
+            "scorers": [],
+            "assists": [],
+            "oppGoals": 1
+          }
+        ]
+      }
+    },
+    {
+      "config": {
+        "formation": "3-5-2",
+        "difficulty": "classic",
+        "pool": "legends"
+      },
+      "seed": 12345,
+      "offset": 0,
+      "rating": 220,
+      "squad": [
+        {
+          "slot": "GK",
+          "id": "casillas"
+        },
+        {
+          "slot": "CB",
+          "id": "cannavaro"
+        },
+        {
+          "slot": "CB",
+          "id": "maldini"
+        },
+        {
+          "slot": "CB",
+          "id": "ramos"
+        },
+        {
+          "slot": "LWB",
+          "id": "robertocarlos"
+        },
+        {
+          "slot": "CM",
+          "id": "pirlo"
+        },
+        {
+          "slot": "CDM",
+          "id": "makelele"
+        },
+        {
+          "slot": "CM",
+          "id": "gattuso"
+        },
+        {
+          "slot": "RWB",
+          "id": "cafu"
+        },
+        {
+          "slot": "ST",
+          "id": "ronaldo"
+        },
+        {
+          "slot": "ST",
+          "id": "henry"
+        }
+      ],
+      "expected": {
+        "exitStage": "Quarter-final",
+        "champion": false,
+        "position": 1,
+        "points": 22,
+        "topScorer": {
+          "name": "Thierry Henry",
+          "goals": 7
+        },
+        "topAssister": {
+          "name": "Andrea Pirlo",
+          "assists": 4
+        },
+        "matches": [
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Athens Greens",
+            "score": "3-1",
+            "result": "win",
+            "scorers": [
+              "Thierry Henry",
+              "Cristiano Ronaldo",
+              "Cristiano Ronaldo"
+            ],
+            "assists": [
+              "Andrea Pirlo",
+              "Thierry Henry"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "London Blues",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Thierry Henry"
+            ],
+            "assists": [
+              "Andrea Pirlo"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Piraeus Reds",
+            "score": "3-1",
+            "result": "win",
+            "scorers": [
+              "Sergio Ramos",
+              "Roberto Carlos",
+              "Thierry Henry"
+            ],
+            "assists": [
+              "Andrea Pirlo",
+              "Andrea Pirlo",
+              "Roberto Carlos"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Andalusian Reds",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Andrea Pirlo"
+            ],
+            "assists": [
+              "Gennaro Gattuso"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Amsterdam Lancers",
+            "score": "2-1",
+            "result": "win",
+            "scorers": [
+              "Claude Makélélé",
+              "Andrea Pirlo"
+            ],
+            "assists": [
+              "Cafu"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Lisbon Lions",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Thierry Henry"
+            ],
+            "assists": [],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Basque Lions",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Cristiano Ronaldo"
+            ],
+            "assists": [],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Turin Stripes",
+            "score": "1-1",
+            "result": "draw",
+            "scorers": [
+              "Cristiano Ronaldo"
+            ],
+            "assists": [
+              "Roberto Carlos"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "ko",
+            "round": "Round of 16",
+            "opponent": "Lisbon Eagles",
+            "score": "3-0",
+            "result": "win",
+            "scorers": [
+              "Cristiano Ronaldo",
+              "Thierry Henry",
+              "Thierry Henry"
+            ],
+            "assists": [
+              "Cafu",
+              "Cristiano Ronaldo",
+              "Roberto Carlos"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "ko",
+            "round": "Quarter-final",
+            "opponent": "London Blues",
+            "score": "1-2",
+            "result": "loss",
+            "scorers": [
+              "Thierry Henry"
+            ],
+            "assists": [
+              "Roberto Carlos"
+            ],
+            "oppGoals": 2
+          }
+        ]
+      }
+    },
+    {
+      "config": {
+        "formation": "3-5-2",
+        "difficulty": "classic",
+        "pool": "legends"
+      },
+      "seed": 777,
+      "offset": 1,
+      "rating": 210,
+      "squad": [
+        {
+          "slot": "GK",
+          "id": "buffon"
+        },
+        {
+          "slot": "CB",
+          "id": "maldini"
+        },
+        {
+          "slot": "CB",
+          "id": "ramos"
+        },
+        {
+          "slot": "CB",
+          "id": "puyol"
+        },
+        {
+          "slot": "LWB",
+          "id": "ashleycole"
+        },
+        {
+          "slot": "CM",
+          "id": "gattuso"
+        },
+        {
+          "slot": "CDM",
+          "id": "pirlo"
+        },
+        {
+          "slot": "CM",
+          "id": "xabialonso"
+        },
+        {
+          "slot": "RWB",
+          "id": "danialves"
+        },
+        {
+          "slot": "ST",
+          "id": "henry"
+        },
+        {
+          "slot": "ST",
+          "id": "etoo"
+        }
+      ],
+      "expected": {
+        "exitStage": "Final",
+        "champion": true,
+        "position": 1,
+        "points": 24,
+        "topScorer": {
+          "name": "Thierry Henry",
+          "goals": 7
+        },
+        "topAssister": {
+          "name": "Andrea Pirlo",
+          "assists": 6
+        },
+        "matches": [
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Salzburg Bulls",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Xabi Alonso"
+            ],
+            "assists": [
+              "Dani Alves"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Piraeus Reds",
+            "score": "3-2",
+            "result": "win",
+            "scorers": [
+              "Thierry Henry",
+              "Samuel Eto'o",
+              "Thierry Henry"
+            ],
+            "assists": [
+              "Andrea Pirlo",
+              "Gennaro Gattuso",
+              "Samuel Eto'o"
+            ],
+            "oppGoals": 2
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Paris Tower FC",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Samuel Eto'o"
+            ],
+            "assists": [],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "London Blues",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Samuel Eto'o"
+            ],
+            "assists": [
+              "Xabi Alonso"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Lisbon Lions",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Thierry Henry"
+            ],
+            "assists": [
+              "Andrea Pirlo"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Lisbon Eagles",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Thierry Henry"
+            ],
+            "assists": [
+              "Andrea Pirlo"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Istanbul Lions",
+            "score": "2-0",
+            "result": "win",
+            "scorers": [
+              "Samuel Eto'o",
+              "Sergio Ramos"
+            ],
+            "assists": [
+              "Xabi Alonso",
+              "Andrea Pirlo"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Manchester Sky",
+            "score": "2-0",
+            "result": "win",
+            "scorers": [
+              "Xabi Alonso",
+              "Dani Alves"
+            ],
+            "assists": [
+              "Gennaro Gattuso"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "ko",
+            "round": "Round of 16",
+            "opponent": "Lisbon Lions",
+            "score": "2-0",
+            "result": "win",
+            "scorers": [
+              "Paolo Maldini",
+              "Thierry Henry"
+            ],
+            "assists": [
+              "Dani Alves",
+              "Andrea Pirlo"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "ko",
+            "round": "Quarter-final",
+            "opponent": "Naples Blues",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Thierry Henry"
+            ],
+            "assists": [
+              "Andrea Pirlo"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "ko",
+            "round": "Semi-final",
+            "opponent": "Athens Greens",
+            "score": "0-0 (pens 5-4)",
+            "result": "pens-win",
+            "scorers": [],
+            "assists": [],
+            "oppGoals": 0
+          },
+          {
+            "kind": "ko",
+            "round": "Final",
+            "opponent": "Basque Lions",
+            "score": "2-1",
+            "result": "win",
+            "scorers": [
+              "Samuel Eto'o",
+              "Thierry Henry"
+            ],
+            "assists": [
+              "Xabi Alonso",
+              "Xabi Alonso"
+            ],
+            "oppGoals": 1
+          }
+        ]
+      }
+    },
+    {
+      "config": {
+        "formation": "3-5-2",
+        "difficulty": "classic",
+        "pool": "legends"
+      },
+      "seed": 20260705,
+      "offset": 2,
+      "rating": 196,
+      "squad": [
+        {
+          "slot": "GK",
+          "id": "schmeichel"
+        },
+        {
+          "slot": "CB",
+          "id": "ramos"
+        },
+        {
+          "slot": "CB",
+          "id": "puyol"
+        },
+        {
+          "slot": "CB",
+          "id": "beckenbauer"
+        },
+        {
+          "slot": "LWB",
+          "id": "maldini"
+        },
+        {
+          "slot": "CM",
+          "id": "deschamps"
+        },
+        {
+          "slot": "CDM",
+          "id": "gattuso"
+        },
+        {
+          "slot": "CM",
+          "id": "yaya"
+        },
+        {
+          "slot": "RWB",
+          "id": "zanetti"
+        },
+        {
+          "slot": "ST",
+          "id": "etoo"
+        },
+        {
+          "slot": "ST",
+          "id": "ibra"
+        }
+      ],
+      "expected": {
+        "exitStage": "Semi-final",
+        "champion": false,
+        "position": 1,
+        "points": 22,
+        "topScorer": {
+          "name": "Samuel Eto'o",
+          "goals": 11
+        },
+        "topAssister": {
+          "name": "Yaya Touré",
+          "assists": 7
+        },
+        "matches": [
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "London Blues",
+            "score": "3-1",
+            "result": "win",
+            "scorers": [
+              "Zlatan Ibrahimović",
+              "Didier Deschamps",
+              "Samuel Eto'o"
+            ],
+            "assists": [
+              "Franz Beckenbauer",
+              "Javier Zanetti",
+              "Carles Puyol"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Chamartín FC",
+            "score": "2-1",
+            "result": "win",
+            "scorers": [
+              "Samuel Eto'o",
+              "Samuel Eto'o"
+            ],
+            "assists": [
+              "Yaya Touré",
+              "Zlatan Ibrahimović"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Ruhr Yellows",
+            "score": "2-0",
+            "result": "win",
+            "scorers": [
+              "Samuel Eto'o",
+              "Samuel Eto'o"
+            ],
+            "assists": [
+              "Yaya Touré",
+              "Zlatan Ibrahimović"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "North London Spurs",
+            "score": "3-0",
+            "result": "win",
+            "scorers": [
+              "Gennaro Gattuso",
+              "Yaya Touré",
+              "Sergio Ramos"
+            ],
+            "assists": [
+              "Gennaro Gattuso",
+              "Javier Zanetti"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Lisbon Eagles",
+            "score": "0-0",
+            "result": "draw",
+            "scorers": [],
+            "assists": [],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Amsterdam Lancers",
+            "score": "3-1",
+            "result": "win",
+            "scorers": [
+              "Paolo Maldini",
+              "Zlatan Ibrahimović",
+              "Zlatan Ibrahimović"
+            ],
+            "assists": [
+              "Yaya Touré",
+              "Yaya Touré",
+              "Yaya Touré"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Roman Wolves",
+            "score": "2-1",
+            "result": "win",
+            "scorers": [
+              "Zlatan Ibrahimović",
+              "Samuel Eto'o"
+            ],
+            "assists": [
+              "Samuel Eto'o",
+              "Didier Deschamps"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Prague Royals",
+            "score": "2-0",
+            "result": "win",
+            "scorers": [
+              "Samuel Eto'o",
+              "Samuel Eto'o"
+            ],
+            "assists": [
+              "Yaya Touré"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "ko",
+            "round": "Round of 16",
+            "opponent": "Istanbul Eagles",
+            "score": "2-1",
+            "result": "win",
+            "scorers": [
+              "Zlatan Ibrahimović",
+              "Samuel Eto'o"
+            ],
+            "assists": [
+              "Zlatan Ibrahimović"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "ko",
+            "round": "Quarter-final",
+            "opponent": "Athens Greens",
+            "score": "2-0",
+            "result": "win",
+            "scorers": [
+              "Samuel Eto'o",
+              "Samuel Eto'o"
+            ],
+            "assists": [
+              "Yaya Touré",
+              "Javier Zanetti"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "ko",
+            "round": "Semi-final",
+            "opponent": "Bavarian Giants",
+            "score": "1-2",
+            "result": "loss",
+            "scorers": [
+              "Paolo Maldini"
+            ],
+            "assists": [],
+            "oppGoals": 2
+          }
+        ]
+      }
+    },
+    {
+      "config": {
+        "formation": "5-3-2",
+        "difficulty": "casual",
+        "pool": "modern"
+      },
+      "seed": 12345,
+      "offset": 0,
+      "rating": 220,
+      "squad": [
+        {
+          "slot": "GK",
+          "id": "casillas"
+        },
+        {
+          "slot": "RB",
+          "id": "cafu"
+        },
+        {
+          "slot": "CB",
+          "id": "cannavaro"
+        },
+        {
+          "slot": "CB",
+          "id": "maldini"
+        },
+        {
+          "slot": "CB",
+          "id": "ramos"
+        },
+        {
+          "slot": "LB",
+          "id": "robertocarlos"
+        },
+        {
+          "slot": "CM",
+          "id": "pirlo"
+        },
+        {
+          "slot": "CM",
+          "id": "gattuso"
+        },
+        {
+          "slot": "CDM",
+          "id": "makelele"
+        },
+        {
+          "slot": "ST",
+          "id": "ronaldo"
+        },
+        {
+          "slot": "ST",
+          "id": "henry"
+        }
+      ],
+      "expected": {
+        "exitStage": "Final",
+        "champion": true,
+        "position": 1,
+        "points": 22,
+        "topScorer": {
+          "name": "Cristiano Ronaldo",
+          "goals": 9
+        },
+        "topAssister": {
+          "name": "Roberto Carlos",
+          "assists": 6
+        },
+        "matches": [
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Athens Greens",
+            "score": "3-1",
+            "result": "win",
+            "scorers": [
+              "Thierry Henry",
+              "Cristiano Ronaldo",
+              "Cristiano Ronaldo"
+            ],
+            "assists": [
+              "Andrea Pirlo",
+              "Thierry Henry"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "London Blues",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Thierry Henry"
+            ],
+            "assists": [
+              "Roberto Carlos"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Piraeus Reds",
+            "score": "3-1",
+            "result": "win",
+            "scorers": [
+              "Sergio Ramos",
+              "Sergio Ramos",
+              "Thierry Henry"
+            ],
+            "assists": [
+              "Andrea Pirlo",
+              "Roberto Carlos",
+              "Cafu"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Andalusian Reds",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Andrea Pirlo"
+            ],
+            "assists": [
+              "Roberto Carlos"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Chamartín FC",
+            "score": "2-1",
+            "result": "win",
+            "scorers": [
+              "Cristiano Ronaldo",
+              "Cristiano Ronaldo"
+            ],
+            "assists": [
+              "Roberto Carlos",
+              "Cafu"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Lisbon Lions",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Thierry Henry"
+            ],
+            "assists": [],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Basque Lions",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Cristiano Ronaldo"
+            ],
+            "assists": [],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "North London Spurs",
+            "score": "1-1",
+            "result": "draw",
+            "scorers": [
+              "Cristiano Ronaldo"
+            ],
+            "assists": [
+              "Fabio Cannavaro"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "ko",
+            "round": "Round of 16",
+            "opponent": "Amsterdam Lancers",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Cristiano Ronaldo"
+            ],
+            "assists": [
+              "Roberto Carlos"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "ko",
+            "round": "Quarter-final",
+            "opponent": "Roman Wolves",
+            "score": "3-0",
+            "result": "win",
+            "scorers": [
+              "Thierry Henry",
+              "Thierry Henry",
+              "Cristiano Ronaldo"
+            ],
+            "assists": [
+              "Cristiano Ronaldo",
+              "Cafu"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "ko",
+            "round": "Semi-final",
+            "opponent": "Chamartín FC",
+            "score": "2-1",
+            "result": "win",
+            "scorers": [
+              "Paolo Maldini",
+              "Cristiano Ronaldo"
+            ],
+            "assists": [
+              "Cafu"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "ko",
+            "round": "Final",
+            "opponent": "Zagreb Blues",
+            "score": "2-0",
+            "result": "win",
+            "scorers": [
+              "Paolo Maldini",
+              "Thierry Henry"
+            ],
+            "assists": [
+              "Andrea Pirlo",
+              "Roberto Carlos"
+            ],
+            "oppGoals": 0
+          }
+        ]
+      }
+    },
+    {
+      "config": {
+        "formation": "5-3-2",
+        "difficulty": "casual",
+        "pool": "modern"
+      },
+      "seed": 777,
+      "offset": 1,
+      "rating": 205,
+      "squad": [
+        {
+          "slot": "GK",
+          "id": "buffon"
+        },
+        {
+          "slot": "RB",
+          "id": "danialves"
+        },
+        {
+          "slot": "CB",
+          "id": "maldini"
+        },
+        {
+          "slot": "CB",
+          "id": "ramos"
+        },
+        {
+          "slot": "CB",
+          "id": "puyol"
+        },
+        {
+          "slot": "LB",
+          "id": "ashleycole"
+        },
+        {
+          "slot": "CM",
+          "id": "gattuso"
+        },
+        {
+          "slot": "CM",
+          "id": "deschamps"
+        },
+        {
+          "slot": "CDM",
+          "id": "pirlo"
+        },
+        {
+          "slot": "ST",
+          "id": "henry"
+        },
+        {
+          "slot": "ST",
+          "id": "etoo"
+        }
+      ],
+      "expected": {
+        "exitStage": "Final",
+        "champion": false,
+        "position": 1,
+        "points": 24,
+        "topScorer": {
+          "name": "Thierry Henry",
+          "goals": 6
+        },
+        "topAssister": {
+          "name": "Dani Alves",
+          "assists": 4
+        },
+        "matches": [
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Salzburg Bulls",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Andrea Pirlo"
+            ],
+            "assists": [
+              "Thierry Henry"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Piraeus Reds",
+            "score": "3-2",
+            "result": "win",
+            "scorers": [
+              "Thierry Henry",
+              "Thierry Henry",
+              "Thierry Henry"
+            ],
+            "assists": [
+              "Ashley Cole",
+              "Dani Alves",
+              "Samuel Eto'o"
+            ],
+            "oppGoals": 2
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Paris Tower FC",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Samuel Eto'o"
+            ],
+            "assists": [],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "London Blues",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Samuel Eto'o"
+            ],
+            "assists": [
+              "Andrea Pirlo"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Lisbon Lions",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Thierry Henry"
+            ],
+            "assists": [
+              "Gennaro Gattuso"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Istanbul Lions",
+            "score": "2-1",
+            "result": "win",
+            "scorers": [
+              "Thierry Henry",
+              "Samuel Eto'o"
+            ],
+            "assists": [
+              "Dani Alves"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Basque Lions",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Paolo Maldini"
+            ],
+            "assists": [
+              "Thierry Henry"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Amsterdam Lancers",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Samuel Eto'o"
+            ],
+            "assists": [
+              "Dani Alves"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "ko",
+            "round": "Round of 16",
+            "opponent": "Catalan Kings",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Thierry Henry"
+            ],
+            "assists": [
+              "Dani Alves"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "ko",
+            "round": "Quarter-final",
+            "opponent": "North London Gunners",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Samuel Eto'o"
+            ],
+            "assists": [
+              "Andrea Pirlo"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "ko",
+            "round": "Semi-final",
+            "opponent": "Milano Reds",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Samuel Eto'o"
+            ],
+            "assists": [
+              "Andrea Pirlo"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "ko",
+            "round": "Final",
+            "opponent": "Ruhr Yellows",
+            "score": "0-1",
+            "result": "loss",
+            "scorers": [],
+            "assists": [],
+            "oppGoals": 1
+          }
+        ]
+      }
+    },
+    {
+      "config": {
+        "formation": "5-3-2",
+        "difficulty": "casual",
+        "pool": "modern"
+      },
+      "seed": 20260705,
+      "offset": 2,
+      "rating": 210,
+      "squad": [
+        {
+          "slot": "GK",
+          "id": "schmeichel"
+        },
+        {
+          "slot": "RB",
+          "id": "lahm"
+        },
+        {
+          "slot": "CB",
+          "id": "ramos"
+        },
+        {
+          "slot": "CB",
+          "id": "puyol"
+        },
+        {
+          "slot": "CB",
+          "id": "beckenbauer"
+        },
+        {
+          "slot": "LB",
+          "id": "maldini"
+        },
+        {
+          "slot": "CM",
+          "id": "deschamps"
+        },
+        {
+          "slot": "CM",
+          "id": "xabialonso"
+        },
+        {
+          "slot": "CDM",
+          "id": "gattuso"
+        },
+        {
+          "slot": "ST",
+          "id": "etoo"
+        },
+        {
+          "slot": "ST",
+          "id": "ibra"
+        }
+      ],
+      "expected": {
+        "exitStage": "Final",
+        "champion": true,
+        "position": 1,
+        "points": 22,
+        "topScorer": {
+          "name": "Samuel Eto'o",
+          "goals": 7
+        },
+        "topAssister": {
+          "name": "Xabi Alonso",
+          "assists": 9
+        },
+        "matches": [
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "London Blues",
+            "score": "3-1",
+            "result": "win",
+            "scorers": [
+              "Zlatan Ibrahimović",
+              "Paolo Maldini",
+              "Samuel Eto'o"
+            ],
+            "assists": [
+              "Philipp Lahm",
+              "Xabi Alonso",
+              "Philipp Lahm"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Lisbon Lions",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Samuel Eto'o"
+            ],
+            "assists": [],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Paris Tower FC",
+            "score": "3-1",
+            "result": "win",
+            "scorers": [
+              "Samuel Eto'o",
+              "Paolo Maldini",
+              "Samuel Eto'o"
+            ],
+            "assists": [
+              "Xabi Alonso",
+              "Xabi Alonso",
+              "Paolo Maldini"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Turin Stripes",
+            "score": "3-0",
+            "result": "win",
+            "scorers": [
+              "Didier Deschamps",
+              "Samuel Eto'o",
+              "Didier Deschamps"
+            ],
+            "assists": [
+              "Philipp Lahm",
+              "Samuel Eto'o"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Andalusian Reds",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Zlatan Ibrahimović"
+            ],
+            "assists": [
+              "Xabi Alonso"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Zagreb Blues",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Xabi Alonso"
+            ],
+            "assists": [
+              "Paolo Maldini"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "North London Spurs",
+            "score": "2-0",
+            "result": "win",
+            "scorers": [
+              "Franz Beckenbauer",
+              "Samuel Eto'o"
+            ],
+            "assists": [
+              "Xabi Alonso",
+              "Zlatan Ibrahimović"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Belgian Royals",
+            "score": "0-0",
+            "result": "draw",
+            "scorers": [],
+            "assists": [],
+            "oppGoals": 0
+          },
+          {
+            "kind": "ko",
+            "round": "Round of 16",
+            "opponent": "Roman Wolves",
+            "score": "3-2",
+            "result": "win",
+            "scorers": [
+              "Samuel Eto'o",
+              "Paolo Maldini",
+              "Zlatan Ibrahimović"
+            ],
+            "assists": [
+              "Xabi Alonso",
+              "Xabi Alonso",
+              "Xabi Alonso"
+            ],
+            "oppGoals": 2
+          },
+          {
+            "kind": "ko",
+            "round": "Quarter-final",
+            "opponent": "Lisbon Lions",
+            "score": "0-0 (pens 4-2)",
+            "result": "pens-win",
+            "scorers": [],
+            "assists": [],
+            "oppGoals": 0
+          },
+          {
+            "kind": "ko",
+            "round": "Semi-final",
+            "opponent": "Milano Reds",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Zlatan Ibrahimović"
+            ],
+            "assists": [
+              "Xabi Alonso"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "ko",
+            "round": "Final",
+            "opponent": "Chamartín FC",
+            "score": "2-1",
+            "result": "win",
+            "scorers": [
+              "Sergio Ramos",
+              "Paolo Maldini"
+            ],
+            "assists": [
+              "Samuel Eto'o"
+            ],
+            "oppGoals": 1
+          }
+        ]
+      }
+    },
+    {
+      "config": {
+        "formation": "4-3-3",
+        "difficulty": "classic",
+        "pool": "modern"
+      },
+      "seed": 2272774119,
+      "offset": 1,
+      "daily": true,
+      "rating": 210,
+      "squad": [
+        {
+          "slot": "GK",
+          "id": "buffon"
+        },
+        {
+          "slot": "RB",
+          "id": "danialves"
+        },
+        {
+          "slot": "CB",
+          "id": "maldini"
+        },
+        {
+          "slot": "CB",
+          "id": "ramos"
+        },
+        {
+          "slot": "LB",
+          "id": "ashleycole"
+        },
+        {
+          "slot": "CM",
+          "id": "gattuso"
+        },
+        {
+          "slot": "CM",
+          "id": "deschamps"
+        },
+        {
+          "slot": "CM",
+          "id": "xabialonso"
+        },
+        {
+          "slot": "RW",
+          "id": "bale"
+        },
+        {
+          "slot": "ST",
+          "id": "henry"
+        },
+        {
+          "slot": "LW",
+          "id": "rivaldo"
+        }
+      ],
+      "expected": {
+        "exitStage": "Quarter-final",
+        "champion": false,
+        "position": 5,
+        "points": 20,
+        "topScorer": {
+          "name": "Thierry Henry",
+          "goals": 6
+        },
+        "topAssister": {
+          "name": "Xabi Alonso",
+          "assists": 6
+        },
+        "matches": [
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Prague Royals",
+            "score": "3-0",
+            "result": "win",
+            "scorers": [
+              "Thierry Henry",
+              "Rivaldo",
+              "Rivaldo"
+            ],
+            "assists": [
+              "Dani Alves",
+              "Ashley Cole",
+              "Xabi Alonso"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Manchester Sky",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Gareth Bale"
+            ],
+            "assists": [
+              "Rivaldo"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Lisbon Eagles",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Thierry Henry"
+            ],
+            "assists": [
+              "Xabi Alonso"
+            ],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Eindhoven Lights",
+            "score": "3-2",
+            "result": "win",
+            "scorers": [
+              "Xabi Alonso",
+              "Thierry Henry",
+              "Thierry Henry"
+            ],
+            "assists": [
+              "Rivaldo",
+              "Xabi Alonso"
+            ],
+            "oppGoals": 2
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Istanbul Lions",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Rivaldo"
+            ],
+            "assists": [],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Amsterdam Lancers",
+            "score": "1-0",
+            "result": "win",
+            "scorers": [
+              "Rivaldo"
+            ],
+            "assists": [],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Chamartín FC",
+            "score": "0-0",
+            "result": "draw",
+            "scorers": [],
+            "assists": [],
+            "oppGoals": 0
+          },
+          {
+            "kind": "league",
+            "round": null,
+            "opponent": "Istanbul Eagles",
+            "score": "1-1",
+            "result": "draw",
+            "scorers": [
+              "Gareth Bale"
+            ],
+            "assists": [
+              "Xabi Alonso"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "ko",
+            "round": "Round of 16",
+            "opponent": "Andalusian Reds",
+            "score": "3-1",
+            "result": "win",
+            "scorers": [
+              "Rivaldo",
+              "Sergio Ramos",
+              "Thierry Henry"
+            ],
+            "assists": [
+              "Xabi Alonso",
+              "Thierry Henry",
+              "Xabi Alonso"
+            ],
+            "oppGoals": 1
+          },
+          {
+            "kind": "ko",
+            "round": "Quarter-final",
+            "opponent": "Istanbul Lions",
+            "score": "1-2",
+            "result": "loss",
+            "scorers": [
+              "Thierry Henry"
+            ],
+            "assists": [
+              "Gareth Bale"
+            ],
+            "oppGoals": 2
+          }
+        ]
+      }
+    }
+  ]
+}

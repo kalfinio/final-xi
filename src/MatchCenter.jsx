@@ -303,27 +303,41 @@ function ControlBtn({ active, onClick, children, className = '' }) {
   )
 }
 
-// Resolved-event stats (everything updates only once an event reaches its outcome).
-function computeStats(resolved, timeline, prog, hg, ag) {
+// Progressive live stats reconciled to the canonical MatchDetail totals.
+//
+// Strategy (documented): the timeline shows selected highlights, not every
+// canonical shot, so live numbers use time-eased progression toward
+// timeline.finalStats (the canonical MatchDetail values), FLOORED by the
+// resolved-event counts and CAPPED at the canonical totals. The timeline's
+// budget accounting guarantees resolved counts never exceed those totals, and
+// at full time (prog = 1) every number equals MatchDetail exactly. Exported
+// for the cross-view consistency tests.
+export function computeStats(resolved, timeline, prog, hg, ag) {
   const fs = timeline.finalStats
   const ease = (v) => Math.round(v * prog)
+  // progressive value: eased toward `fin`, never below observed events, never above canonical
+  const live = (fin, counted) => Math.min(fin, Math.max(ease(fin), counted))
   const cShot = (team) => resolved.filter((e) => e.team === team && e.countsShot).length
   const cOnT = (team) => resolved.filter((e) => e.team === team && e.countsShot && e.onTarget).length
-  const hShots = Math.max(ease(fs.home.shots), cShot('home'))
-  const aShots = Math.max(ease(fs.away.shots), cShot('away'))
-  const hSot = Math.max(ease(fs.home.sot), hg, cOnT('home'))
-  const aSot = Math.max(ease(fs.away.sot), ag, cOnT('away'))
+  // resolved saves BY a team = opponent's resolved on-target shots that didn't score
+  const cSaves = (team) => resolved.filter((e) => e.team !== team && e.countsShot && e.onTarget && e.type !== 'goal').length
+  const hShots = live(fs.home.shots, cShot('home'))
+  const aShots = live(fs.away.shots, cShot('away'))
+  const hSot = live(fs.home.sot, Math.max(hg, cOnT('home')))
+  const aSot = live(fs.away.sot, Math.max(ag, cOnT('away')))
+  const hSaves = live(fs.home.saves, cSaves('home'))
+  const aSaves = live(fs.away.saves, cSaves('away'))
+  // big chances have no 1:1 timeline events — pure eased progression, floored
+  // by resolved goals (a goal is always a big chance).
+  const hBig = live(fs.home.bigChances, hg)
+  const aBig = live(fs.away.bigChances, ag)
   const hPoss = Math.round(50 + (fs.home.possession - 50) * prog)
-  const big = (team) => resolved.filter((e) => e.team === team && (e.type === 'goal' || e.type === 'save' || e.type === 'chance')).length
+  // momentum is visual flair (not a canonical hard stat) — unchanged.
   const att = (team) => resolved.filter((e) => e.team === team && ['goal', 'shot', 'save', 'chance'].includes(e.type)).length
   const totalAtt = att('home') + att('away') || 1
-  // A keeper's saves are the opponent's on-target shots that did not score —
-  // keeps Saves logically consistent with Shots on target and Goals.
-  const hSaves = Math.max(0, aSot - ag)
-  const aSaves = Math.max(0, hSot - hg)
   return {
     hShots, aShots, hSot, aSot, hPoss, aPoss: 100 - hPoss,
-    hBig: big('home'), aBig: big('away'), hSaves, aSaves,
+    hBig, aBig, hSaves, aSaves,
     momentumHome: Math.round((att('home') / totalAtt) * 100),
   }
 }
@@ -471,7 +485,7 @@ export default function MatchCenter({ squad, feature, onContinue, isLast = false
   const stats = computeStats(resolved, timeline, prog, hg, ag)
   const keyPlayer = timeline.potm ? shortDisplayName(timeline.potm) : null
   const oppStyle = timeline.opponentMeta ? `${timeline.away} are ${timeline.opponentMeta.style}` : null
-  const verdictLine = matchVerdict(timeline)
+  const verdictLine = timeline.verdict || matchVerdict(timeline) // canonical detail.verdict
   const tacticalNotes = tactics?.liveNotes || []
   const tacticalNote = tacticalNotes.length ? tacticalNotes[Math.floor(minute / 18) % tacticalNotes.length] : null
 

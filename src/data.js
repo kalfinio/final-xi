@@ -15,36 +15,13 @@ export function posTypeOf(primaryPos) {
 }
 
 // ---------------------------------------------------------------------------
-// Seeded randomness
+// Seeded randomness — implementations live in seedUtils.js (extracted so
+// matchEngine.js can use them without a circular import). Re-exported here so
+// existing `from './data'` imports keep working.
 // ---------------------------------------------------------------------------
-export function makeRng(seed) {
-  let a = seed >>> 0
-  return function () {
-    a |= 0
-    a = (a + 0x6d2b79f5) | 0
-    let t = Math.imul(a ^ (a >>> 15), 1 | a)
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
-}
-
-export function hashString(s) {
-  let h = 2166136261
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i)
-    h = Math.imul(h, 16777619)
-  }
-  return h >>> 0
-}
-
-export function combineSeed(base, ...nums) {
-  let h = base >>> 0
-  for (const n of nums) {
-    h ^= n | 0
-    h = Math.imul(h, 16777619)
-  }
-  return h >>> 0
-}
+import { makeRng, hashString, combineSeed } from './seedUtils'
+import { buildMatchDetail } from './matchEngine'
+export { makeRng, hashString, combineSeed }
 
 export function dateSeed(d = new Date()) {
   return hashString(todayKey(d))
@@ -1234,6 +1211,11 @@ function buildGoals(rng, players, gf, ga, tallies, lateStage = false) {
   return events
 }
 
+// DEPRECATED as a display source (Phase 1): views must read match.detail
+// (canonical MatchDetail from matchEngine.js) instead of match.stats. This
+// function MUST keep running inside simulate() — it consumes rng() calls that
+// are part of the frozen simulation RNG stream, and its possession/shots/SOT/
+// potm feed the canonical detail. Its `saves` and `xg` are superseded.
 function matchStats(rng, rating, gf, players, events) {
   const poss = clamp(Math.round(50 + clamp((rating - 100) / 4, -16, 20) + (rng() - 0.5) * 12), 28, 74)
   const shots = Math.max(gf, Math.round(7 + poss / 7 + rng() * 7))
@@ -1368,7 +1350,9 @@ export function runVerdict(result, squad) {
   return champion ? 'Conquered Europe' : 'European Run Ended'
 }
 
-export function simulate({ rating, difficulty = 'classic', squad, rng = Math.random }) {
+// `runSeed` seeds only the canonical MatchDetail presentation layer — it is
+// never fed into the simulation RNG stream, which is unchanged by Phase 1.
+export function simulate({ rating, difficulty = 'classic', squad, rng = Math.random, runSeed = 1 }) {
   // Base knockout win probability for this squad: strength minus weakness drag.
   const p = squadBaseProb(squad, difficulty)
   const players = squad.map((s) => s.player).filter(Boolean)
@@ -1446,6 +1430,15 @@ export function simulate({ rating, difficulty = 'classic', squad, rng = Math.ran
 
   const champion = advancedToKO && !eliminated
   if (champion) exitStage = 'Final'
+
+  // Canonical MatchDetail for every played match (league, play-off, KO).
+  // Built strictly AFTER every result is final; uses its own per-match seeded
+  // RNG (runSeed + stable match number), so the simulation RNG stream above is
+  // byte-identical to pre-Phase-1 behavior. allMatches is in fixed run order
+  // (league 1..8 → play-off → knockouts), which makes matchNumber stable.
+  allMatches.forEach((m, i) => {
+    m.detail = buildMatchDetail({ match: m, runSeed, matchNumber: i + 1 })
+  })
 
   const lastWithOpp = [...allMatches].reverse().find((m) => m.opponent)
   const knockoutWins = [playoff, ...knockouts].filter((m) => m && (m.result === 'win' || m.result === 'pens-win')).length
@@ -1627,7 +1620,9 @@ export function recordGame({ result, squad, formation }) {
 
   stats.gamesPlayed += 1
   if (result.champion) stats.trophies += 1
-  if (result.champion || result.exitRound === 'Final') stats.finalsReached += 1
+  // Fixed field mismatch: simulate() sets `exitStage` (there is no exitRound),
+  // so a lost final now correctly counts as a final reached.
+  if (result.champion || result.exitStage === 'Final') stats.finalsReached += 1
   if (total > stats.bestRating) stats.bestRating = total
 
   stats.formationCounts = { ...stats.formationCounts }

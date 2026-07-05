@@ -161,8 +161,11 @@ export function PostMatchCard({ squad, item, teamName, tactics, isLast, onContin
   const tl = useMemo(() => buildMatchTimeline(m, players, mcStageLabel(item), teamName, tactics), [m, players, item, teamName, tactics])
   const [open, setOpen] = useState(false)
 
-  const verdict = matchVerdict({ gf: m.gf, ga: m.ga, result: m.result, pens: m.pens })
-  const keyPlayer = m.stats?.potm ? shortDisplayName(m.stats.potm) : null
+  // Canonical MatchDetail values (verdict + key player), same source as the
+  // Match Center and the European Run report.
+  const verdict = m.detail?.verdict ?? matchVerdict({ gf: m.gf, ga: m.ga, result: m.result, pens: m.pens })
+  const canonicalPotm = m.detail?.keyPlayer ?? m.stats?.potm
+  const keyPlayer = canonicalPotm ? shortDisplayName(canonicalPotm) : null
   const squadNames = new Set(players.map((p) => p.name))
   const firstUs = (m.events || []).find((e) => e.side === 'us')
   const keyEvent = (m.events || []).length === 0
