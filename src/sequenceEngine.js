@@ -1,24 +1,24 @@
 // ---------------------------------------------------------------------------
-// Participant-based possession-sequence engine (Phase 2).
+// Participant-based possession-sequence engine (Phase 2, extended in Phase 3).
 //
-// Turns canonical MatchDetail outcomes into readable football sequences the
-// 2D Match Center can animate touch by touch:
+//   MatchDetail (+ canonical tactical matchup) → attachSequences() →
+//   event.seq → 2D animator → progressive live stats → canonical FT stats
 //
-//   MatchDetail → attachSequences() → event.seq → 2D animator
-//     → progressive live stats → exact canonical finalStats at FT
+// Phase 3 additions (all presentation-side, deterministic, zero result impact):
+//   • pattern weights = Phase 2 role weights × matchup patternModifiers
+//     (0.7–1.4) × a repetition penalty (×0.5 last pattern, ×0.75 the one
+//     before — patterns cool down, never disappear) × game-state bias
+//     (trailing late → more direct/pressing; leading late → more control
+//     and counters);
+//   • non-shot 'chance' sequences end in varied, readable football outcomes
+//     (interception, blocked cross, keeper claim, clearance, recycle…);
+//   • away sequences follow the opponent archetype's preferred patterns,
+//     including a high-press pattern for pressing sides;
+//   • the sequence's final actor is ALWAYS the outcome actor (chain, label,
+//     spotlight, banner and ball agree at the finish).
 //
-// Rules:
-//   • NEVER changes results, scores, stats, or probabilities — it decorates
-//     the highlight events the (budget-constrained) timeline already emits,
-//     so every visible shot/SOT/save/big-chance count stays within the
-//     canonical MatchDetail totals from Phase 1.
-//   • Deterministic: each sequence's RNG is derived from
-//     detail.presentationSeed + the event's stable id. No Math.random().
-//   • Uses the REAL drafted XI: participants are actual players, selected by
-//     slot / posType / role, and positioned via the tactics.js marker model
-//     (single positional source — projected, not re-modelled).
-//   • Roles shape narrative and participation ONLY (Phase 2) — no effect on
-//     match probability or outcomes.
+// Determinism: per-event RNG from presentationSeed + event id. No
+// Math.random(). Roles shape narrative and participants only.
 // ---------------------------------------------------------------------------
 
 import { makeRng, combineSeed } from './seedUtils'
@@ -38,8 +38,6 @@ function project(m) {
   }
 }
 
-// Home dots for the 2D pitch: role/formation-aware base shape + in-possession
-// shape (used as "temporary possession positions" during sequences).
 export function projectHomeDots(squad, compact = 1) {
   const base = buildMarkers(squad, 'combined', compact)
   const poss = buildMarkers(squad, 'inPossession', compact)
@@ -60,7 +58,6 @@ export function projectHomeDots(squad, compact = 1) {
 }
 
 // Generic opponent shape (right half, defending the right goal), numbered 1..11.
-// Exported so the Match Center and the engine share one away layout.
 export function layoutAwayDots() {
   const shape = [
     { line: 'GK', n: 1, x: 93 },
@@ -80,10 +77,9 @@ export function layoutAwayDots() {
 }
 
 // Attack-relative anchor points (home attacking →). `side` picks the wing.
-// Away sequences mirror through mirrorPt().
 function zone(name, side = 'R') {
   const wy = side === 'R' ? 52 : 12
-  const near = side === 'R' ? 26 : 38 // near post relative to delivery side
+  const near = side === 'R' ? 26 : 38
   const Z = {
     deepBuild: { x: 24, y: 32 },
     midHub: { x: 42, y: 32 },
@@ -100,13 +96,14 @@ function zone(name, side = 'R') {
     penaltySpot: { x: 88, y: 32 },
     goalMouth: { x: 96, y: 32 },
     missWide: { x: 99, y: side === 'R' ? 46 : 18 },
+    pressWin: { x: 66, y: 32 },
   }
   return { ...(Z[name] || Z.centerAtt) }
 }
 function mirrorPt(p) { return { x: 100 - p.x, y: 64 - p.y } }
 
 // ---------------------------------------------------------------------------
-// Squad pools + role weights
+// Squad pools + role weights (Phase 2 — unchanged)
 // ---------------------------------------------------------------------------
 const WIDE_SLOTS = new Set(['RW', 'LW', 'RM', 'LM'])
 const FB_SLOTS = new Set(['RB', 'LB', 'RWB', 'LWB'])
@@ -136,9 +133,6 @@ function buildPools(squad) {
 const count = (pool) => pool.length
 const roleCount = (squad, role) => squad.filter((s) => s.player.role === role || s.player.secondaryRole === role).length
 
-// Pattern availability weights from the squad's role profile. Every pattern
-// keeps a base weight so any XI can occasionally produce it, but role-heavy
-// squads lean into their identity. Narrative-only — never touches results.
 export function squadPatternWeights(squad) {
   const P = buildPools(squad)
   const tempo = roleCount(squad, 'Tempo Controller')
@@ -170,8 +164,6 @@ export function squadPatternWeights(squad) {
 
 export const SEQ_PATTERNS = Object.keys(squadPatternWeights([]))
 
-// Assister-role affinity: for goal sequences the penultimate touch is the real
-// assister, so patterns that fit that player's role get boosted.
 function assistAffinity(role) {
   switch (role) {
     case 'Touchline Winger': return ['cross', 'cutback', 'wide_overlap']
@@ -201,7 +193,6 @@ function pickEntry(rng, pool, fallback, used) {
   return src[Math.floor(rng() * src.length)]
 }
 
-// Shooter weighting for non-goal sequences (narrative only).
 function shooterWeight(e, minute) {
   const r = e.p.role
   let w = FINISHER_ROLES.has(r) ? 10 : WIDE_ROLES.has(r) ? 7 : CREATOR_ROLES.has(r) ? 5
@@ -212,10 +203,27 @@ function shooterWeight(e, minute) {
 
 const sideOfSlot = (slot) => (slot && slot.startsWith('L') ? 'L' : 'R')
 
+// Combined pattern weight: role base × matchup modifier (0.7–1.4) ×
+// repetition penalty (recent patterns cool down) × game-state bias.
+function patternWeight(name, base, ctx) {
+  let w = base
+  const mod = ctx.patternMods?.[name]
+  if (mod != null) w *= clamp(mod, 0.7, 1.4)
+  const hist = ctx.history || []
+  if (name === hist[0]) w *= 0.5
+  else if (name === hist[1]) w *= 0.75
+  const gs = ctx.gameState
+  if (gs?.late) {
+    if (gs.diff < 0 && (name === 'direct_attack' || name === 'pressing_recovery')) w *= 1.3
+    if (gs.diff < 0 && name === 'cross') w *= 1.15
+    if (gs.diff > 0 && (name === 'counterattack' || name === 'central_buildup')) w *= 1.2
+  }
+  return w
+}
+
 // ---------------------------------------------------------------------------
 // Sequence construction (home team — real players)
 // ---------------------------------------------------------------------------
-// A touch = one readable beat: the actor acts at `at`, then the ball moves on.
 function T(entry, action, text, at, kind = 'pass') {
   return {
     playerId: entry.p.id,
@@ -229,7 +237,7 @@ function T(entry, action, text, at, kind = 'pass') {
   }
 }
 
-function buildHomeSequence({ event, rng, squad, pools, nameOf, minute, scorerEntry, assistEntry }) {
+function buildHomeSequence({ event, rng, squad, pools, nameOf, minute, scorerEntry, assistEntry, ctx }) {
   const P = pools
   const used = new Set()
   const take = (pool, fallback = P.outfield) => {
@@ -239,7 +247,6 @@ function buildHomeSequence({ event, rng, squad, pools, nameOf, minute, scorerEnt
   }
   const isGoal = event.type === 'goal'
 
-  // Finisher: real scorer for goals; role-weighted shooter otherwise.
   let finisher
   if (isGoal && scorerEntry) {
     finisher = { ...scorerEntry, name: nameOf(scorerEntry.p.name) }
@@ -249,11 +256,9 @@ function buildHomeSequence({ event, rng, squad, pools, nameOf, minute, scorerEnt
     finisher.name = nameOf(finisher.p.name)
   }
   used.add(finisher.p.id)
-  // Penultimate actor: real assister for assisted goals.
   const penult = isGoal && assistEntry ? { ...assistEntry, name: nameOf(assistEntry.p.name) } : null
   if (penult) used.add(penult.p.id)
 
-  // GK-miracle goal (keeper scores late): dedicated set-piece sequence.
   if (isGoal && finisher.p.posType === 'GK') {
     const taker = penult || take(P.creators, P.mids)
     const side = sideOfSlot(taker.slot)
@@ -263,7 +268,6 @@ function buildHomeSequence({ event, rng, squad, pools, nameOf, minute, scorerEnt
       T(finisher, 'header', `THE KEEPER IS UP — ${finisher.name} attacks the ball!`, zone('boxCenter'), 'shot'),
     ])
   }
-  // Defender set-piece goal (the sim labels these as headers).
   if (isGoal && event.label && finisher.p.posType === 'DEF') {
     const taker = penult || take(P.creators, P.mids)
     const side = sideOfSlot(taker.slot)
@@ -273,11 +277,11 @@ function buildHomeSequence({ event, rng, squad, pools, nameOf, minute, scorerEnt
     ])
   }
 
-  // Pattern choice: squad-profile weights × assister affinity for goals.
+  // Pattern choice: role weights × matchup/repetition/game-state × assister affinity.
   const weights = squadPatternWeights(squad)
   const names = Object.keys(weights)
   const affinity = penult ? assistAffinity(penult.p.role) : []
-  const ws = names.map((n) => weights[n] * (affinity.includes(n) ? 4 : 1))
+  const ws = names.map((n) => patternWeight(n, weights[n] * (affinity.includes(n) ? 4 : 1), ctx))
   const pattern = wpick(rng, names, ws)
 
   const touches = []
@@ -382,17 +386,14 @@ function buildHomeSequence({ event, rng, squad, pools, nameOf, minute, scorerEnt
     }
   }
 
-  // If the forced penultimate assister wasn't placed by the pattern, insert a
-  // final key pass so the assist is always the last action before the finish.
   if (penult && !touches.some((t) => t.playerId === penult.p.id)) {
     push(T(penult, 'keypass', `${penult.name} picks out the killer pass`, zone('centerAtt'), 'through'))
   }
 
-  // Finishing touch: the real scorer / weighted shooter acts in the box.
   const shotAt = pattern === 'cross' ? zone('boxNear', sideOfSlot(touches[touches.length - 1].slot))
     : pattern === 'cutback' ? zone('cutbackSpot')
     : zone('boxCenter')
-  const verb = event.type === 'chance' ? `${finisher.name} arrives… but can't quite connect`
+  const verb = event.type === 'chance' ? `${finisher.name} arrives in the box…`
     : `${finisher.name} shoots!`
   push(T(finisher, event.type === 'chance' ? 'run' : 'shot', verb, shotAt, event.type === 'chance' ? 'run' : 'shot'))
 
@@ -404,16 +405,28 @@ function buildHomeSequence({ event, rng, squad, pools, nameOf, minute, scorerEnt
 }
 
 // ---------------------------------------------------------------------------
-// Generic opponent sequences (no real names — matches the sim's away style)
+// Generic opponent sequences — pattern mix follows the opponent archetype.
 // ---------------------------------------------------------------------------
-const AWAY_PATTERNS = ['central_buildup', 'wide_overlap', 'counterattack', 'cross', 'direct_attack']
+const DEFAULT_AWAY_PATTERNS = { central_buildup: 2, wide_overlap: 1.5, cross: 1.5, counterattack: 1.5, direct_attack: 1 }
 const AWAY_LABELS = {
   DEF: 'their defender', MID: 'their midfielder', ATT: 'their forward',
   playmaker: 'their playmaker', winger: 'their winger', striker: 'their striker',
 }
 
-function buildAwaySequence({ event, rng, awayDots, opponent }) {
-  const pattern = AWAY_PATTERNS[Math.floor(rng() * AWAY_PATTERNS.length)]
+function buildAwaySequence({ event, rng, awayDots, opponent, ctx }) {
+  const prefs = ctx.awayPatterns || DEFAULT_AWAY_PATTERNS
+  const names = Object.keys(prefs)
+  const ws = names.map((n) => {
+    let w = prefs[n]
+    const hist = ctx.awayHistory || []
+    if (n === hist[0]) w *= 0.5
+    else if (n === hist[1]) w *= 0.75
+    const gs = event.gameState
+    if (gs?.late && gs.diff < 0 && (n === 'direct_attack' || n === 'press')) w *= 1.3
+    if (gs?.late && gs.diff > 0 && n === 'counterattack') w *= 1.25
+    return w
+  })
+  const pattern = wpick(rng, names, ws)
   const dotOf = (line) => {
     const pool = awayDots.filter((d) => d.line === line)
     return pool[Math.floor(rng() * pool.length)]
@@ -432,26 +445,39 @@ function buildAwaySequence({ event, rng, awayDots, opponent }) {
       AT(mid, AWAY_LABELS.MID, 'recovery', `${opponent} win it back and break`, at('deepBuild'), 'recovery'),
       AT(att, AWAY_LABELS.winger, 'carry', `${AWAY_LABELS.winger} carries at speed`, at('halfSpace'), 'carry'),
     ]
-    : pattern === 'cross' || pattern === 'wide_overlap'
+    : pattern === 'press'
       ? [
-        AT(mid, AWAY_LABELS.playmaker, 'pass', `${opponent} work it wide`, at('centerMid')),
-        AT(att, AWAY_LABELS.winger, 'cross', `${AWAY_LABELS.winger} gets to the byline and crosses`, at('byline'), 'cross'),
+        AT(att, AWAY_LABELS.striker, 'recovery', `${opponent} press high and win it in your half!`, at('pressWin'), 'recovery'),
+        AT(mid, AWAY_LABELS.playmaker, 'pass', `${AWAY_LABELS.playmaker} plays it first time`, at('centerAtt')),
       ]
-      : pattern === 'direct_attack'
+      : pattern === 'cross' || pattern === 'wide_overlap'
         ? [
-          AT(def, AWAY_LABELS.DEF, 'longball', `${opponent} go direct`, at('deepBuild'), 'longball'),
-          AT(att, AWAY_LABELS.striker, 'layoff', `${AWAY_LABELS.striker} brings it down`, at('centerAtt'), 'layoff'),
+          AT(mid, AWAY_LABELS.playmaker, 'pass', `${opponent} work it wide`, at('centerMid')),
+          AT(att, AWAY_LABELS.winger, 'cross', `${AWAY_LABELS.winger} gets to the byline and crosses`, at('byline'), 'cross'),
         ]
-        : [
-          AT(def, AWAY_LABELS.DEF, 'pass', `${opponent} build from the back`, at('deepBuild')),
-          AT(mid, AWAY_LABELS.playmaker, 'through', `${AWAY_LABELS.playmaker} finds a gap between the lines`, at('centerAtt'), 'through'),
-        ]
-  const shooter = dotOf('ATT')
-  const shooterLabel = event.type === 'goal' && event.scorer ? event.scorer : AWAY_LABELS.striker
+        : pattern === 'direct_attack'
+          ? [
+            AT(def, AWAY_LABELS.DEF, 'longball', `${opponent} go direct`, at('deepBuild'), 'longball'),
+            AT(att, AWAY_LABELS.striker, 'layoff', `${AWAY_LABELS.striker} brings it down`, at('centerAtt'), 'layoff'),
+          ]
+          : [
+            AT(def, AWAY_LABELS.DEF, 'pass', `${opponent} build from the back`, at('deepBuild')),
+            AT(mid, AWAY_LABELS.playmaker, 'through', `${AWAY_LABELS.playmaker} finds a gap between the lines`, at('centerAtt'), 'through'),
+          ]
+  // Shooter: never silently reuse the previous actor's dot under a different
+  // generic label — the chain, label and outcome must agree (bug 10A).
+  const prev = touches[touches.length - 1]
+  let shooter = dotOf('ATT')
+  if (shooter.num === prev.awayNum) {
+    const alt = awayDots.filter((d) => d.line === 'ATT' && d.num !== prev.awayNum)
+    if (alt.length) shooter = alt[Math.floor(rng() * alt.length)]
+  }
+  const shooterLabel = event.type === 'goal' && event.scorer ? event.scorer
+    : shooter.num === prev.awayNum ? prev.playerName : AWAY_LABELS.striker
   touches.push({
     playerId: null, awayNum: shooter.num, playerName: shooterLabel, role: shooterLabel, slot: null,
     action: event.type === 'chance' ? 'run' : 'shot',
-    text: event.type === 'chance' ? `${shooterLabel} can't quite reach it` : `${shooterLabel} shoots!`,
+    text: event.type === 'chance' ? `${shooterLabel} attacks the space…` : `${shooterLabel} shoots!`,
     at: mirrorPt(event.type === 'chance' ? zone('centerAtt', side) : zone('boxCenter', side)),
     kind: event.type === 'chance' ? 'run' : 'shot',
   })
@@ -461,7 +487,22 @@ function buildAwaySequence({ event, rng, awayDots, opponent }) {
 // ---------------------------------------------------------------------------
 // Outcome + assembly
 // ---------------------------------------------------------------------------
-function outcomeFor(event, seq, { gkName, oppName, teamName }) {
+// Varied, readable endings for non-shot sequences (zero hard-stat impact).
+const CHANCE_VARIANTS = {
+  cross: ['the cross is blocked', 'the keeper claims the cross', 'headed clear at the near post'],
+  wide_overlap: ['the cutback is cut out', 'the low cross is cleared'],
+  cutback: ['the cutback is scrambled clear'],
+  through_ball: ['the last defender reads it', 'it runs through to the keeper'],
+  one_two: ['the return pass is intercepted'],
+  counterattack: ['a last-ditch challenge halts the break'],
+  direct_attack: ['the second ball is mopped up'],
+  pressing_recovery: ['the touch is heavy — possession lost'],
+  switch_of_play: ['the far-post ball is just too long'],
+  central_buildup: ['the final pass is intercepted', 'blocked on the edge of the box'],
+  press: ['the counter-press swallows it straight back'],
+}
+
+function outcomeFor(event, seq, { gkName, oppName, teamName }, rng) {
   const home = event.team === 'home'
   const shooter = seq.touches[seq.touches.length - 1]
   const side = sideOfSlot(shooter.slot)
@@ -491,23 +532,26 @@ function outcomeFor(event, seq, { gkName, oppName, teamName }) {
           at: home ? zone('missWide', side) : mirrorPt(zone('missWide', side)),
           description: `${shooter.playerName} fires just wide`,
         }
-    default: // chance
+    default: { // chance — the move breaks down; varied, readable, no shot
+      const gs = event.gameState
+      let variants = CHANCE_VARIANTS[seq.pattern] || CHANCE_VARIANTS.central_buildup
+      let variantLabel = variants[Math.floor(rng() * variants.length)]
+      if (gs?.late && gs.diff > 0 && rng() < 0.5) variantLabel = 'they calmly recycle possession and kill the tempo'
       return {
         type: 'chance', playerId: shooter.playerId, playerName: shooter.playerName,
         at: shooter.at,
+        variantLabel,
         description: home
-          ? `${teamName} carve them open — ${shooter.playerName} just can't finish the move`
-          : `${oppName} threaten — the final ball evades ${shooter.playerName}`,
+          ? `${teamName} probe — ${variantLabel}`
+          : `${oppName} threaten — ${variantLabel}`,
       }
+    }
   }
 }
 
 // Attach a deterministic participant sequence to every shot-like highlight
 // event, plus canonical big-chance flags (never exceeding detail bigChances).
-// Mutates the event objects the timeline already built; descriptions of
-// non-goal events are rewritten to match the sequence story (goal wording is
-// kept verbatim from the simulation).
-export function attachSequences(events, { detail, squad, nameOf, teamName, opponent }) {
+export function attachSequences(events, { detail, squad, nameOf, teamName, opponent, matchup = null }) {
   const pools = buildPools(squad)
   const awayDots = layoutAwayDots()
   const gkEntry = squad.find((s) => s.player.posType === 'GK')
@@ -515,8 +559,8 @@ export function attachSequences(events, { detail, squad, nameOf, teamName, oppon
   const byName = Object.fromEntries(pools.entries.map((e) => [e.p.name, e]))
   const byShort = Object.fromEntries(pools.entries.map((e) => [nameOf(e.p.name), e]))
 
-  // --- canonical big-chance flags (goals first, then saves, on-target shots,
-  //     then chances, in minute order) --------------------------------------
+  // canonical big-chance flags (goals first, then saves, on-target shots,
+  // then chances, in minute order)
   for (const team of ['home', 'away']) {
     const fs = team === 'home' ? detail.finalStats.home : detail.finalStats.away
     let budget = fs.bigChances
@@ -534,20 +578,33 @@ export function attachSequences(events, { detail, squad, nameOf, teamName, oppon
     }
   }
 
-  // --- sequences -------------------------------------------------------------
+  // Pattern repetition memory per team (diversity control — deterministic).
+  const history = { home: [], away: [] }
+  const remember = (team, pattern) => {
+    history[team].unshift(pattern)
+    if (history[team].length > 2) history[team].pop()
+  }
+
   for (const e of events) {
     if (!['goal', 'save', 'shot', 'chance'].includes(e.type)) continue
     const rng = makeRng(combineSeed(detail.presentationSeed, 5000 + e.id))
     let seq
     if (e.team === 'home') {
-      // Goal events carry display names; map back to squad entries.
       const scorerEntry = e.type === 'goal' ? (byShort[e.scorer] || byName[e.scorer] || null) : null
       const assistEntry = e.type === 'goal' && e.assister ? (byShort[e.assister] || byName[e.assister] || null) : null
-      seq = buildHomeSequence({ event: e, rng, squad, pools, nameOf, minute: e.minute, scorerEntry, assistEntry })
+      seq = buildHomeSequence({
+        event: e, rng, squad, pools, nameOf, minute: e.minute, scorerEntry, assistEntry,
+        ctx: { patternMods: matchup?.patternModifiers || null, history: history.home, gameState: e.gameState },
+      })
+      remember('home', seq.pattern)
     } else {
-      seq = buildAwaySequence({ event: e, rng, awayDots, opponent })
+      seq = buildAwaySequence({
+        event: e, rng, awayDots, opponent,
+        ctx: { awayPatterns: matchup?.awayPatterns || null, awayHistory: history.away },
+      })
+      remember('away', seq.pattern)
     }
-    const outcome = outcomeFor(e, seq, { gkName, oppName: opponent, teamName })
+    const outcome = outcomeFor(e, seq, { gkName, oppName: opponent, teamName }, rng)
     const participants = []
     const seen = new Set()
     for (const t of seq.touches) {
@@ -574,7 +631,6 @@ export function attachSequences(events, { detail, squad, nameOf, teamName, oppon
         goals: e.type === 'goal' ? 1 : 0,
       },
     }
-    // The ticker, spotlight, ball and highlights must tell one story.
     if (e.type !== 'goal') e.description = outcome.description
   }
   return events

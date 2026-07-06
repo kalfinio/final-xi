@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { shortDisplayName } from './data'
 import { buildMatchTimeline, matchVerdict } from './matchTimeline'
 import { projectHomeDots, layoutAwayDots } from './sequenceEngine'
-import { PATTERN_LABELS, buildSeqChain, chainActiveIndex, pathSegments, spreadMarkers, outcomeBanner } from './matchCenterView'
+import { PATTERN_LABELS, buildSeqChain, chainActiveIndex, pathSegments, spreadMarkers, outcomeBanner, placeLabels, ftBallPoint } from './matchCenterView'
+import { postMatchTacticalNote } from './tacticalMatchup'
 
 // ---------------------------------------------------------------------------
 // 2D Match Center (Phase 2): participant-based sequence playback.
@@ -42,10 +43,12 @@ export function buildPlan(e) {
     const seq = e.seq
     const a = e.anim || {}
     const dramatic = e.type === 'goal' || e.type === 'save' || !!a.lateDrama
-    const outcomeMs = e.type === 'goal' ? 1800 : e.type === 'save' ? 1450 : a.lateDrama ? 1150 : 880
+    // Phase 3: slightly tighter pacing so the denser highlight package stays
+    // watchable at x1 — dead time is trimmed, football actions are not.
+    const outcomeMs = e.type === 'goal' ? 1800 : e.type === 'save' ? 1400 : a.lateDrama ? 1100 : 780
     const stops = seq.touches.map((t, i) => ({
       point: t.at,
-      hold: i === 0 ? 640 : 720,
+      hold: i === 0 ? 560 : 640,
       kind: 'touch',
       touchIdx: i,
       text: t.text,
@@ -59,7 +62,7 @@ export function buildPlan(e) {
       actorKey: last.playerId != null ? `h${last.playerId}` : `a${last.awayNum}`,
       actorName: last.playerName,
     })
-    stops.push({ point: zonePt('center', e.team), hold: dramatic ? 680 : 460, kind: 'rest' })
+    stops.push({ point: zonePt('center', e.team), hold: dramatic ? 560 : 380, kind: 'rest' })
     return {
       seq, stops, outcomeFrame, noBall: false, dramatic,
       lateDrama: !!a.lateDrama, animType: a.animType || e.type,
@@ -234,14 +237,13 @@ function Spotlight({ active, homeName, awayName, atOutcome, momentumHome, liveAc
 // ---------------------------------------------------------------------------
 // Pitch — larger, clearer, event-driven.
 // ---------------------------------------------------------------------------
-function Dot({ d, active, keeper, dim, label, labelTone }) {
+function Dot({ d, active, keeper, dim, label, labelTone, labelPos }) {
   const fill = d.gk ? (d.side === 'home' ? '#c9a84c' : '#f87171') : (d.side === 'home' ? '#f5f5f5' : '#3b82f6')
   // Temporary name label for the active participant (and, subtler, the next
-  // receiver / the keeper on saves). Flips below the marker near the top edge;
-  // keeper labels sit below so they can't collide with the shooter's label at
-  // the goal mouth.
-  const below = labelTone === 'keeper' ? d.y <= 54 : d.y < 10
-  const labelY = below ? 5.6 : -3.6
+  // receiver / the keeper on saves). Position comes from the deterministic
+  // placeLabels pass (above/below/left/right, collision- and bounds-aware).
+  const dx = labelPos?.dx ?? 0
+  const dy = labelPos?.dy ?? -3.6
   const labelFill = labelTone === 'active' ? '#c9a84c' : labelTone === 'keeper' ? '#e2e8f0' : '#cbd5e1'
   return (
     <g className="fx-dotm" style={{ transform: `translate(${d.x}px, ${d.y}px)` }} opacity={dim ? 0.45 : 1}>
@@ -250,7 +252,7 @@ function Dot({ d, active, keeper, dim, label, labelTone }) {
       <text x="0" y="0.8" textAnchor="middle" fontSize="2.1" fontWeight="700" fill="#0c1a10">{d.num}</text>
       {label && (
         <text
-          x="0" y={labelY} textAnchor="middle" fontSize="2.5" fontWeight="800"
+          x={dx} y={dy} textAnchor="middle" fontSize="2.5" fontWeight="800"
           fill={labelFill} stroke="#0c1a10" strokeWidth="0.55" style={{ paintOrder: 'stroke' }}
           opacity={labelTone === 'next' ? 0.75 : 1}
         >{label}</text>
@@ -270,11 +272,22 @@ const BANNER_TONE = {
 }
 
 function Pitch({ homeDots, awayDots, ball, moveDur, segments, segKey, activeTeam, activeKey, activeName, nextKey, nextName, keeperSide, keeperName, banner, goalFlash, drama, highlight, eventKey }) {
+  // Deterministic, collision-aware label placement (priority: active → keeper → next).
+  const allDots = [...homeDots.map((d) => ({ d, key: `h${d.id}` })), ...awayDots.map((d) => ({ d, key: `a${d.num}` }))]
+  const requests = []
+  const findDot = (key) => allDots.find((x) => x.key === key)?.d
+  if (activeKey && activeName) { const d = findDot(activeKey); if (d) requests.push({ key: activeKey, name: activeName, x: d.x, y: d.y }) }
+  if (keeperSide && keeperName) {
+    const gkDot = (keeperSide === 'home' ? homeDots : awayDots).find((d) => d.gk)
+    if (gkDot) requests.push({ key: keeperSide === 'home' ? `h${gkDot.id}` : `a${gkDot.num}`, name: keeperName, x: gkDot.x, y: gkDot.y })
+  }
+  if (nextKey && nextName) { const d = findDot(nextKey); if (d) requests.push({ key: nextKey, name: nextName, x: d.x, y: d.y }) }
+  const placements = placeLabels(requests)
   const dotLabel = (key, d) => {
-    if (key === activeKey && activeName) return { label: activeName, tone: 'active' }
-    if (key === nextKey && nextName) return { label: nextName, tone: 'next' }
-    if (d.gk && keeperSide === d.side && keeperName) return { label: keeperName, tone: 'keeper' }
-    return { label: null, tone: null }
+    if (key === activeKey && activeName) return { label: activeName, tone: 'active', pos: placements[key] }
+    if (d.gk && keeperSide === d.side && keeperName) return { label: keeperName, tone: 'keeper', pos: placements[key] }
+    if (key === nextKey && nextName) return { label: nextName, tone: 'next', pos: placements[key] }
+    return { label: null, tone: null, pos: null }
   }
   const tone = banner ? (BANNER_TONE[banner.tone] || BANNER_TONE.neutral) : null
   return (
@@ -335,12 +348,12 @@ function Pitch({ homeDots, awayDots, ball, moveDur, segments, segKey, activeTeam
 
         {/* dots */}
         {awayDots.map((d) => {
-          const { label, tone: lt } = dotLabel(`a${d.num}`, d)
-          return <Dot key={`a${d.num}`} d={d} active={activeKey === `a${d.num}`} keeper={d.gk && keeperSide === 'away'} dim={activeTeam === 'home'} label={label} labelTone={lt} />
+          const { label, tone: lt, pos } = dotLabel(`a${d.num}`, d)
+          return <Dot key={`a${d.num}`} d={d} active={activeKey === `a${d.num}`} keeper={d.gk && keeperSide === 'away'} dim={activeTeam === 'home'} label={label} labelTone={lt} labelPos={pos} />
         })}
         {homeDots.map((d) => {
-          const { label, tone: lt } = dotLabel(`h${d.id}`, d)
-          return <Dot key={`h${d.id}`} d={d} active={activeKey === `h${d.id}`} keeper={d.gk && keeperSide === 'home'} dim={activeTeam === 'away'} label={label} labelTone={lt} />
+          const { label, tone: lt, pos } = dotLabel(`h${d.id}`, d)
+          return <Dot key={`h${d.id}`} d={d} active={activeKey === `h${d.id}`} keeper={d.gk && keeperSide === 'home'} dim={activeTeam === 'away'} label={label} labelTone={lt} labelPos={pos} />
         })}
 
         {/* goal-mouth flash */}
@@ -583,7 +596,6 @@ export default function MatchCenter({ squad, feature, onContinue, isLast = false
   const clampedFrame = plan ? Math.min(frame, plan.stops.length - 1) : 0
   const atOutcome = plan ? clampedFrame >= plan.outcomeFrame : false
   const curStop = plan ? plan.stops[clampedFrame] : null
-  const ball = curStop ? curStop.point : zonePt('center', 'home')
   const moveDur = curStop ? Math.min(curStop.hold, 700) / speed : 500
 
   // Resolved = events whose outcome has fired → drives score, ticker, stats.
@@ -598,6 +610,13 @@ export default function MatchCenter({ squad, feature, onContinue, isLast = false
     () => displayDots(baseHome, baseAway, plan, clampedFrame, finished),
     [baseHome, baseAway, plan, clampedFrame, finished],
   )
+
+  // Ball position — on rest frames it nudges deterministically off any marker
+  // sitting near the centre spot (bug 10C); marker coordinates never move.
+  const ballRaw = curStop ? curStop.point : zonePt('center', 'home')
+  const ball = !curStop || curStop.kind === 'rest'
+    ? ftBallPoint([...homeDots, ...awayDots], ballRaw)
+    : ballRaw
 
   // Active actor + keeper highlight + name labels for the current frame. The
   // labels, ball, highlight ring, spotlight text and chain all read the same
@@ -621,6 +640,8 @@ export default function MatchCenter({ squad, feature, onContinue, isLast = false
   const verdictLine = timeline.verdict || matchVerdict(timeline) // canonical detail.verdict
   const tacticalNotes = tactics?.liveNotes || []
   const tacticalNote = tacticalNotes.length ? tacticalNotes[Math.floor(minute / 18) % tacticalNotes.length] : null
+  // Canonical post-match tactical note from the stored matchup (Phase 3).
+  const ftTacticalNote = postMatchTacticalNote(feature.match.matchup, feature.match.result) || tactics?.postNote || null
 
   // Pitch flags for the active event at its outcome moment. The compact
   // banner derives strictly from the canonical event/sequence outcome.
@@ -648,70 +669,78 @@ export default function MatchCenter({ squad, feature, onContinue, isLast = false
 
       <Scoreboard home={timeline.home} away={timeline.away} hg={hg} ag={ag} minute={minute} stageLabel={timeline.stageLabel} finished={finished} />
 
-      {oppStyle && <p className="text-center text-[11px] text-secondary -mt-1.5 mb-1">{oppStyle}.</p>}
-      {!finished && tacticalNote && <p className="text-center text-[11px] text-gold/75 mb-2">{tacticalNote}</p>}
+      {!finished ? (
+        <>
+          {oppStyle && <p className="text-center text-[11px] text-secondary -mt-1.5 mb-1">{oppStyle}.</p>}
+          {tacticalNote && <p className="text-center text-[11px] text-gold/75 mb-2">{tacticalNote}</p>}
 
-      {!finished && <Spotlight active={active} homeName={timeline.home} awayName={timeline.away} atOutcome={atOutcome} momentumHome={stats.momentumHome} liveAction={liveAction} chain={chain} chainPos={chainPos} patternLabel={patternLabel} />}
+          <Spotlight active={active} homeName={timeline.home} awayName={timeline.away} atOutcome={atOutcome} momentumHome={stats.momentumHome} liveAction={liveAction} chain={chain} chainPos={chainPos} patternLabel={patternLabel} />
 
-      <Pitch
-        homeDots={homeDots} awayDots={awayDots}
-        ball={ball} moveDur={moveDur}
-        segments={segments} segKey={clampedFrame}
-        activeTeam={active && !finished ? active.team : null}
-        activeKey={activeKey} activeName={activeName}
-        nextKey={nextKey} nextName={nextName}
-        keeperSide={keeperSide} keeperName={keeperName}
-        banner={banner} goalFlash={finished ? null : goalFlash}
-        drama={drama} highlight={highlight}
-        eventKey={idx}
-      />
+          <Pitch
+            homeDots={homeDots} awayDots={awayDots}
+            ball={ball} moveDur={moveDur}
+            segments={segments} segKey={clampedFrame}
+            activeTeam={active ? active.team : null}
+            activeKey={activeKey} activeName={activeName}
+            nextKey={nextKey} nextName={nextName}
+            keeperSide={keeperSide} keeperName={keeperName}
+            banner={banner} goalFlash={goalFlash}
+            drama={drama} highlight={highlight}
+            eventKey={idx}
+          />
 
-      {/* Controls (under pitch) */}
-      <div className="flex flex-wrap items-center justify-center gap-2 mb-3">
-        {!finished ? (
-          <>
+          {/* Controls (under pitch) */}
+          <div className="flex flex-wrap items-center justify-center gap-2 mb-3">
             <ControlBtn active={false} onClick={() => setPlaying((p) => !p)} className="min-w-[5rem]">{playing ? '⏸ Pause' : '▶ Play'}</ControlBtn>
             <div className="flex items-center gap-1">
               {[1, 2, 4].map((s) => (<ControlBtn key={s} active={speed === s} onClick={() => setSpeed(s)}>x{s}</ControlBtn>))}
             </div>
             <button onClick={() => { setPlaying(false); setFinished(true) }} className="ml-1 px-3 py-1.5 rounded-md text-xs font-bold border border-border bg-card text-secondary hover:text-gold fx-press">Skip to end</button>
-          </>
-        ) : (
-          <ControlBtn active={false} onClick={restart}>↻ Replay</ControlBtn>
-        )}
-      </div>
-
-      {/* Live stats preview */}
-      <div className="rounded-lg bg-card border border-border p-3 mb-3">
-        <StatBar label="Possession" hv={stats.hPoss} av={stats.aPoss} suffix="%" />
-        <StatBar label="Shots" hv={stats.hShots} av={stats.aShots} />
-        <StatBar label="On target" hv={stats.hSot} av={stats.aSot} />
-      </div>
-
-      <ToggleBtn open={showStats} onClick={() => setShowStats((o) => !o)}>{showStats ? 'Hide Full Match Stats' : 'Show Full Match Stats'}</ToggleBtn>
-      {showStats && <FullStats s={stats} home={timeline.home} away={timeline.away} keyPlayer={keyPlayer} />}
-
-      <Ticker shown={resolved} activeId={active ? active.id : null} />
-
-      {finished && (
-        <div>
-          <div className="text-center mb-3">
-            <div className="text-sm text-secondary">
-              Full time: <span className="font-bold text-primary">{timeline.home} {timeline.gf}–{timeline.ga} {timeline.away}</span>
-              {timeline.pens && <span className="block text-xs mt-0.5">Penalty shootout: {timeline.pens.score} — {timeline.pens.won ? 'won' : 'lost'}</span>}
-            </div>
-            {verdictLine && <div className="text-base font-black text-gold tracking-tight mt-1">“{verdictLine}”</div>}
-            {tactics?.postNote && <div className="text-[11px] text-gold/70 mt-1 px-2">{tactics.postNote}</div>}
-            {keyPlayer && <div className="text-[11px] text-secondary mt-0.5">Key player: <span className="text-primary font-semibold">{keyPlayer}</span></div>}
           </div>
+
+          {/* Live stats preview */}
+          <div className="rounded-lg bg-card border border-border p-3 mb-3">
+            <StatBar label="Possession" hv={stats.hPoss} av={stats.aPoss} suffix="%" />
+            <StatBar label="Shots" hv={stats.hShots} av={stats.aShots} />
+            <StatBar label="On target" hv={stats.hSot} av={stats.aSot} />
+          </div>
+
+          <ToggleBtn open={showStats} onClick={() => setShowStats((o) => !o)}>{showStats ? 'Hide Full Match Stats' : 'Show Full Match Stats'}</ToggleBtn>
+          {showStats && <FullStats s={stats} home={timeline.home} away={timeline.away} keyPlayer={keyPlayer} />}
+
+          <Ticker shown={resolved} activeId={active ? active.id : null} />
+        </>
+      ) : (
+        <>
+          {/* Full time: compact summary first, primary CTA early, everything
+              else collapses. The pitch lives behind "Replay Match". */}
+          <div className="rounded-lg bg-card border border-border p-4 mb-3 text-center">
+            {verdictLine && <div className="text-lg font-black text-gold tracking-tight mb-1">“{verdictLine}”</div>}
+            {timeline.pens && <p className="text-xs text-secondary mb-1">Penalty shootout: {timeline.pens.score} — {timeline.pens.won ? 'won' : 'lost'}</p>}
+            {ftTacticalNote && <div className="text-[11px] text-gold/70 mb-1 px-2">{ftTacticalNote}</div>}
+            {keyPlayer && <div className="text-[11px] text-secondary">Key player: <span className="text-primary font-semibold">{keyPlayer}</span></div>}
+          </div>
+
+          <div className="mb-4">
+            <button onClick={() => onContinue && onContinue()} className="w-full px-6 py-3 rounded-md font-semibold fx-press bg-gold text-black hover:bg-gold/90">{isLast ? 'See Final Result →' : 'Continue to Next Match →'}</button>
+          </div>
+
+          <div className="rounded-lg bg-card border border-border p-3 mb-3">
+            <StatBar label="Possession" hv={stats.hPoss} av={stats.aPoss} suffix="%" />
+            <StatBar label="Shots" hv={stats.hShots} av={stats.aShots} />
+            <StatBar label="On target" hv={stats.hSot} av={stats.aSot} />
+          </div>
+
+          <ToggleBtn open={showStats} onClick={() => setShowStats((o) => !o)}>{showStats ? 'Hide Full Match Stats' : 'Show Full Match Stats'}</ToggleBtn>
+          {showStats && <FullStats s={stats} home={timeline.home} away={timeline.away} keyPlayer={keyPlayer} />}
 
           <ToggleBtn open={showTimeline} onClick={() => setShowTimeline((o) => !o)}>{showTimeline ? 'Hide Match Timeline' : 'Show Match Timeline'}</ToggleBtn>
           {showTimeline && <TimelineList events={events} />}
 
-          <div className="flex justify-center mt-1">
-            <button onClick={() => onContinue && onContinue()} className="px-6 py-3 rounded-md font-semibold fx-press bg-gold text-black hover:bg-gold/90 w-full sm:w-auto">{isLast ? 'See Final Result →' : 'Continue to Next Match →'}</button>
+          <div className="flex justify-center">
+            <ControlBtn active={false} onClick={restart}>↻ Replay Match</ControlBtn>
           </div>
-        </div>
+        </>
       )}
     </div>
   )

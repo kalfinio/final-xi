@@ -23,18 +23,21 @@ export const PATTERN_LABELS = {
   direct_attack: 'Direct attack',
   set_piece: 'Set piece',
   gk_miracle: 'Keeper up for it!',
+  press: 'High press',
 }
 
 // Compact actor chain for a sequence: consecutive touches by the same player
-// collapse into one step (e.g. the cross pattern's carry+cross). Each step
-// keeps the touch index it starts at so the current actor can be highlighted.
+// collapse into one step (e.g. the cross pattern's carry+cross). Merging
+// requires the SAME key AND the SAME display name — two different generic
+// away labels on one dot stay separate steps, so the final outcome actor is
+// always visible at the end of the chain (bug 10A).
 export function buildSeqChain(seq) {
   if (!seq || !seq.touches?.length) return null
   const chain = []
   seq.touches.forEach((t, i) => {
     const key = t.playerId != null ? `h${t.playerId}` : `a${t.awayNum}`
     const last = chain[chain.length - 1]
-    if (last && last.key === key) { last.lastTouch = i; return }
+    if (last && last.key === key && last.name === t.playerName) { last.lastTouch = i; return }
     chain.push({ key, name: t.playerName, firstTouch: i, lastTouch: i })
   })
   return chain
@@ -102,6 +105,55 @@ export function spreadMarkers(dots, minDist = 4.0, maxPush = 2.2) {
   return out
 }
 
+// Deterministic label placement (bug 10B): for each requested label (in
+// priority order — active first, then keeper, then next receiver) try
+// above → below → right → left, keep the label inside the pitch and away
+// from already-placed label boxes. Pure geometry; never moves the markers.
+export function placeLabels(requests) {
+  const placed = []
+  const out = {}
+  for (const r of requests) {
+    const half = Math.max(3, (r.name?.length || 4) * 0.68)
+    const cands = [
+      { dx: 0, dy: -3.6 },
+      { dx: 0, dy: 5.6 },
+      { dx: half + 3.2, dy: 0.9 },
+      { dx: -(half + 3.2), dy: 0.9 },
+    ]
+    let chosen = null
+    for (const c of cands) {
+      const cx = r.x + c.dx
+      const cy = r.y + c.dy
+      if (cx - half < 1 || cx + half > 99 || cy < 4 || cy > 62) continue
+      const box = { x1: cx - half, x2: cx + half, y1: cy - 2.4, y2: cy + 1 }
+      const hit = placed.some((b) => !(box.x2 < b.x1 - 0.5 || box.x1 > b.x2 + 0.5 || box.y2 < b.y1 - 0.5 || box.y1 > b.y2 + 0.5))
+      if (!hit) { chosen = c; placed.push(box); break }
+    }
+    if (!chosen) {
+      // everything collides — fall back away from the pitch centre, clamped
+      chosen = { dx: 0, dy: r.y > 32 ? -3.6 : 5.6 }
+      const cx = r.x
+      const cy = clamp(r.y + chosen.dy, 4, 62)
+      placed.push({ x1: cx - half, x2: cx + half, y1: cy - 2.4, y2: cy + 1 })
+    }
+    out[r.key] = chosen
+  }
+  return out
+}
+
+// Deterministic FT/rest ball spot (bug 10C): keep the ball near the centre
+// spot but never visually on top of a marker. Markers themselves never move.
+export function ftBallPoint(dots, center = { x: 50, y: 32 }, minDist = 4.2) {
+  const clear = (p) => dots.every((d) => Math.hypot(d.x - p.x, d.y - p.y) >= minDist)
+  if (clear(center)) return center
+  const cands = [
+    { x: 50, y: 26 }, { x: 50, y: 38 }, { x: 50, y: 22 }, { x: 50, y: 42 },
+    { x: 46, y: 32 }, { x: 54, y: 32 },
+  ]
+  for (const c of cands) if (clear(c)) return c
+  return { x: 50, y: 24 }
+}
+
 // Compact outcome banner content, derived strictly from the canonical
 // event/sequence outcome (visual only — stats and score timing are untouched).
 export function outcomeBanner(event) {
@@ -131,6 +183,6 @@ export function outcomeBanner(event) {
     case 'shot_off':
       return { title: 'WIDE', detail: out.playerName, sub: null, tone: 'miss' }
     default: // chance — the move broke down, no shot occurred
-      return { title: 'CHANCE', detail: out.playerName, sub: 'the move breaks down — no shot', tone: 'chance' }
+      return { title: 'CHANCE', detail: out.playerName, sub: out.variantLabel || 'the move breaks down — no shot', tone: 'chance' }
   }
 }

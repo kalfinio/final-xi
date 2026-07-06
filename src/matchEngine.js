@@ -72,16 +72,25 @@ export function buildMatchDetail({ match, runSeed = 1, matchNumber = 0 }) {
   const rng = makeRng(presentationSeed)
   const s = match.stats || {}
 
+  // Phase 3: tactical stat-profile shifts (capped, deterministic, no rng).
+  // Applied BEFORE invariant enforcement so the canonical guarantees below
+  // (goals ≤ SOT ≤ shots, saves derivation, possession = 100) still hold.
+  const sm = match.matchup?.statModifiers || null
+  const possShift = sm ? clamp(sm.possessionShift | 0, -5, 5) : 0
+  const hShotShift = sm ? clamp(sm.homeShotsShift | 0, -2, 2) : 0
+  const aShotShift = sm ? clamp(sm.awayShotsShift | 0, -2, 2) : 0
+  const bigShift = sm ? clamp(sm.bigChanceShift | 0, -1, 1) : 0
+
   // --- home side: carry over sim numbers, enforce goals <= SOT <= shots ----
-  const hShots = Math.max(s.shots ?? Math.max(gf, 6), gf, 1)
+  const hShots = Math.max((s.shots ?? Math.max(gf, 6)) + hShotShift, gf, 1)
   const hSot = clamp(s.shotsOnTarget ?? Math.max(gf, 3), gf, hShots)
-  const hPoss = clamp(Math.round(s.possession ?? 52), 20, 80)
+  const hPoss = clamp(Math.round((s.possession ?? 52) + possShift), 20, 80)
 
   // --- away side: synthesized deterministically (same shape the old timeline
   //     used, now canonical). Stronger opponents carry a touch more threat. ---
   const strength = match.opponentMeta?.strength
   const strengthFactor = typeof strength === 'number' ? clamp(0.82 + (strength - 72) / 70, 0.82, 1.2) : 1
-  const aShots = clamp(Math.round(hShots * (0.5 + rng() * 0.4) * strengthFactor), Math.max(ga, 3), hShots + 4)
+  const aShots = clamp(Math.round(hShots * (0.5 + rng() * 0.4) * strengthFactor) + aShotShift, Math.max(ga, 3), hShots + 4)
   const aSot = clamp(Math.round(Math.max(ga, aShots * (0.3 + rng() * 0.2))), ga, aShots)
 
   // --- saves: strictly derived from the other side's on-target shots --------
@@ -90,7 +99,7 @@ export function buildMatchDetail({ match, runSeed = 1, matchNumber = 0 }) {
 
   // --- big chances: goals + a share of saved efforts (+ occasional wasted
   //     sitter), never exceeding total shots ---------------------------------
-  const hBig = clamp(gf + Math.round((hSot - gf) * (0.45 + rng() * 0.3)) + (rng() < 0.35 ? 1 : 0), gf, hShots)
+  const hBig = clamp(gf + Math.round((hSot - gf) * (0.45 + rng() * 0.3)) + (rng() < 0.35 ? 1 : 0) + bigShift, gf, hShots)
   const aBig = clamp(ga + Math.round((aSot - ga) * (0.45 + rng() * 0.3)) + (rng() < 0.3 ? 1 : 0), ga, aShots)
 
   // --- xG: deterministic, plausible against the stat mix --------------------

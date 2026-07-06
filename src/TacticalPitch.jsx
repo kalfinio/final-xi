@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { buildMarkers, shapeLabel, buildTactics } from './tactics'
+import { buildSquadTacticalProfile, DIMENSIONS, DIMENSION_LABELS } from './tacticalMatchup'
 
 // View options for the tactical shape viewer.
 const VIEWS = [
@@ -61,6 +62,44 @@ function PitchSvg({ markers, ghostMarkers }) {
         {ghostMarkers && ghostMarkers.map((m) => <Marker key={`g-${m.id}`} m={m} ghost />)}
         {markers.map((m) => <Marker key={m.id} m={m} />)}
       </svg>
+    </div>
+  )
+}
+
+// Compact five-dimension tactical profile (Phase 3). Structure-only values —
+// how the XI is built, not how good the players are.
+function profileState(v) {
+  // Thresholds sit around the measured expected level of a drafted XI
+  // (~63–71 per dimension), matching the matchup resolver's centre.
+  if (v >= 72) return { label: 'Strong', cls: 'text-success' }
+  if (v >= 58) return { label: 'Balanced', cls: 'text-primary' }
+  return { label: 'Vulnerable', cls: 'text-danger' }
+}
+
+function TacticalProfileCard({ squad }) {
+  const profile = useMemo(() => buildSquadTacticalProfile(squad), [squad])
+  if (!profile) return null
+  return (
+    <div className="mt-3 rounded-lg bg-card border border-border p-3">
+      <div className="text-[10px] uppercase tracking-widest text-secondary mb-2">Tactical Profile</div>
+      <div className="space-y-2">
+        {DIMENSIONS.map((dim) => {
+          const v = profile[dim]
+          const st = profileState(v)
+          return (
+            <div key={dim}>
+              <div className="flex justify-between items-baseline text-[11px] mb-0.5">
+                <span className="text-secondary">{DIMENSION_LABELS[dim]}</span>
+                <span className={`font-bold ${st.cls}`}>{st.label}</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-bg overflow-hidden">
+                <div className={`h-full ${v >= 72 ? 'bg-success/80' : v >= 58 ? 'bg-gold' : 'bg-danger/80'}`} style={{ width: `${v}%` }} />
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      <p className="text-[10px] text-secondary mt-2 leading-snug">How your XI is structured — shapes matchups against opponent styles.</p>
     </div>
   )
 }
@@ -133,6 +172,7 @@ export default function TacticalPitch({ squad, formation }) {
       )}
 
       <IdentityCard tactics={tactics} />
+      <TacticalProfileCard squad={squad} />
     </div>
   )
 }

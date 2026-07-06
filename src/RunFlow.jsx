@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { shortDisplayName, squadDisplayName } from './data'
 import { buildMatchTimeline, matchVerdict } from './matchTimeline'
+import { postMatchTacticalNote } from './tacticalMatchup'
 
 // Public stage names (the sim stores 'Quarter-final'/'Semi-final' lowercase).
 const STAGE_DISPLAY = {
@@ -18,6 +19,13 @@ const DIFF_STYLE = {
   Elite: 'text-danger border-danger/40 bg-danger/10',
 }
 const TYPE_DOT = { goal: 'bg-gold', save: 'bg-blue-300', shot: 'bg-primary/70', chance: 'bg-emerald-300', momentum: 'bg-orange-300', card: 'bg-yellow-400', substitution: 'bg-secondary' }
+const MATCHUP_STYLE = {
+  'Strong Edge': 'text-success border-success/40 bg-success/10',
+  'Slight Edge': 'text-success border-success/30 bg-success/5',
+  Even: 'text-gold border-gold/40 bg-gold/10',
+  'Slight Concern': 'text-orange-300 border-orange-400/40 bg-orange-500/10',
+  'Difficult Matchup': 'text-danger border-danger/40 bg-danger/10',
+}
 
 // ---------------------------------------------------------------------------
 // Run data: turn a finished simulation into an ordered list of playable matches.
@@ -101,6 +109,26 @@ export function MatchHub({ item, teamName, record, matchIndex, total, firstTime,
         </div>
       </div>
 
+      {/* Tactical matchup card — from the ONE canonical stored matchup. */}
+      {item.match.matchup && (
+        <div className="rounded-lg bg-card border border-border p-3 mb-4">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <span className="text-[10px] uppercase tracking-widest text-secondary">Tactical matchup</span>
+            <span className={`px-2 py-0.5 rounded text-[11px] font-black border ${MATCHUP_STYLE[item.match.matchup.overallLabel] || MATCHUP_STYLE.Even}`}>{item.match.matchup.overallLabel}</span>
+          </div>
+          <div className="space-y-1 text-[11px] leading-snug">
+            <div className="flex gap-2">
+              <span className="shrink-0 w-16 text-[9px] uppercase tracking-wide text-success font-bold pt-0.5">Advantage</span>
+              <span className="text-primary">{item.match.matchup.keyAdvantage?.text || 'No clear structural edge in this matchup.'}</span>
+            </div>
+            <div className="flex gap-2">
+              <span className="shrink-0 w-16 text-[9px] uppercase tracking-wide text-danger font-bold pt-0.5">Risk</span>
+              <span className="text-primary">{item.match.matchup.keyRisk?.text || 'No obvious structural weakness against this style.'}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="rounded-lg bg-surface border border-border p-3 mb-5 text-center text-sm">
         <span className="text-secondary">Run record </span>
         <span className="font-bold text-primary">{record.w}W-{record.d}D-{record.l}L</span>
@@ -166,6 +194,8 @@ export function PostMatchCard({ squad, item, teamName, tactics, isLast, onContin
   const verdict = m.detail?.verdict ?? matchVerdict({ gf: m.gf, ga: m.ga, result: m.result, pens: m.pens })
   const canonicalPotm = m.detail?.keyPlayer ?? m.stats?.potm
   const keyPlayer = canonicalPotm ? shortDisplayName(canonicalPotm) : null
+  // Tactical note from the ONE canonical stored matchup (Phase 3).
+  const tacticalNote = postMatchTacticalNote(m.matchup, m.result) || tactics?.postNote || null
   const squadNames = new Set(players.map((p) => p.name))
   const firstUs = (m.events || []).find((e) => e.side === 'us')
   const keyEvent = (m.events || []).length === 0
@@ -195,7 +225,7 @@ export function PostMatchCard({ squad, item, teamName, tactics, isLast, onContin
       <div className="rounded-lg bg-card border border-border p-3 mb-3 space-y-1.5 text-xs">
         <div className="flex justify-between gap-3"><span className="text-secondary shrink-0">Key event</span><span className="font-semibold text-primary text-right">{keyEvent}</span></div>
         <div className="flex justify-between gap-3"><span className="text-secondary shrink-0">Key player</span><span className="font-semibold text-gold text-right">{keyPlayer || '—'}</span></div>
-        {tactics?.postNote && <div className="flex justify-between gap-3"><span className="text-secondary shrink-0">Tactical note</span><span className="text-gold/80 text-right">{tactics.postNote}</span></div>}
+        {tacticalNote && <div className="flex justify-between gap-3"><span className="text-secondary shrink-0">Tactical note</span><span className="text-gold/80 text-right">{tacticalNote}</span></div>}
       </div>
 
       <div className="rounded-lg bg-card border border-border p-3 mb-3">

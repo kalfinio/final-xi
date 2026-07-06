@@ -21,6 +21,7 @@ export function posTypeOf(primaryPos) {
 // ---------------------------------------------------------------------------
 import { makeRng, hashString, combineSeed } from './seedUtils'
 import { buildMatchDetail } from './matchEngine'
+import { buildSquadTacticalProfile, buildOpponentTacticalProfile, resolveTacticalMatchup } from './tacticalMatchup'
 export { makeRng, hashString, combineSeed }
 
 export function dateSeed(d = new Date()) {
@@ -1252,14 +1253,17 @@ export function leagueSeedBonus(position, round) {
 // round). Returns the match object with an `eliminated` flag.
 // usedOpponents (Set) ensures no team appears in two different KO rounds.
 // position = League Phase finish, used for the seeding advantage.
-function decisiveMatch(rng, baseProb, rating, players, tallies, round, usedOpponents, position) {
+function decisiveMatch(rng, baseProb, rating, players, tallies, round, usedOpponents, position, matchupFor) {
   // Later rounds bias toward stronger clubs, so the run builds toward the giants.
   const opp = pickOpponent(rng, usedOpponents, koOppWeight(round))
   const opponent = opp.name
+  // Tactical matchup (Phase 3): pure + deterministic, consumes no rng. Its
+  // capped delta joins the existing modifiers inside the existing clamp.
+  const matchup = matchupFor ? matchupFor(opp) : null
   // Opponent pressure rises each round; the Final is the hardest match. A strong
   // League Phase finish softens the early rounds via leagueSeedBonus. The chosen
   // club's strength adds a small, capped nudge on top.
-  const p = clamp(baseProb - (SIM.ROUND_PRESSURE[round] ?? 0) + leagueSeedBonus(position, round) + oppProbDelta(opp), SIM.KO_PR_FLOOR, SIM.KO_PR_CEIL)
+  const p = clamp(baseProb - (SIM.ROUND_PRESSURE[round] ?? 0) + leagueSeedBonus(position, round) + oppProbDelta(opp) + (matchup ? matchup.probabilityDelta : 0), SIM.KO_PR_FLOOR, SIM.KO_PR_CEIL)
   const roll = rng()
   let result, mgf, mga, pens = null, eliminated = false
 
@@ -1285,7 +1289,7 @@ function decisiveMatch(rng, baseProb, rating, players, tallies, round, usedOppon
   const stats = matchStats(rng, rating, mgf, players, events)
   const normalScore = `${mgf}-${mga}`
   const score = pens ? `${normalScore} (pens ${pens.score})` : normalScore
-  return { type: 'ko', round, opponent, opponentMeta: opp, result, score, normalScore, pens, stats, events, gf: mgf, ga: mga, eliminated }
+  return { type: 'ko', round, opponent, opponentMeta: opp, matchup, result, score, normalScore, pens, stats, events, gf: mgf, ga: mga, eliminated }
 }
 
 // Map an internal exit stage to a public outcome label.
@@ -1357,6 +1361,10 @@ export function simulate({ rating, difficulty = 'classic', squad, rng = Math.ran
   const p = squadBaseProb(squad, difficulty)
   const players = squad.map((s) => s.player).filter(Boolean)
   const byId = Object.fromEntries(players.map((pl) => [pl.id, pl]))
+  // Phase 3: one squad tactical profile per run; one canonical matchup per
+  // match (pure — consumes zero rng, so the simulation RNG stream is intact).
+  const squadProfile = buildSquadTacticalProfile(squad)
+  const matchupFor = (opp) => resolveTacticalMatchup(squadProfile, buildOpponentTacticalProfile(opp))
   const tally = { goals: {}, assists: {} }        // whole-run tally
   const leagueTally = { goals: {}, assists: {} }    // league-phase only
   const allMatches = []                             // for run-wide best/toughest
@@ -1367,7 +1375,8 @@ export function simulate({ rating, difficulty = 'classic', squad, rng = Math.ran
   let lw = 0, ld = 0, ll = 0, lgf = 0, lga = 0
   for (let i = 0; i < 8; i++) {
     const opp = pickOpponent(rng, leagueOppUsed) // flat weight = full tier mix
-    const pMatch = clamp(p + oppProbDelta(opp), SIM.KO_PR_FLOOR, SIM.KO_PR_CEIL)
+    const matchup = matchupFor(opp)
+    const pMatch = clamp(p + oppProbDelta(opp) + matchup.probabilityDelta, SIM.KO_PR_FLOOR, SIM.KO_PR_CEIL)
     const home = rng() < 0.5
     const roll = rng()
     let result, mgf, mga, points
@@ -1377,7 +1386,7 @@ export function simulate({ rating, difficulty = 'classic', squad, rng = Math.ran
     lgf += mgf; lga += mga
     const events = buildGoals(rng, players, mgf, mga, [tally, leagueTally])
     const stats = matchStats(rng, rating, mgf, players, events)
-    const match = { type: 'league', matchNo: i + 1, opponent: opp.name, opponentMeta: opp, home, score: `${mgf}-${mga}`, result, points, events, stats, gf: mgf, ga: mga }
+    const match = { type: 'league', matchNo: i + 1, opponent: opp.name, opponentMeta: opp, matchup, home, score: `${mgf}-${mga}`, result, points, events, stats, gf: mgf, ga: mga }
     leagueMatches.push(match)
     allMatches.push(match)
   }
@@ -1412,7 +1421,7 @@ export function simulate({ rating, difficulty = 'classic', squad, rng = Math.ran
   const usedKOOpponents = new Set()
 
   if (qualification === 'playoff') {
-    playoff = decisiveMatch(rng, p, rating, players, [tally], 'Knockout Play-Off', usedKOOpponents, position)
+    playoff = decisiveMatch(rng, p, rating, players, [tally], 'Knockout Play-Off', usedKOOpponents, position, matchupFor)
     allMatches.push(playoff)
     if (playoff.eliminated) { eliminated = true; exitStage = 'Knockout Play-Off' }
   }
@@ -1421,7 +1430,7 @@ export function simulate({ rating, difficulty = 'classic', squad, rng = Math.ran
   if (advancedToKO) {
     for (const round of ['Round of 16', 'Quarter-final', 'Semi-final', 'Final']) {
       if (eliminated) break
-      const m = decisiveMatch(rng, p, rating, players, [tally], round, usedKOOpponents, position)
+      const m = decisiveMatch(rng, p, rating, players, [tally], round, usedKOOpponents, position, matchupFor)
       knockouts.push(m)
       allMatches.push(m)
       if (m.eliminated) { eliminated = true; exitStage = round }

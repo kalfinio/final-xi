@@ -12,7 +12,7 @@ import baseline from './simBaseline.fixture.json'
 import { PLAYERS, computeRating, simulate, makeRng } from './data'
 import { buildMatchTimeline } from './matchTimeline'
 import { buildPlan } from './MatchCenter'
-import { buildSeqChain, chainActiveIndex, pathSegments, spreadMarkers, outcomeBanner, PATTERN_LABELS } from './matchCenterView'
+import { buildSeqChain, chainActiveIndex, pathSegments, spreadMarkers, outcomeBanner, PATTERN_LABELS, placeLabels, ftBallPoint } from './matchCenterView'
 
 const byId = Object.fromEntries(PLAYERS.map((p) => [p.id, p]))
 const squadFromFixture = (run) => run.squad.map(({ slot, id }) => ({ slot, player: byId[id] }))
@@ -198,8 +198,9 @@ describe('5. outcome banner', () => {
     const chance = byOutcome('chance')
     if (chance) {
       const b = outcomeBanner(chance)
-      expect(b.title).toBe('CHANCE')
-      expect(b.sub).toContain('no shot') // never looks like a shot occurred
+      expect(b.title).toBe('CHANCE') // never presented as a shot outcome
+      expect(b.sub).toBeTruthy()     // varied non-shot ending (variant label)
+      expect(['GOAL', 'SAVED', 'WIDE', 'BIG SAVE']).not.toContain(b.title)
     }
     // at least save-or-shotOn and one non-shot outcome must exist in the pool
     expect(save || shotOn).toBeTruthy()
@@ -211,5 +212,85 @@ describe('5. outcome banner', () => {
     expect(outcomeBanner(momentum).title).toBe('MOMENTUM SHIFT')
     const card = EVENTS.find((e) => e.type === 'card')
     if (card) expect(['YELLOW CARD', 'RED CARD']).toContain(outcomeBanner(card).title)
+  })
+})
+
+// ---------------------------------------------------------------------------
+describe('6. outcome actor in chain (bug 10A regression)', () => {
+  it('the sequence chain always ends with the canonical outcome actor', () => {
+    for (const e of SEQ_EVENTS) {
+      const chain = buildSeqChain(e.seq)
+      expect(chain[chain.length - 1].name).toBe(e.seq.outcome.playerName)
+    }
+  })
+
+  it('two different generic labels never merge into one chain step', () => {
+    for (const e of SEQ_EVENTS.filter((x) => x.team === 'away')) {
+      const chain = buildSeqChain(e.seq)
+      for (let i = 1; i < chain.length; i++) {
+        const same = chain[i].key === chain[i - 1].key && chain[i].name === chain[i - 1].name
+        expect(same).toBe(false)
+      }
+    }
+  })
+})
+
+// ---------------------------------------------------------------------------
+describe('7. label placement (bug 10B)', () => {
+  it('is deterministic and keeps labels inside the pitch', () => {
+    const reqs = [
+      { key: 'a', name: 'their striker', x: 6, y: 5 },       // near top-left corner
+      { key: 'b', name: 'Keeper', x: 7, y: 32 },
+      { key: 'c', name: 'their playmaker', x: 96, y: 60 },   // near bottom-right corner
+    ]
+    const p1 = placeLabels(reqs)
+    const p2 = placeLabels(reqs)
+    expect(JSON.stringify(p1)).toBe(JSON.stringify(p2))
+    for (const r of reqs) {
+      const pos = p1[r.key]
+      const half = Math.max(3, r.name.length * 0.68)
+      const cx = r.x + pos.dx
+      const cy = r.y + pos.dy
+      expect(cx - half).toBeGreaterThanOrEqual(0)
+      expect(cx + half).toBeLessThanOrEqual(100)
+      expect(cy).toBeGreaterThanOrEqual(3)
+      expect(cy).toBeLessThanOrEqual(63)
+    }
+  })
+
+  it('active + keeper at the goal mouth do not overlap (long generic labels)', () => {
+    const reqs = [
+      { key: 'shooter', name: 'their striker', x: 88, y: 32 },
+      { key: 'keeper', name: 'Courtois', x: 93, y: 32 },
+    ]
+    const p = placeLabels(reqs)
+    const box = (r) => {
+      const half = Math.max(3, r.name.length * 0.68)
+      const cx = r.x + p[r.key].dx
+      const cy = r.y + p[r.key].dy
+      return { x1: cx - half, x2: cx + half, y1: cy - 2.4, y2: cy + 1 }
+    }
+    const a = box(reqs[0])
+    const b = box(reqs[1])
+    const intersect = !(a.x2 < b.x1 || a.x1 > b.x2 || a.y2 < b.y1 || a.y1 > b.y2)
+    expect(intersect).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+describe('8. FT/rest ball position (bug 10C)', () => {
+  it('nudges the ball off markers near the centre spot, deterministically', () => {
+    const dots = [{ x: 49, y: 32 }, { x: 53, y: 30 }, { x: 20, y: 10 }]
+    const p1 = ftBallPoint(dots)
+    const p2 = ftBallPoint(dots)
+    expect(p1).toEqual(p2)
+    for (const d of dots) expect(Math.hypot(d.x - p1.x, d.y - p1.y)).toBeGreaterThanOrEqual(4.2)
+    // stays near the centre spot
+    expect(Math.abs(p1.x - 50)).toBeLessThanOrEqual(6)
+    expect(Math.abs(p1.y - 32)).toBeLessThanOrEqual(10)
+  })
+
+  it('keeps the exact centre when it is clear', () => {
+    expect(ftBallPoint([{ x: 10, y: 10 }, { x: 90, y: 50 }])).toEqual({ x: 50, y: 32 })
   })
 })

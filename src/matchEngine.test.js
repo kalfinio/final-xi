@@ -8,7 +8,8 @@
 // F. finalsReached regression (lost final)
 // G. Player DB validation
 import { describe, it, expect } from 'vitest'
-import baseline from './simBaseline.fixture.json'
+import baseline from './simBaseline.fixture.json' // historical Phase ≤2.1 capture (evidence, do not overwrite)
+import phase3 from './simBaselinePhase3.fixture.json' // Phase 3 deterministic baseline (same runs/seeds)
 import {
   PLAYERS, FORMATIONS, computeRating, simulate, makeRng, buildSimSeed,
   getEligiblePlayers, recordGame, validatePlayerDB,
@@ -16,6 +17,7 @@ import {
 import { buildMatchDetail, presentationSeedFor, matchVerdict } from './matchEngine'
 import { buildMatchTimeline } from './matchTimeline'
 import { computeStats } from './MatchCenter'
+import { TUNING } from './tacticalMatchup'
 
 const byId = Object.fromEntries(PLAYERS.map((p) => [p.id, p]))
 
@@ -142,9 +144,54 @@ describe('B. statistical invariant fuzzing', () => {
 })
 
 // ---------------------------------------------------------------------------
-describe('C. pre/post simulation baseline (result layer unchanged)', () => {
-  it.each(baseline.runs.map((r, i) => [i, r]))(
-    'run %#: opponents, scores, exit stage, scorers, assists identical to pre-refactor capture',
+describe('C. simulation baselines (Phase 3)', () => {
+  // Phase 3 intentionally changes some results via the capped tactical delta.
+  // Proof that NOTHING ELSE changed: with the tactical probability scale set
+  // to zero, every run is byte-identical to the historical Phase ≤2.1 capture
+  // — same RNG stream, same opponents, same scores, same scorers/assists.
+  it('with PROB_SCALE = 0, results are identical to the Phase ≤2.1 fixture', () => {
+    const saved = TUNING.PROB_SCALE
+    try {
+      TUNING.PROB_SCALE = 0
+      for (const run of baseline.runs) {
+        const squad = squadFromFixture(run)
+        const { total } = computeRating(squad)
+        const result = simulate({
+          rating: total, difficulty: run.config.difficulty, squad,
+          rng: makeRng(run.seed), runSeed: run.seed,
+        })
+        expect(snapshotRun(result)).toEqual(run.expected)
+      }
+    } finally {
+      TUNING.PROB_SCALE = saved
+    }
+  })
+
+  it('Phase 3 vs Phase ≤2.1 diff is small and threshold-shaped (report)', () => {
+    let changedRuns = 0
+    let changedMatches = 0
+    let championFlips = 0
+    for (let i = 0; i < baseline.runs.length; i++) {
+      const oldSnap = baseline.runs[i].expected
+      const newSnap = phase3.runs[i].expected
+      let runChanged = false
+      const n = Math.max(oldSnap.matches.length, newSnap.matches.length)
+      for (let k = 0; k < n; k++) {
+        const a = oldSnap.matches[k]
+        const b = newSnap.matches[k]
+        if (!a || !b || a.score !== b.score || a.result !== b.result || a.opponent !== b.opponent) { changedMatches++; runChanged = true }
+      }
+      if (runChanged) changedRuns++
+      if (oldSnap.champion !== newSnap.champion) championFlips++
+    }
+    // eslint-disable-next-line no-console
+    console.log(`[phase3 diff] changedRuns=${changedRuns}/16 changedMatches=${changedMatches}/172 championFlips=${championFlips}`)
+    expect(changedRuns).toBeLessThanOrEqual(6) // small, threshold-origin drift only
+    expect(championFlips).toBeLessThanOrEqual(2)
+  })
+
+  it.each(phase3.runs.map((r, i) => [i, r]))(
+    'run %#: Phase 3 engine reproduces the Phase 3 baseline exactly',
     (_, run) => {
       const squad = squadFromFixture(run)
       const { total } = computeRating(squad)
