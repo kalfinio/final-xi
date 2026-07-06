@@ -153,6 +153,14 @@ body {
 }
 .fx-goal-flash { animation: fxGoalFlash 1.3s ease forwards; }
 
+/* Compact outcome banner — slides in at the top edge of the pitch, never
+   covering the final movement in the middle. */
+@keyframes fxBanner {
+  from { opacity: 0; transform: translate(-50%, -6px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+.fx-banner { animation: fxBanner 0.22s ease forwards; }
+
 /* A zone band pulses to highlight where the action is. */
 @keyframes fxZonePulse {
   0%, 100% { opacity: 0.08; }
@@ -178,6 +186,11 @@ body {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
+  }
+  .fx-banner {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: translate(-50%, 0) !important;
   }
   .fx-path { stroke-dashoffset: 0 !important; }
   .fx-ball,

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { shortDisplayName } from './data'
 import { buildMatchTimeline, matchVerdict } from './matchTimeline'
 import { projectHomeDots, layoutAwayDots } from './sequenceEngine'
+import { PATTERN_LABELS, buildSeqChain, chainActiveIndex, pathSegments, spreadMarkers, outcomeBanner } from './matchCenterView'
 
 // ---------------------------------------------------------------------------
 // 2D Match Center (Phase 2): participant-based sequence playback.
@@ -34,8 +35,9 @@ function zonePt(zone, team) {
 function dist(a, b) { return Math.hypot(a.x - b.x, a.y - b.y) }
 
 // Per-event playback plan. Sequence events: one stop per touch → outcome →
-// rest. Legacy (no-ball) events keep the Phase 1 zone plan.
-function buildPlan(e) {
+// rest. Legacy (no-ball) events keep the Phase 1 zone plan. Exported for the
+// view-helper tests.
+export function buildPlan(e) {
   if (e.seq) {
     const seq = e.seq
     const a = e.anim || {}
@@ -48,15 +50,20 @@ function buildPlan(e) {
       touchIdx: i,
       text: t.text,
       actorKey: t.playerId != null ? `h${t.playerId}` : `a${t.awayNum}`,
+      actorName: t.playerName,
     }))
     const outcomeFrame = stops.length
-    stops.push({ point: seq.outcome.at, hold: outcomeMs, kind: 'outcome' })
+    const last = seq.touches[seq.touches.length - 1]
+    stops.push({
+      point: seq.outcome.at, hold: outcomeMs, kind: 'outcome',
+      actorKey: last.playerId != null ? `h${last.playerId}` : `a${last.awayNum}`,
+      actorName: last.playerName,
+    })
     stops.push({ point: zonePt('center', e.team), hold: dramatic ? 680 : 460, kind: 'rest' })
-    const pathPts = [...seq.touches.map((t) => `${t.at.x},${t.at.y}`), `${seq.outcome.at.x},${seq.outcome.at.y}`].join(' ')
     return {
       seq, stops, outcomeFrame, noBall: false, dramatic,
       lateDrama: !!a.lateDrama, animType: a.animType || e.type,
-      label: a.visualLabel, sub: a.subLabel, endPoint: seq.outcome.at, pathPts,
+      label: a.visualLabel, sub: a.subLabel, endPoint: seq.outcome.at,
       highlightZone: null,
     }
   }
@@ -118,7 +125,11 @@ function displayDots(baseHome, baseAway, plan, frame, finished) {
   } else {
     reactDefenders(home, ball, atOutcome, plan)
   }
-  return { home, away }
+  // Display-only de-overlap pass (deterministic, bounded) so clustered
+  // markers and their name labels stay readable around the box. Tactical
+  // coordinates are untouched; markers ease back once positions separate.
+  const spread = spreadMarkers([...home, ...away])
+  return { home: spread.slice(0, home.length), away: spread.slice(home.length) }
 }
 
 function reactDefenders(defs, ball, atOutcome, plan) {
@@ -176,7 +187,7 @@ const TYPE_META = {
   substitution: { label: 'ROLE IMPACT', cls: 'text-secondary border-border bg-surface' },
 }
 
-function Spotlight({ active, homeName, awayName, atOutcome, momentumHome, liveAction }) {
+function Spotlight({ active, homeName, awayName, atOutcome, momentumHome, liveAction, chain, chainPos, patternLabel }) {
   if (!active) {
     return (
       <div className="rounded-lg bg-card border border-border px-3 py-2.5 mb-2 text-center">
@@ -198,6 +209,18 @@ function Spotlight({ active, homeName, awayName, atOutcome, momentumHome, liveAc
       </div>
       {/* Live play-by-play during the sequence; the resolved story at the outcome. */}
       <div className="text-xs text-secondary leading-snug">{!atOutcome && liveAction ? liveAction : active.description}</div>
+      {/* Compact sequence chain: pattern + actors (done · CURRENT · next). */}
+      {chain && chain.length > 1 && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-1 gap-y-0.5 text-[10px] leading-tight">
+          {patternLabel && <span className="mr-1 px-1.5 py-0.5 rounded border border-gold/30 text-gold/80 text-[9px] font-bold tracking-wide uppercase">{patternLabel}</span>}
+          {chain.map((c, i) => (
+            <span key={i} className="flex items-center gap-x-1 min-w-0">
+              {i > 0 && <span className="text-secondary/50">→</span>}
+              <span className={`truncate max-w-[7rem] ${i < chainPos ? 'text-secondary/60' : i === chainPos ? 'text-gold font-bold' : 'text-secondary'}`}>{c.name}</span>
+            </span>
+          ))}
+        </div>
+      )}
       {active.type === 'momentum' && (
         <div className="mt-1.5 h-1.5 rounded-full bg-bg overflow-hidden flex">
           <div className="h-full bg-gold transition-all duration-700" style={{ width: `${momentumHome}%` }} />
@@ -211,18 +234,49 @@ function Spotlight({ active, homeName, awayName, atOutcome, momentumHome, liveAc
 // ---------------------------------------------------------------------------
 // Pitch — larger, clearer, event-driven.
 // ---------------------------------------------------------------------------
-function Dot({ d, active, keeper, dim }) {
+function Dot({ d, active, keeper, dim, label, labelTone }) {
   const fill = d.gk ? (d.side === 'home' ? '#c9a84c' : '#f87171') : (d.side === 'home' ? '#f5f5f5' : '#3b82f6')
+  // Temporary name label for the active participant (and, subtler, the next
+  // receiver / the keeper on saves). Flips below the marker near the top edge;
+  // keeper labels sit below so they can't collide with the shooter's label at
+  // the goal mouth.
+  const below = labelTone === 'keeper' ? d.y <= 54 : d.y < 10
+  const labelY = below ? 5.6 : -3.6
+  const labelFill = labelTone === 'active' ? '#c9a84c' : labelTone === 'keeper' ? '#e2e8f0' : '#cbd5e1'
   return (
     <g className="fx-dotm" style={{ transform: `translate(${d.x}px, ${d.y}px)` }} opacity={dim ? 0.45 : 1}>
       {(active || keeper) && <circle className="fx-dot-pulse" cx="0" cy="0" r="3.3" fill="none" stroke="#c9a84c" strokeWidth="0.6" />}
       <circle cx="0" cy="0" r="2.1" fill={fill} stroke="#0c1a10" strokeWidth="0.4" />
       <text x="0" y="0.8" textAnchor="middle" fontSize="2.1" fontWeight="700" fill="#0c1a10">{d.num}</text>
+      {label && (
+        <text
+          x="0" y={labelY} textAnchor="middle" fontSize="2.5" fontWeight="800"
+          fill={labelFill} stroke="#0c1a10" strokeWidth="0.55" style={{ paintOrder: 'stroke' }}
+          opacity={labelTone === 'next' ? 0.75 : 1}
+        >{label}</text>
+      )}
     </g>
   )
 }
 
-function Pitch({ homeDots, awayDots, ball, moveDur, pathPts, activeTeam, activeKey, keeperSide, overlay, goalFlash, drama, highlight, ballMoving, eventKey }) {
+// Tone styles for the compact outcome banner (dark/gold identity preserved).
+const BANNER_TONE = {
+  goal: { box: 'border-gold/60', title: 'text-gold' },
+  save: { box: 'border-blue-400/50', title: 'text-blue-200' },
+  miss: { box: 'border-border', title: 'text-primary' },
+  chance: { box: 'border-emerald-400/40', title: 'text-emerald-200' },
+  card: { box: 'border-yellow-400/50', title: 'text-yellow-200' },
+  neutral: { box: 'border-orange-400/40', title: 'text-orange-200' },
+}
+
+function Pitch({ homeDots, awayDots, ball, moveDur, segments, segKey, activeTeam, activeKey, activeName, nextKey, nextName, keeperSide, keeperName, banner, goalFlash, drama, highlight, eventKey }) {
+  const dotLabel = (key, d) => {
+    if (key === activeKey && activeName) return { label: activeName, tone: 'active' }
+    if (key === nextKey && nextName) return { label: nextName, tone: 'next' }
+    if (d.gk && keeperSide === d.side && keeperName) return { label: keeperName, tone: 'keeper' }
+    return { label: null, tone: null }
+  }
+  const tone = banner ? (BANNER_TONE[banner.tone] || BANNER_TONE.neutral) : null
   return (
     <div className="relative rounded-lg overflow-hidden border border-border mb-2" style={{ background: '#0c1a10' }}>
       <svg viewBox="0 0 100 64" className="w-full block" style={{ aspectRatio: '100 / 64' }}>
@@ -266,14 +320,28 @@ function Pitch({ homeDots, awayDots, ball, moveDur, pathPts, activeTeam, activeK
           <rect className="fx-zone-pulse" x={highlight.x - 11} y="4" width="22" height="56" rx="2" fill="#c9a84c" />
         )}
 
-        {/* active pass/shot path */}
-        {ballMoving && pathPts && (
-          <polyline key={`path-${eventKey}`} className="fx-path" points={pathPts} fill="none" stroke="#c9a84c" strokeOpacity="0.85" strokeWidth="0.8" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="2.6 2" markerEnd="url(#fxArrow)" />
+        {/* travelled path — dim: "where the ball has been" */}
+        {segments?.completed && (
+          <polyline points={segments.completed} fill="none" stroke="#c9a84c" strokeOpacity="0.26" strokeWidth="0.55" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="1.4 1.8" />
+        )}
+        {/* current pass — bright, arrowed: "where the ball is moving now" */}
+        {segments?.current && (
+          <line
+            key={`seg-${eventKey}-${segKey}`} className="fx-path"
+            x1={segments.current.x1} y1={segments.current.y1} x2={segments.current.x2} y2={segments.current.y2}
+            stroke="#c9a84c" strokeOpacity="0.95" strokeWidth="0.9" strokeLinecap="round" strokeDasharray="2.6 2" markerEnd="url(#fxArrow)"
+          />
         )}
 
         {/* dots */}
-        {awayDots.map((d) => <Dot key={`a${d.num}`} d={d} active={activeKey === `a${d.num}`} keeper={d.gk && keeperSide === 'away'} dim={activeTeam === 'home'} />)}
-        {homeDots.map((d) => <Dot key={`h${d.id}`} d={d} active={activeKey === `h${d.id}`} keeper={d.gk && keeperSide === 'home'} dim={activeTeam === 'away'} />)}
+        {awayDots.map((d) => {
+          const { label, tone: lt } = dotLabel(`a${d.num}`, d)
+          return <Dot key={`a${d.num}`} d={d} active={activeKey === `a${d.num}`} keeper={d.gk && keeperSide === 'away'} dim={activeTeam === 'home'} label={label} labelTone={lt} />
+        })}
+        {homeDots.map((d) => {
+          const { label, tone: lt } = dotLabel(`h${d.id}`, d)
+          return <Dot key={`h${d.id}`} d={d} active={activeKey === `h${d.id}`} keeper={d.gk && keeperSide === 'home'} dim={activeTeam === 'away'} label={label} labelTone={lt} />
+        })}
 
         {/* goal-mouth flash */}
         {goalFlash && (
@@ -290,11 +358,14 @@ function Pitch({ homeDots, awayDots, ball, moveDur, pathPts, activeTeam, activeK
       {/* late-drama vignette */}
       <div className="fx-drama pointer-events-none absolute inset-0" style={{ opacity: drama ? 1 : 0, background: 'radial-gradient(circle at center, transparent 35%, rgba(0,0,0,0.55) 100%)' }} />
 
-      {/* outcome overlay */}
-      {overlay && (
-        <div key={overlay.key} className="fx-flash pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
-          <div className={`font-black tracking-tight ${overlay.color}`} style={{ fontSize: overlay.big ? 'clamp(2.2rem, 9vw, 4rem)' : 'clamp(1.1rem, 4.5vw, 2rem)', textShadow: '0 2px 18px rgba(0,0,0,0.75)' }}>{overlay.text}</div>
-          {overlay.sub && <div className="text-xs sm:text-sm font-bold text-primary/90 mt-0.5" style={{ textShadow: '0 1px 8px rgba(0,0,0,0.8)' }}>{overlay.sub}</div>}
+      {/* compact outcome banner — top edge, never covers the final movement */}
+      {banner && (
+        <div key={`bn-${eventKey}`} className={`fx-banner pointer-events-none absolute top-1.5 left-1/2 z-10 max-w-[94%] px-3 py-1 rounded-md border bg-black/75 text-center ${tone.box}`}>
+          <div className="flex items-baseline justify-center gap-1.5 min-w-0">
+            <span className={`font-black tracking-tight text-sm sm:text-base ${tone.title}`}>{banner.title}</span>
+            {banner.detail && <span className="truncate text-[10px] sm:text-xs font-bold text-primary/90 uppercase tracking-wide">{banner.detail}</span>}
+          </div>
+          {banner.sub && <div className="truncate text-[9px] sm:text-[10px] text-secondary leading-tight">{banner.sub}</div>}
         </div>
       )}
 
@@ -465,16 +536,6 @@ function ToggleBtn({ open, onClick, children }) {
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
-const OUTCOME_OVERLAY = {
-  goal: { text: 'GOAL', color: 'text-gold', big: true },
-  save: { text: 'BIG SAVE', color: 'text-blue-200', big: true },
-  shot: { text: 'SHOT', color: 'text-primary', big: false },
-  chance: { text: 'CHANCE', color: 'text-emerald-200', big: false },
-  momentum: { text: 'MOMENTUM SHIFT', color: 'text-orange-200', big: false },
-  card: { text: 'CARD', color: 'text-yellow-200', big: false },
-  substitution: { text: 'ROLE IMPACT', color: 'text-secondary', big: false },
-}
-
 export default function MatchCenter({ squad, feature, onContinue, isLast = false, teamName = 'Final XI', tactics = null }) {
   const players = useMemo(() => squad.map((s) => s.player).filter(Boolean), [squad])
   const timeline = useMemo(
@@ -538,13 +599,19 @@ export default function MatchCenter({ squad, feature, onContinue, isLast = false
     [baseHome, baseAway, plan, clampedFrame, finished],
   )
 
-  // Active actor + keeper highlight for the current frame.
-  const activeKey = !finished && curStop?.kind === 'touch' ? curStop.actorKey
-    : !finished && atOutcome && plan?.seq ? plan.stops[plan.outcomeFrame - 1]?.actorKey
-    : null
+  // Active actor + keeper highlight + name labels for the current frame. The
+  // labels, ball, highlight ring, spotlight text and chain all read the same
+  // stop, so they always tell one story.
+  const activeKey = !finished ? (curStop?.actorKey ?? null) : null
+  const activeName = !finished ? (curStop?.actorName ?? null) : null
   const keeperSide = !finished && atOutcome && plan?.seq && ['goal', 'save', 'shot_on'].includes(plan.seq.outcome.type)
     ? (active.team === 'home' ? 'away' : 'home')
     : null
+  const gkPlayer = players.find((p) => p.posType === 'GK')
+  const keeperName = keeperSide === 'home' ? (gkPlayer ? shortDisplayName(gkPlayer.name) : 'Keeper') : keeperSide === 'away' ? 'Keeper' : null
+  const nextStop = plan && !finished && curStop?.kind === 'touch' ? plan.stops[clampedFrame + 1] : null
+  const nextKey = nextStop?.kind === 'touch' && nextStop.actorKey !== activeKey ? nextStop.actorKey : null
+  const nextName = nextKey ? nextStop.actorName : null
 
   const minute = finished ? 90 : (active ? active.minute : (resolved.length ? events[resolved.length - 1].minute : 0))
   const prog = Math.min(1, (finished ? 90 : (active ? active.minute : 0)) / 90)
@@ -555,15 +622,20 @@ export default function MatchCenter({ squad, feature, onContinue, isLast = false
   const tacticalNotes = tactics?.liveNotes || []
   const tacticalNote = tacticalNotes.length ? tacticalNotes[Math.floor(minute / 18) % tacticalNotes.length] : null
 
-  // Pitch overlay/flags for the active event at its outcome moment.
-  const overlay = (active && atOutcome)
-    ? { ...(OUTCOME_OVERLAY[active.type] || OUTCOME_OVERLAY.substitution), sub: plan.sub, key: `${idx}` }
-    : null
+  // Pitch flags for the active event at its outcome moment. The compact
+  // banner derives strictly from the canonical event/sequence outcome.
+  const banner = (active && atOutcome && !finished) ? outcomeBanner(active) : null
   const goalFlash = (active && atOutcome && active.type === 'goal') ? active.team : null
   const drama = !!(active && plan?.lateDrama && !finished)
   const highlight = (active && plan?.highlightZone && !finished) ? zonePt(plan.highlightZone, active.team) : null
-  const ballMoving = !!(plan && !plan.noBall && clampedFrame >= 1)
+  // Path split: dim travelled segments vs one bright current segment; future
+  // segments stay hidden until played.
+  const segments = plan && !plan.noBall && !finished ? pathSegments(plan.stops, clampedFrame) : null
   const liveAction = !finished && curStop?.kind === 'touch' ? curStop.text : null
+  // Compact sequence chain (pattern + actors), derived from event.seq.
+  const chain = active?.seq && !finished ? buildSeqChain(active.seq) : null
+  const chainPos = chain ? chainActiveIndex(chain, curStop?.kind === 'touch' ? curStop.touchIdx : Infinity) : -1
+  const patternLabel = active?.seq ? (PATTERN_LABELS[active.seq.pattern] || active.seq.pattern) : null
 
   function restart() { setIdx(-1); setFrame(0); setFinished(false); setPlaying(true) }
 
@@ -579,15 +651,18 @@ export default function MatchCenter({ squad, feature, onContinue, isLast = false
       {oppStyle && <p className="text-center text-[11px] text-secondary -mt-1.5 mb-1">{oppStyle}.</p>}
       {!finished && tacticalNote && <p className="text-center text-[11px] text-gold/75 mb-2">{tacticalNote}</p>}
 
-      {!finished && <Spotlight active={active} homeName={timeline.home} awayName={timeline.away} atOutcome={atOutcome} momentumHome={stats.momentumHome} liveAction={liveAction} />}
+      {!finished && <Spotlight active={active} homeName={timeline.home} awayName={timeline.away} atOutcome={atOutcome} momentumHome={stats.momentumHome} liveAction={liveAction} chain={chain} chainPos={chainPos} patternLabel={patternLabel} />}
 
       <Pitch
         homeDots={homeDots} awayDots={awayDots}
-        ball={ball} moveDur={moveDur} pathPts={plan?.pathPts}
+        ball={ball} moveDur={moveDur}
+        segments={segments} segKey={clampedFrame}
         activeTeam={active && !finished ? active.team : null}
-        activeKey={activeKey} keeperSide={keeperSide}
-        overlay={finished ? null : overlay} goalFlash={finished ? null : goalFlash}
-        drama={drama} highlight={highlight} ballMoving={ballMoving && !finished}
+        activeKey={activeKey} activeName={activeName}
+        nextKey={nextKey} nextName={nextName}
+        keeperSide={keeperSide} keeperName={keeperName}
+        banner={banner} goalFlash={finished ? null : goalFlash}
+        drama={drama} highlight={highlight}
         eventKey={idx}
       />
 
