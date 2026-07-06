@@ -224,9 +224,9 @@ export function buildMatchTimeline(match, players, stageLabel = '', teamName = '
     if (e.type === 'goal') { if (e.team === 'home') runH++; else runA++ }
   }
 
-  // 5) Participant-based possession sequences (Phase 2/3).
+  // 5) Participant-based possession sequences (Phase 2/3/4).
   const seqSquad = squad || players.map((p) => ({ slot: p.primaryPos, player: p }))
-  attachSequences(events, { detail, squad: seqSquad, nameOf: homeName, teamName, opponent, matchup })
+  attachSequences(events, { detail, squad: seqSquad, nameOf: homeName, teamName, opponent, matchup, approach: match.approach || 'balanced' })
 
   return {
     home: teamName,

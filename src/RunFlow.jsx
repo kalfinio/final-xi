@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { shortDisplayName, squadDisplayName } from './data'
 import { buildMatchTimeline, matchVerdict } from './matchTimeline'
-import { postMatchTacticalNote } from './tacticalMatchup'
+import { TACTICAL_APPROACHES, APPROACH_KEYS, approachTradeoffs, approachEmphasis, approachFit, approachFeedback } from './tacticalApproach'
 
 // Public stage names (the sim stores 'Quarter-final'/'Semi-final' lowercase).
 const STAGE_DISPLAY = {
@@ -27,31 +27,24 @@ const MATCHUP_STYLE = {
   'Difficult Matchup': 'text-danger border-danger/40 bg-danger/10',
 }
 
-// ---------------------------------------------------------------------------
-// Run data: turn a finished simulation into an ordered list of playable matches.
-// (League 1..8 → Knockout Play-Off? → knockout rounds.) No matches are invented;
-// it only walks the matches the simulation already produced.
-// ---------------------------------------------------------------------------
-export function buildRunMatches(result) {
-  if (!result) return []
-  const list = []
-  const league = result.leaguePhase?.matches || []
-  league.forEach((m, i) => list.push({ match: m, kind: 'league', stageLabel: 'League Phase', matchNo: i + 1, leagueTotal: league.length }))
-  if (result.playoff) list.push({ match: result.playoff, kind: 'ko', stageLabel: 'Knockout Play-Off' })
-  ;(result.knockouts || []).forEach((m) => list.push({ match: m, kind: 'ko', stageLabel: m.round }))
-  return list
-}
-
-// Running W-D-L + goals from the matches already played.
-export function runRecord(items) {
+// Running W-D-L + goals from the matches already resolved (Phase 4: the run
+// is resolved match by match, so this takes the controller's matches array).
+export function runRecord(matches) {
   let w = 0, d = 0, l = 0, gf = 0, ga = 0
-  items.forEach(({ match }) => {
+  matches.forEach((match) => {
     gf += match.gf; ga += match.ga
     if (match.result === 'win' || match.result === 'pens-win') w++
     else if (match.result === 'loss' || match.result === 'pens-loss') l++
     else d++
   })
   return { w, d, l, gf, ga }
+}
+
+// Wrap a resolved match in the item shape the post-match views expect.
+export function itemForMatch(match) {
+  return match.type === 'league'
+    ? { match, kind: 'league', stageLabel: 'League Phase', matchNo: match.matchNo, leagueTotal: 8 }
+    : { match, kind: 'ko', stageLabel: match.round }
 }
 
 export function stageDisplay(item) {
@@ -67,10 +60,10 @@ export function mcStageLabel(item) {
 }
 
 // Pre-match difficulty flavour from opponent strength + round (no result spoiler).
-export function predictedDifficulty(item) {
-  const s = item.match.opponentMeta?.strength ?? 80
+export function predictedDifficulty(pending) {
+  const s = pending.opponentMeta?.strength ?? 80
   let score = s >= 88 ? 4 : s >= 83 ? 3 : s >= 76 ? 2 : 1
-  if (item.kind === 'ko' && (item.stageLabel === 'Semi-final' || item.stageLabel === 'Final')) score = Math.min(4, score + 1)
+  if (pending.kind === 'ko' && (pending.round === 'Semi-final' || pending.round === 'Final')) score = Math.min(4, score + 1)
   return ['', 'Easy', 'Balanced', 'Dangerous', 'Elite'][score]
 }
 
@@ -84,15 +77,23 @@ function RunBtn({ children, onClick, variant = 'gold', className = '' }) {
 }
 
 // ---------------------------------------------------------------------------
-// Match Hub — shown before every match.
+// Match Hub — shown before every match. Phase 4: the player picks a tactical
+// approach here; it locks the moment Watch / Quick Sim / Sim All starts the
+// match. Everything shown is a pure preview (no rng, no result exists yet).
 // ---------------------------------------------------------------------------
-export function MatchHub({ item, teamName, record, matchIndex, total, firstTime, onWatch, onQuick, onSimAll }) {
-  const { stage, label } = stageDisplay(item)
-  const meta = item.match.opponentMeta
-  const diff = predictedDifficulty(item)
+export function MatchHub({ pending, teamName, record, matchNumber, firstTime, squadProfile, onWatch, onQuick, onSimAll }) {
+  const [approach, setApproach] = useState('balanced') // reset per match via key
+  const stage = pending.kind === 'league' ? 'League Phase' : (STAGE_DISPLAY[pending.round] || pending.round)
+  const label = pending.kind === 'league' ? `League Match ${pending.matchNo} of ${pending.leagueTotal}` : stage
+  const meta = pending.opponentMeta
+  const diff = predictedDifficulty(pending)
+  const matchup = pending.previews[approach]
+  const fit = approachFit(approach, pending.previews, squadProfile)
+  const { helps, costs } = approachTradeoffs(approach)
+  const emphasis = approachEmphasis(approach)
   return (
     <div className="max-w-xl mx-auto px-4 py-6 sm:py-8">
-      <div className="text-center mb-1"><span className="text-[10px] uppercase tracking-widest text-gold/80">European Run · Match {matchIndex + 1} of {total}</span></div>
+      <div className="text-center mb-1"><span className="text-[10px] uppercase tracking-widest text-gold/80">European Run · Match {matchNumber}</span></div>
       <h2 className="text-2xl sm:text-3xl font-black text-gold text-center mb-1">{stage}</h2>
       <p className="text-center text-secondary text-sm mb-5">{label}</p>
 
@@ -100,7 +101,7 @@ export function MatchHub({ item, teamName, record, matchIndex, total, firstTime,
         <div className="flex items-center justify-center gap-3 mb-3">
           <div className="flex-1 text-right min-w-0"><div className="font-black text-base sm:text-lg truncate text-primary">{teamName}</div><div className="text-[10px] text-secondary">You</div></div>
           <div className="shrink-0 text-secondary font-bold text-sm">vs</div>
-          <div className="flex-1 text-left min-w-0"><div className="font-black text-base sm:text-lg truncate text-blue-300">{meta?.name || item.match.opponent}</div><div className="text-[10px] text-secondary truncate capitalize">{meta ? meta.archetype : 'opponent'}</div></div>
+          <div className="flex-1 text-left min-w-0"><div className="font-black text-base sm:text-lg truncate text-blue-300">{meta?.name || pending.opponent}</div><div className="text-[10px] text-secondary truncate capitalize">{meta ? meta.archetype : 'opponent'}</div></div>
         </div>
         {meta?.style && <p className="text-center text-[11px] text-secondary mb-3">{meta.name} — {meta.style}.</p>}
         <div className="flex items-center justify-center gap-2">
@@ -109,25 +110,56 @@ export function MatchHub({ item, teamName, record, matchIndex, total, firstTime,
         </div>
       </div>
 
-      {/* Tactical matchup card — from the ONE canonical stored matchup. */}
-      {item.match.matchup && (
+      {/* Tactical matchup card — canonical preview for the SELECTED approach. */}
+      {matchup && (
         <div className="rounded-lg bg-card border border-border p-3 mb-4">
           <div className="flex items-center justify-between gap-2 mb-2">
             <span className="text-[10px] uppercase tracking-widest text-secondary">Tactical matchup</span>
-            <span className={`px-2 py-0.5 rounded text-[11px] font-black border ${MATCHUP_STYLE[item.match.matchup.overallLabel] || MATCHUP_STYLE.Even}`}>{item.match.matchup.overallLabel}</span>
+            <span className={`px-2 py-0.5 rounded text-[11px] font-black border ${MATCHUP_STYLE[matchup.overallLabel] || MATCHUP_STYLE.Even}`}>{matchup.overallLabel}</span>
           </div>
           <div className="space-y-1 text-[11px] leading-snug">
             <div className="flex gap-2">
               <span className="shrink-0 w-16 text-[9px] uppercase tracking-wide text-success font-bold pt-0.5">Advantage</span>
-              <span className="text-primary">{item.match.matchup.keyAdvantage?.text || 'No clear structural edge in this matchup.'}</span>
+              <span className="text-primary">{matchup.keyAdvantage?.text || 'No clear structural edge in this matchup.'}</span>
             </div>
             <div className="flex gap-2">
               <span className="shrink-0 w-16 text-[9px] uppercase tracking-wide text-danger font-bold pt-0.5">Risk</span>
-              <span className="text-primary">{item.match.matchup.keyRisk?.text || 'No obvious structural weakness against this style.'}</span>
+              <span className="text-primary">{matchup.keyRisk?.text || 'No obvious structural weakness against this style.'}</span>
             </div>
           </div>
         </div>
       )}
+
+      {/* Tactical approach selector — locks when the match starts. */}
+      <div className="rounded-lg bg-card border border-border p-3 mb-4">
+        <div className="text-[10px] uppercase tracking-widest text-secondary mb-2">Tactical approach</div>
+        <div className="grid grid-cols-2 gap-2 mb-2">
+          {APPROACH_KEYS.map((key) => {
+            const def = TACTICAL_APPROACHES[key]
+            const active = approach === key
+            return (
+              <button
+                key={key}
+                onClick={() => setApproach(key)}
+                className={`p-2.5 rounded-lg border text-left fx-press ${active ? 'border-gold bg-gold/10 ring-1 ring-gold/40' : 'border-border bg-surface hover:border-gold/50'}`}
+              >
+                <div className={`text-xs font-black tracking-wide ${active ? 'text-gold' : 'text-primary'}`}>{def.name.toUpperCase()}</div>
+                <div className="text-[10px] text-secondary leading-snug mt-0.5">{def.tagline}</div>
+              </button>
+            )
+          })}
+        </div>
+        {(helps.length > 0 || costs.length > 0) && (
+          <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] mb-1.5">
+            {helps.length > 0 && <span><span className="text-success font-bold uppercase text-[9px] tracking-wide mr-1">Helps</span><span className="text-secondary">{helps.join(', ')}</span></span>}
+            {costs.length > 0 && <span><span className="text-danger font-bold uppercase text-[9px] tracking-wide mr-1">Costs</span><span className="text-secondary">{costs.join(', ')}</span></span>}
+          </div>
+        )}
+        {emphasis.length > 0 && (
+          <div className="text-[10px] text-gold/70 mb-1.5">{TACTICAL_APPROACHES[approach].name} emphasizes: {emphasis.join(' · ')}</div>
+        )}
+        {fit && <div className="text-[11px] text-primary leading-snug">{fit}</div>}
+      </div>
 
       <div className="rounded-lg bg-surface border border-border p-3 mb-5 text-center text-sm">
         <span className="text-secondary">Run record </span>
@@ -136,23 +168,23 @@ export function MatchHub({ item, teamName, record, matchIndex, total, firstTime,
         <span className="text-secondary">Goals </span><span className="font-bold text-primary">{record.gf}–{record.ga}</span>
       </div>
 
-      {firstTime && matchIndex === 0 && (
+      {firstTime && matchNumber === 1 && (
         <p className="text-[11px] text-gold/75 text-center mb-3">Recommended: Watch one match first, then Quick Sim league matches for a faster run.</p>
       )}
 
       <div className="flex flex-col gap-3">
         <div>
-          <RunBtn onClick={onWatch} className="w-full">Watch Match</RunBtn>
+          <RunBtn onClick={() => onWatch(approach)} className="w-full">Watch Match</RunBtn>
           <p className="text-[10px] text-secondary text-center mt-1">Watch the 2D simulation play out.</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="sm:flex-1">
-            <RunBtn onClick={onQuick} variant="ghost" className="w-full">Quick Sim</RunBtn>
+            <RunBtn onClick={() => onQuick(approach)} variant="ghost" className="w-full">Quick Sim</RunBtn>
             <p className="text-[10px] text-secondary text-center mt-1">Instantly simulate this match.</p>
           </div>
           <div className="sm:flex-1">
-            <RunBtn onClick={onSimAll} variant="surface" className="w-full">Sim All</RunBtn>
-            <p className="text-[10px] text-secondary text-center mt-1">Finish the run, go to the final result.</p>
+            <RunBtn onClick={() => onSimAll(approach)} variant="surface" className="w-full">Sim All</RunBtn>
+            <p className="text-[10px] text-secondary text-center mt-1">Future matches use Balanced.</p>
           </div>
         </div>
       </div>
@@ -194,8 +226,10 @@ export function PostMatchCard({ squad, item, teamName, tactics, isLast, onContin
   const verdict = m.detail?.verdict ?? matchVerdict({ gf: m.gf, ga: m.ga, result: m.result, pens: m.pens })
   const canonicalPotm = m.detail?.keyPlayer ?? m.stats?.potm
   const keyPlayer = canonicalPotm ? shortDisplayName(canonicalPotm) : null
-  // Tactical note from the ONE canonical stored matchup (Phase 3).
-  const tacticalNote = postMatchTacticalNote(m.matchup, m.result) || tactics?.postNote || null
+  // Approach-aware note from the ONE canonical helper (Phase 4) — same
+  // source the Match Center FT summary uses.
+  const tacticalNote = approachFeedback({ approach: m.approach, matchup: m.matchup, detail: m.detail, result: m.result }) || tactics?.postNote || null
+  const approachName = m.approach ? TACTICAL_APPROACHES[m.approach]?.name : null
   const squadNames = new Set(players.map((p) => p.name))
   const firstUs = (m.events || []).find((e) => e.side === 'us')
   const keyEvent = (m.events || []).length === 0
@@ -225,6 +259,7 @@ export function PostMatchCard({ squad, item, teamName, tactics, isLast, onContin
       <div className="rounded-lg bg-card border border-border p-3 mb-3 space-y-1.5 text-xs">
         <div className="flex justify-between gap-3"><span className="text-secondary shrink-0">Key event</span><span className="font-semibold text-primary text-right">{keyEvent}</span></div>
         <div className="flex justify-between gap-3"><span className="text-secondary shrink-0">Key player</span><span className="font-semibold text-gold text-right">{keyPlayer || '—'}</span></div>
+        {approachName && <div className="flex justify-between gap-3"><span className="text-secondary shrink-0">Approach</span><span className="font-semibold text-primary text-right">{approachName}</span></div>}
         {tacticalNote && <div className="flex justify-between gap-3"><span className="text-secondary shrink-0">Tactical note</span><span className="text-gold/80 text-right">{tacticalNote}</span></div>}
       </div>
 

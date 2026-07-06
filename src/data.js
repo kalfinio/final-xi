@@ -22,6 +22,7 @@ export function posTypeOf(primaryPos) {
 import { makeRng, hashString, combineSeed } from './seedUtils'
 import { buildMatchDetail } from './matchEngine'
 import { buildSquadTacticalProfile, buildOpponentTacticalProfile, resolveTacticalMatchup } from './tacticalMatchup'
+import { applyTacticalApproach, approachMatchupPreviews } from './tacticalApproach'
 export { makeRng, hashString, combineSeed }
 
 export function dateSeed(d = new Date()) {
@@ -1480,6 +1481,247 @@ function bestWin(matches) {
     if (margin > 0 && (!best || margin > best.margin)) best = { opponent: m.opponent, score: m.score, margin }
   })
   return best ? { opponent: best.opponent, score: best.score } : null
+}
+
+// ---------------------------------------------------------------------------
+// Staged run simulation (Phase 4).
+//
+// simulate() precomputes a whole run, which would make a pre-match tactical
+// approach cosmetic. createRunSimulation() resolves the SAME run lazily, one
+// match at a time, splitting each match in two:
+//
+//   prepareNext()          — consumes rng ONLY for the opponent pick (and the
+//                            league home flag), so the Match Hub can show the
+//                            opponent + per-approach matchup previews while
+//                            the result is still genuinely undecided;
+//   resolveNext(approach)  — locks the approach, adjusts the squad profile
+//                            through applyTacticalApproach(), runs the
+//                            existing Phase 3 resolver, and only THEN
+//                            consumes the result roll and everything after.
+//
+// The rng consumption order is IDENTICAL to simulate() (opponent → home →
+// roll → goals → stats → standings jitter after match 8 → …), so with
+// Balanced selected for every match this controller reproduces simulate()
+// byte-for-byte — the Phase 3 baseline fixture doubles as the all-Balanced
+// Phase 4 baseline (test-asserted). Approaches shift only the probability
+// threshold, exactly like the Phase 3 tactical delta.
+//
+// Anti-probing by construction: nothing about a match's outcome exists until
+// resolveNext() runs; switching the hub selection is pure preview (no rng),
+// each match resolves exactly once, and Watch / Quick Sim / Replay all read
+// the one stored match object.
+// ---------------------------------------------------------------------------
+export function createRunSimulation({ rating, difficulty = 'classic', squad, rng = Math.random, runSeed = 1 }) {
+  const p = squadBaseProb(squad, difficulty)
+  const players = squad.map((s) => s.player).filter(Boolean)
+  const byId = Object.fromEntries(players.map((pl) => [pl.id, pl]))
+  const squadProfile = buildSquadTacticalProfile(squad)
+
+  const tally = { goals: {}, assists: {} }
+  const leagueTally = { goals: {}, assists: {} }
+  const allMatches = []
+  const leagueOppUsed = new Set()
+  const usedKOOpponents = new Set()
+  let lw = 0
+  let ld = 0
+  let ll = 0
+  let lgf = 0
+  let lga = 0
+  let leaguePhase = null
+  let playoff = null
+  const knockouts = []
+  let eliminated = false
+  let exitStage = 'League Phase'
+  let champion = false
+  let stage = { kind: 'league', matchNo: 1 }
+  let pending = null
+  let done = false
+
+  // League standings — consumes the jitter rng exactly where simulate() does
+  // (right after match 8, before any knockout opponent pick).
+  function computeStandings() {
+    const points = lw * 3 + ld
+    const gd = lgf - lga
+    const ratingNudge = clamp((p - 0.50) * SIM.LEAGUE_NUDGE_MULT, SIM.LEAGUE_NUDGE_LO, SIM.LEAGUE_NUDGE_HI)
+    const strength = points * SIM.LEAGUE_POS_POINTS + gd * SIM.LEAGUE_POS_GD + ratingNudge + (rng() - 0.5) * SIM.LEAGUE_JITTER
+    const position = clamp(Math.round(37 - strength), 1, 36)
+    const qualification = position <= 8 ? 'direct' : position <= 24 ? 'playoff' : 'eliminated'
+    const qualLabel = qualification === 'direct' ? 'Direct to Round of 16' : qualification === 'playoff' ? 'Knockout Play-Off' : 'Eliminated in League Phase'
+    const leagueMatches = allMatches.filter((m) => m.type === 'league')
+    leaguePhase = {
+      matches: leagueMatches,
+      record: { w: lw, d: ld, l: ll },
+      points, gf: lgf, ga: lga, gd, position, qualification, qualLabel,
+      topScorer: topEntry(leagueTally.goals, byId, 'goals'),
+      topAssister: topEntry(leagueTally.assists, byId, 'assists'),
+      bestMatch: bestWin(leagueMatches),
+    }
+    if (qualification === 'eliminated') {
+      eliminated = true
+      exitStage = 'League Phase'
+      done = true
+    } else {
+      stage = { kind: 'ko', round: qualification === 'playoff' ? 'Knockout Play-Off' : 'Round of 16' }
+    }
+  }
+
+  function prepareNext() {
+    if (done) return null
+    if (pending) return pending
+    if (stage.kind === 'league') {
+      const opp = pickOpponent(rng, leagueOppUsed) // 1 rng — same as simulate()
+      const home = rng() < 0.5                     // 1 rng — same as simulate()
+      pending = {
+        kind: 'league', matchNo: stage.matchNo, leagueTotal: 8,
+        stageLabel: 'League Phase',
+        opponent: opp.name, opponentMeta: opp, home,
+        matchNumber: allMatches.length + 1,
+        previews: approachMatchupPreviews(squadProfile, opp), // pure, no rng
+      }
+    } else {
+      const opp = pickOpponent(rng, usedKOOpponents, koOppWeight(stage.round)) // 1 rng
+      pending = {
+        kind: 'ko', round: stage.round, stageLabel: stage.round,
+        opponent: opp.name, opponentMeta: opp,
+        matchNumber: allMatches.length + 1,
+        previews: approachMatchupPreviews(squadProfile, opp),
+      }
+    }
+    return pending
+  }
+
+  // Lock the approach and resolve the pending match. Exactly one resolution
+  // per match; the stored canonical matchup is previews[approach].
+  function resolveNext(approachKey = 'balanced') {
+    if (done) return null
+    if (!pending) prepareNext()
+    if (!pending) return null
+    const opp = pending.opponentMeta
+    const adjusted = applyTacticalApproach(squadProfile, approachKey)
+    const matchup = resolveTacticalMatchup(adjusted, buildOpponentTacticalProfile(opp))
+    let match
+
+    if (pending.kind === 'league') {
+      const pMatch = clamp(p + oppProbDelta(opp) + matchup.probabilityDelta, SIM.KO_PR_FLOOR, SIM.KO_PR_CEIL)
+      const roll = rng()
+      let result, mgf, mga, points
+      if (roll < pMatch) { result = 'win'; mgf = 1 + Math.floor(rng() * 3); mga = Math.floor(rng() * mgf); points = 3; lw++ }
+      else if (roll < pMatch + SIM.LEAGUE_DRAW_BAND) { result = 'draw'; mgf = Math.floor(rng() * 2); mga = mgf; points = 1; ld++ }
+      else { result = 'loss'; mga = 1 + Math.floor(rng() * 2); mgf = Math.floor(rng() * mga); points = 0; ll++ }
+      lgf += mgf; lga += mga
+      const events = buildGoals(rng, players, mgf, mga, [tally, leagueTally])
+      const stats = matchStats(rng, rating, mgf, players, events)
+      match = {
+        type: 'league', matchNo: pending.matchNo, opponent: opp.name, opponentMeta: opp,
+        matchup, approach: approachKey, home: pending.home,
+        score: `${mgf}-${mga}`, result, points, events, stats, gf: mgf, ga: mga,
+      }
+    } else {
+      const round = pending.round
+      const position = leaguePhase.position
+      const pKo = clamp(
+        p - (SIM.ROUND_PRESSURE[round] ?? 0) + leagueSeedBonus(position, round) + oppProbDelta(opp) + matchup.probabilityDelta,
+        SIM.KO_PR_FLOOR, SIM.KO_PR_CEIL,
+      )
+      const roll = rng()
+      let result, mgf, mga, pens = null, elim = false
+      if (roll < pKo) {
+        result = 'win'
+        mgf = 1 + Math.floor(rng() * 3); mga = Math.floor(rng() * mgf)
+      } else if (roll < pKo + SIM.KO_DRAW_BAND) {
+        mgf = Math.floor(rng() * 2); mga = mgf
+        const wonPens = rng() < 0.5
+        const a = 3 + Math.floor(rng() * 3)
+        const b = wonPens ? a - 1 - Math.floor(rng() * 2) : a + 1
+        pens = { won: wonPens, score: wonPens ? `${a}-${Math.max(0, b)}` : `${Math.max(0, b)}-${a}`, hero: wonPens ? (rng() < 0.5 ? 'GK save in the shootout' : 'Ice-cold winning penalty') : null }
+        result = wonPens ? 'pens-win' : 'pens-loss'
+        if (!wonPens) elim = true
+      } else {
+        result = 'loss'
+        mga = 1 + Math.floor(rng() * 2); mgf = Math.floor(rng() * mga)
+        elim = true
+      }
+      const lateStage = round === 'Semi-final' || round === 'Final'
+      const events = buildGoals(rng, players, mgf, mga, [tally], lateStage)
+      const stats = matchStats(rng, rating, mgf, players, events)
+      const normalScore = `${mgf}-${mga}`
+      const score = pens ? `${normalScore} (pens ${pens.score})` : normalScore
+      match = {
+        type: 'ko', round, opponent: opp.name, opponentMeta: opp,
+        matchup, approach: approachKey,
+        result, score, normalScore, pens, stats, events, gf: mgf, ga: mga, eliminated: elim,
+      }
+    }
+
+    match.detail = buildMatchDetail({ match, runSeed, matchNumber: allMatches.length + 1 })
+    allMatches.push(match)
+    pending = null
+
+    // advance the run state machine
+    if (match.type === 'league') {
+      if (stage.matchNo < 8) stage = { kind: 'league', matchNo: stage.matchNo + 1 }
+      else computeStandings() // consumes the jitter rng at the exact simulate() position
+    } else if (match.round === 'Knockout Play-Off') {
+      playoff = match
+      if (match.eliminated) { eliminated = true; exitStage = 'Knockout Play-Off'; done = true }
+      else stage = { kind: 'ko', round: 'Round of 16' }
+    } else {
+      knockouts.push(match)
+      if (match.eliminated) { eliminated = true; exitStage = match.round; done = true }
+      else if (match.round === 'Final') { champion = true; exitStage = 'Final'; done = true }
+      else {
+        const order = ['Round of 16', 'Quarter-final', 'Semi-final', 'Final']
+        stage = { kind: 'ko', round: order[order.indexOf(match.round) + 1] }
+      }
+    }
+    return match
+  }
+
+  // Sim All: resolve every remaining match with the given approach (Balanced
+  // by default — future matches are never auto-optimized). Deterministic.
+  function finishRemaining(defaultApproach = 'balanced') {
+    while (!done) {
+      prepareNext()
+      if (done || !pending) break
+      resolveNext(defaultApproach)
+    }
+  }
+
+  // Final result object — same shape simulate() returns, for the result
+  // screen, run report, share flow and recordGame.
+  function finish() {
+    const lastWithOpp = [...allMatches].reverse().find((m) => m.opponent)
+    const knockoutWins = [playoff, ...knockouts].filter((m) => m && (m.result === 'win' || m.result === 'pens-win')).length
+    const topScorer = topEntry(tally.goals, byId, 'goals')
+    const topAssister = topEntry(tally.assists, byId, 'assists')
+    let best = null
+    let toughest = null
+    allMatches.forEach((m) => {
+      const margin = m.gf - m.ga
+      if (margin > 0 && (!best || margin > best.margin)) best = { round: m.type === 'league' ? 'League Phase' : m.round, opponent: m.opponent, score: m.score, margin }
+      if (!toughest || m.ga >= toughest.ga) toughest = { opponent: m.opponent, ga: m.ga }
+    })
+    return {
+      leaguePhase, playoff, knockouts,
+      champion, exitStage, knockoutWins,
+      lastOpponent: lastWithOpp ? lastWithOpp.opponent : null,
+      lastScore: lastWithOpp ? lastWithOpp.score : null,
+      topScorer, topAssister,
+      bestMatch: best ? { round: best.round, opponent: best.opponent, score: best.score } : null,
+      toughestOpponent: toughest ? toughest.opponent : null,
+    }
+  }
+
+  return {
+    prepareNext,
+    resolveNext,
+    finishRemaining,
+    finish,
+    squadProfile,
+    get matches() { return allMatches },
+    get isDone() { return done },
+    get resolvedCount() { return allMatches.length },
+  }
 }
 
 // ---------------------------------------------------------------------------

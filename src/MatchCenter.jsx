@@ -3,7 +3,7 @@ import { shortDisplayName } from './data'
 import { buildMatchTimeline, matchVerdict } from './matchTimeline'
 import { projectHomeDots, layoutAwayDots } from './sequenceEngine'
 import { PATTERN_LABELS, buildSeqChain, chainActiveIndex, pathSegments, spreadMarkers, outcomeBanner, placeLabels, ftBallPoint } from './matchCenterView'
-import { postMatchTacticalNote } from './tacticalMatchup'
+import { TACTICAL_APPROACHES, approachFeedback } from './tacticalApproach'
 
 // ---------------------------------------------------------------------------
 // 2D Match Center (Phase 2): participant-based sequence playback.
@@ -640,8 +640,17 @@ export default function MatchCenter({ squad, feature, onContinue, isLast = false
   const verdictLine = timeline.verdict || matchVerdict(timeline) // canonical detail.verdict
   const tacticalNotes = tactics?.liveNotes || []
   const tacticalNote = tacticalNotes.length ? tacticalNotes[Math.floor(minute / 18) % tacticalNotes.length] : null
-  // Canonical post-match tactical note from the stored matchup (Phase 3).
-  const ftTacticalNote = postMatchTacticalNote(feature.match.matchup, feature.match.result) || tactics?.postNote || null
+  // Canonical approach-aware note (Phase 4) — one helper, shared with the
+  // Post Match Card; reasoning comes from the stored matchup + real stats.
+  const ftTacticalNote = approachFeedback({
+    approach: feature.match.approach || 'balanced',
+    matchup: feature.match.matchup,
+    detail: feature.match.detail,
+    result: feature.match.result,
+  }) || tactics?.postNote || null
+  const approachName = feature.match.approach && feature.match.approach !== 'balanced'
+    ? TACTICAL_APPROACHES[feature.match.approach]?.name
+    : null
 
   // Pitch flags for the active event at its outcome moment. The compact
   // banner derives strictly from the canonical event/sequence outcome.
@@ -671,7 +680,7 @@ export default function MatchCenter({ squad, feature, onContinue, isLast = false
 
       {!finished ? (
         <>
-          {oppStyle && <p className="text-center text-[11px] text-secondary -mt-1.5 mb-1">{oppStyle}.</p>}
+          {oppStyle && <p className="text-center text-[11px] text-secondary -mt-1.5 mb-1">{oppStyle}.{approachName ? <span className="text-gold/70"> Approach: {approachName}.</span> : null}</p>}
           {tacticalNote && <p className="text-center text-[11px] text-gold/75 mb-2">{tacticalNote}</p>}
 
           <Spotlight active={active} homeName={timeline.home} awayName={timeline.away} atOutcome={atOutcome} momentumHome={stats.momentumHome} liveAction={liveAction} chain={chain} chainPos={chainPos} patternLabel={patternLabel} />

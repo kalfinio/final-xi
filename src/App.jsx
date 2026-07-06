@@ -18,7 +18,7 @@ import {
   eraCounts,
   bestEraPick,
   knockoutOutlook,
-  simulate,
+  createRunSimulation,
   ordinal,
   outcomeLabel,
   runVerdict,
@@ -48,7 +48,7 @@ import { buildShareData, buildShareText, downloadShareCard } from './share'
 import { buildTactics } from './tactics'
 import MatchCenter from './MatchCenter'
 import TacticalPitch from './TacticalPitch'
-import { MatchHub, PostMatchCard, buildRunMatches, runRecord, mcStageLabel } from './RunFlow'
+import { MatchHub, PostMatchCard, itemForMatch, runRecord, mcStageLabel } from './RunFlow'
 
 const TOTAL_REROLLS = 3
 
@@ -942,10 +942,14 @@ export default function App() {
   const [rerollsUsed, setRerollsUsed] = useState(0)
   const [stats, setStats] = useState(() => loadStats())
   const [teamName, setTeamName] = useState(() => loadTeamName())
-  const [matchIndex, setMatchIndex] = useState(0)
+  // Phase 4 staged run: matchNo counts hubs shown (also keys the hub so the
+  // approach selector resets to Balanced for every new match).
+  const [matchNo, setMatchNo] = useState(0)
   const resultRef = useRef(null)
   const tacticsRef = useRef(null)
-  const runMatchesRef = useRef([])
+  const runRef = useRef(null)          // staged run controller
+  const pendingRef = useRef(null)      // prepared-but-unresolved match
+  const currentMatchRef = useRef(null) // the one locked, resolved match
   const recordedRef = useRef(false)
 
   function startDraft(cfg) { setConfig(cfg); setScreen('draft') }
@@ -974,34 +978,55 @@ export default function App() {
       rng = makeRng(seed)
       runSeed = seed
     }
-    resultRef.current = simulate({ rating: total, difficulty: config.difficulty, squad, rng, runSeed })
+    // Staged run (Phase 4): matches resolve one at a time, each when its
+    // tactical approach locks — nothing about a match exists before that.
+    runRef.current = createRunSimulation({ rating: total, difficulty: config.difficulty, squad, rng, runSeed })
     // Tactical read of the XI — flavours the Match Center, report and result.
     tacticsRef.current = buildTactics(squad, config.formation)
-    // Walk the run match-by-match. The simulation already decided every result.
-    runMatchesRef.current = buildRunMatches(resultRef.current)
+    resultRef.current = null
     recordedRef.current = false
-    setMatchIndex(0)
-    if (runMatchesRef.current.length) setScreen('hub')
-    else finishRun()
+    currentMatchRef.current = null
+    pendingRef.current = runRef.current.prepareNext()
+    setMatchNo(1)
+    setScreen('hub')
   }
 
   // ---- European Run, match by match -------------------------------------
-  function watchMatch() { setScreen('watch') }
-  function quickSim() { setScreen('postmatch') }
-
-  // Continue from a finished match (watched or quick-simmed) to the next one,
-  // or to the final result if the whole run is over.
-  function continueRun() {
-    const next = matchIndex + 1
-    if (next < runMatchesRef.current.length) { setMatchIndex(next); setScreen('hub') }
-    else finishRun()
+  // Watch / Quick Sim lock the approach and resolve the match exactly once;
+  // both then read the same stored canonical match object.
+  function watchMatch(approach) {
+    currentMatchRef.current = runRef.current.resolveNext(approach)
+    setScreen('watch')
+  }
+  function quickSim(approach) {
+    currentMatchRef.current = runRef.current.resolveNext(approach)
+    setScreen('postmatch')
   }
 
-  // Skip the rest of the run straight to the final result/share screen.
-  function simAll() { finishRun() }
+  // Continue from a finished match to the next hub (fresh approach choice),
+  // or to the final result if the run is over.
+  function continueRun() {
+    const pending = runRef.current.prepareNext()
+    if (pending) {
+      pendingRef.current = pending
+      setMatchNo((n) => n + 1)
+      setScreen('hub')
+    } else {
+      finishRun()
+    }
+  }
+
+  // Sim All: the current match uses the approach selected on the hub; every
+  // remaining match uses Balanced. Deterministic.
+  function simAll(approach) {
+    runRef.current.resolveNext(approach)
+    runRef.current.finishRemaining('balanced')
+    finishRun()
+  }
 
   // Record the game once, then show the final result/share screen.
   function finishRun() {
+    if (!resultRef.current) resultRef.current = runRef.current.finish()
     if (!recordedRef.current) {
       const updated = recordGame({ result: resultRef.current, squad, formation: config.formation })
       setStats(updated)
@@ -1014,8 +1039,9 @@ export default function App() {
 
   function reset() {
     setConfig(null); setDraftedSquad(null); setSquad(null); setRerollsUsed(0)
-    resultRef.current = null; tacticsRef.current = null; runMatchesRef.current = []; recordedRef.current = false
-    setMatchIndex(0); setScreen('intro')
+    resultRef.current = null; tacticsRef.current = null; recordedRef.current = false
+    runRef.current = null; pendingRef.current = null; currentMatchRef.current = null
+    setMatchNo(0); setScreen('intro')
   }
 
   return (
@@ -1024,36 +1050,37 @@ export default function App() {
       {screen === 'draft' && <DraftScreen config={config} onComplete={finishDraft} />}
       {screen === 'setxi' && <SetXIScreen config={config} draftedSquad={draftedSquad} onConfirm={confirmXI} />}
       {screen === 'bonuses' && <BonusesScreen squad={squad} config={config} rerollsUsed={rerollsUsed} onSimulate={runSimulation} initialTeamName={teamName} />}
-      {screen === 'hub' && runMatchesRef.current[matchIndex] && (
+      {screen === 'hub' && pendingRef.current && runRef.current && (
         <MatchHub
-          item={runMatchesRef.current[matchIndex]}
+          key={matchNo}
+          pending={pendingRef.current}
           teamName={teamName}
-          record={runRecord(runMatchesRef.current.slice(0, matchIndex))}
-          matchIndex={matchIndex}
-          total={runMatchesRef.current.length}
+          record={runRecord(runRef.current.matches)}
+          matchNumber={matchNo}
           firstTime={!stats?.gamesPlayed}
+          squadProfile={runRef.current.squadProfile}
           onWatch={watchMatch}
           onQuick={quickSim}
           onSimAll={simAll}
         />
       )}
-      {screen === 'watch' && runMatchesRef.current[matchIndex] && (
+      {screen === 'watch' && currentMatchRef.current && (
         <MatchCenter
           squad={squad}
-          feature={{ match: runMatchesRef.current[matchIndex].match, stageLabel: mcStageLabel(runMatchesRef.current[matchIndex]) }}
+          feature={{ match: currentMatchRef.current, stageLabel: mcStageLabel(itemForMatch(currentMatchRef.current)) }}
           onContinue={continueRun}
-          isLast={matchIndex === runMatchesRef.current.length - 1}
+          isLast={runRef.current.isDone}
           teamName={teamName}
           tactics={tacticsRef.current}
         />
       )}
-      {screen === 'postmatch' && runMatchesRef.current[matchIndex] && (
+      {screen === 'postmatch' && currentMatchRef.current && (
         <PostMatchCard
           squad={squad}
-          item={runMatchesRef.current[matchIndex]}
+          item={itemForMatch(currentMatchRef.current)}
           teamName={teamName}
           tactics={tacticsRef.current}
-          isLast={matchIndex === runMatchesRef.current.length - 1}
+          isLast={runRef.current.isDone}
           onContinue={continueRun}
         />
       )}

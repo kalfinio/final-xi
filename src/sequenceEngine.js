@@ -23,6 +23,7 @@
 
 import { makeRng, combineSeed } from './seedUtils'
 import { buildMarkers } from './tactics'
+import { approachIntents, INTENT_MIN, INTENT_MAX } from './tacticalApproach'
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
 
@@ -204,11 +205,14 @@ function shooterWeight(e, minute) {
 const sideOfSlot = (slot) => (slot && slot.startsWith('L') ? 'L' : 'R')
 
 // Combined pattern weight: role base × matchup modifier (0.7–1.4) ×
+// approach intent (0.85–1.15, Phase 4 — never overrides role identity) ×
 // repetition penalty (recent patterns cool down) × game-state bias.
 function patternWeight(name, base, ctx) {
   let w = base
   const mod = ctx.patternMods?.[name]
   if (mod != null) w *= clamp(mod, 0.7, 1.4)
+  const intent = ctx.intents?.[name]
+  if (intent != null) w *= clamp(intent, INTENT_MIN, INTENT_MAX)
   const hist = ctx.history || []
   if (name === hist[0]) w *= 0.5
   else if (name === hist[1]) w *= 0.75
@@ -551,7 +555,8 @@ function outcomeFor(event, seq, { gkName, oppName, teamName }, rng) {
 
 // Attach a deterministic participant sequence to every shot-like highlight
 // event, plus canonical big-chance flags (never exceeding detail bigChances).
-export function attachSequences(events, { detail, squad, nameOf, teamName, opponent, matchup = null }) {
+export function attachSequences(events, { detail, squad, nameOf, teamName, opponent, matchup = null, approach = 'balanced' }) {
+  const intents = approachIntents(approach)
   const pools = buildPools(squad)
   const awayDots = layoutAwayDots()
   const gkEntry = squad.find((s) => s.player.posType === 'GK')
@@ -594,7 +599,7 @@ export function attachSequences(events, { detail, squad, nameOf, teamName, oppon
       const assistEntry = e.type === 'goal' && e.assister ? (byShort[e.assister] || byName[e.assister] || null) : null
       seq = buildHomeSequence({
         event: e, rng, squad, pools, nameOf, minute: e.minute, scorerEntry, assistEntry,
-        ctx: { patternMods: matchup?.patternModifiers || null, history: history.home, gameState: e.gameState },
+        ctx: { patternMods: matchup?.patternModifiers || null, intents, history: history.home, gameState: e.gameState },
       })
       remember('home', seq.pattern)
     } else {
