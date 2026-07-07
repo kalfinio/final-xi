@@ -1,0 +1,138 @@
+{
+  "snapshotDate": "2026-07-07",
+  "researchCutoffUtc": "2026-07-07T13:25:05Z",
+  "note": "Confirmed summer-2026 moves for players present in the V2 database. Canonical player.clubId already reflects these. Kept intentionally conservative: only completed/officially-corroborated moves are recorded; weak rumours are excluded. Sources captured via club/official announcements and Tier-1 aggregators at the cutoff.",
+  "entries": [
+    {
+      "playerId": "cucurella",
+      "canonicalClubId": "real_madrid",
+      "targetClubId": "real_madrid",
+      "status": "confirmed",
+      "confidenceBand": "near_certain",
+      "sources": [
+        { "sourceType": "official_club", "publishedAt": "2026-06-15", "checkedAt": "2026-07-07", "url": "https://www.si.com/soccer/real-madrid-2026-27-transfers-new-signings-targets-outgoings" },
+        { "sourceType": "tier_one_reporter", "publishedAt": "2026-06-15", "checkedAt": "2026-07-07", "url": "https://www.espn.com/soccer/story/_/id/48990955/summer-transfer-window-grading-big-signings-mens-soccer" }
+      ]
+    },
+    {
+      "playerId": "bernardo",
+      "canonicalClubId": "real_madrid",
+      "targetClubId": "real_madrid",
+      "status": "confirmed",
+      "confidenceBand": "near_certain",
+      "sources": [
+        { "sourceType": "tier_one_reporter", "publishedAt": "2026-06-30", "checkedAt": "2026-07-07", "url": "https://onefootball.com/en/news/every-completed-real-madrid-transfer-in-summer-2026-signings-sales-loans-42956343" }
+      ]
+    },
+    {
+      "playerId": "konate",
+      "canonicalClubId": "real_madrid",
+      "targetClubId": "real_madrid",
+      "status": "confirmed",
+      "confidenceBand": "near_certain",
+      "sources": [
+        { "sourceType": "tier_one_reporter", "publishedAt": "2026-06-30", "checkedAt": "2026-07-07", "url": "https://www.sportsmole.co.uk/football/real-madrid/transfer-talk/feature/real-madrid-summer-transfers-all-confirmed-ins-and-outs-for-2026_599076.html" }
+      ]
+    },
+    {
+      "playerId": "dumfries",
+      "canonicalClubId": "real_madrid",
+      "targetClubId": "real_madrid",
+      "status": "confirmed",
+      "confidenceBand": "near_certain",
+      "sources": [
+        { "sourceType": "tier_one_reporter", "publishedAt": "2026-07-05", "checkedAt": "2026-07-07", "url": "https://onefootball.com/en/news/every-completed-real-madrid-transfer-in-summer-2026-signings-sales-loans-42956343" }
+      ]
+    },
+    {
+      "playerId": "olise",
+      "canonicalClubId": "barcelona",
+      "targetClubId": "barcelona",
+      "status": "confirmed",
+      "confidenceBand": "near_certain",
+      "sources": [
+        { "sourceType": "tier_one_reporter", "publishedAt": "2026-06-28", "checkedAt": "2026-07-07", "url": "https://www.sportsmole.co.uk/football/barcelona/transfer-talk/feature/barcelona-summer-transfers-all-confirmed-ins-and-outs-for-2026_599077.html" }
+      ]
+    },
+    {
+      "playerId": "xavisimons",
+      "canonicalClubId": "barcelona",
+      "targetClubId": "barcelona",
+      "status": "confirmed",
+      "confidenceBand": "near_certain",
+      "sources": [
+        { "sourceType": "tier_one_reporter", "publishedAt": "2026-06-28", "checkedAt": "2026-07-07", "url": "https://www.sportsmole.co.uk/football/barcelona/transfer-talk/feature/barcelona-summer-transfers-all-confirmed-ins-and-outs-for-2026_599077.html" }
+      ]
+    },
+    {
+      "playerId": "kimmich",
+      "canonicalClubId": "barcelona",
+      "targetClubId": "barcelona",
+      "status": "confirmed",
+      "confidenceBand": "near_certain",
+      "sources": [
+        { "sourceType": "tier_one_reporter", "publishedAt": "2026-06-28", "checkedAt": "2026-07-07", "url": "https://www.teamtalk.com/news/every-completed-barcelona-transfer-summer-2026-signings-sales-loans" }
+      ]
+    },
+    {
+      "playerId": "gordon",
+      "canonicalClubId": "barcelona",
+      "targetClubId": "barcelona",
+      "status": "confirmed",
+      "confidenceBand": "near_certain",
+      "sources": [
+        { "sourceType": "tier_one_reporter", "publishedAt": "2026-06-20", "checkedAt": "2026-07-07", "url": "https://www.espn.com/soccer/story/_/id/48955344/premier-league-2026-summer-transfers-all-confirmed-ins-outs-every-club" }
+      ]
+    },
+    {
+      "playerId": "jonathandavid",
+      "canonicalClubId": "barcelona",
+      "targetClubId": "barcelona",
+      "status": "confirmed",
+      "confidenceBand": "near_certain",
+      "sources": [
+        { "sourceType": "tier_one_reporter", "publishedAt": "2026-06-25", "checkedAt": "2026-07-07", "url": "https://www.teamtalk.com/news/every-completed-barcelona-transfer-summer-2026-signings-sales-loans" }
+      ]
+    },
+    {
+      "playerId": "frenkie",
+      "canonicalClubId": "man_united",
+      "targetClubId": "man_united",
+      "status": "confirmed",
+      "confidenceBand": "near_certain",
+      "sources": [
+        { "sourceType": "tier_one_reporter", "publishedAt": "2026-06-25", "checkedAt": "2026-07-07", "url": "https://www.teamtalk.com/news/every-completed-barcelona-transfer-summer-2026-signings-sales-loans" }
+      ]
+    },
+    {
+      "playerId": "christensen",
+      "canonicalClubId": "bayern",
+      "targetClubId": "bayern",
+      "status": "confirmed",
+      "confidenceBand": "near_certain",
+      "sources": [
+        { "sourceType": "tier_one_reporter", "publishedAt": "2026-06-25", "checkedAt": "2026-07-07", "url": "https://www.bavarianfootballworks.com/bayern-munich-transfer-news-rumors/201663/bayern-munichs-2026-summer-transfer-window-all-updates" }
+      ]
+    },
+    {
+      "playerId": "lewandowski",
+      "canonicalClubId": "chicago_fire",
+      "targetClubId": "chicago_fire",
+      "status": "confirmed",
+      "confidenceBand": "near_certain",
+      "sources": [
+        { "sourceType": "tier_one_reporter", "publishedAt": "2026-06-25", "checkedAt": "2026-07-07", "url": "https://www.teamtalk.com/news/every-completed-barcelona-transfer-summer-2026-signings-sales-loans" }
+      ]
+    },
+    {
+      "playerId": "jackson",
+      "canonicalClubId": "chelsea",
+      "targetClubId": "chelsea",
+      "status": "confirmed",
+      "confidenceBand": "near_certain",
+      "sources": [
+        { "sourceType": "tier_one_reporter", "publishedAt": "2026-07-01", "checkedAt": "2026-07-07", "url": "https://www.bavarianfootballworks.com/bayern-munich-transfer-news-rumors/201663/bayern-munichs-2026-summer-transfer-window-all-updates" }
+      ]
+    }
+  ]
+}

@@ -52,6 +52,11 @@ export function createRunSnapshot(state) {
     run: {
       mode: config.mode,
       runSeed: runSeed >>> 0,
+      // Player-DB / catalogue version this run was drafted from (Phase A). The
+      // live game still drafts from the frozen legacy pool, so current runs are
+      // 'legacy_v1'. Old snapshots have no field → interpreted as legacy_v1.
+      dbVersion: state.dbVersion || 'v1',
+      catalogVersion: state.catalogVersion || 'legacy_v1',
       dailyContext: config.mode === 'daily' ? { dateKey: config.dateKey || null } : null,
       config: { formation: config.formation, pool: config.pool, difficulty: config.difficulty },
       teamName,
@@ -145,7 +150,18 @@ export function validateRunSnapshot(snap) {
   if (r.signatures.resolvedMatches.length !== cp.resolvedMatchCount) return false
   if (r.approachHistory.length !== cp.resolvedMatchCount) return false
   if (cp.selectedApproach && !APPROACH_KEYS.includes(cp.selectedApproach)) return false
+  // Catalogue/db version are optional (absent → legacy_v1); if present they
+  // must be non-empty strings. Reconstruction resolves squads by id, so a
+  // legacy snapshot without these fields still restores exactly.
+  if (r.catalogVersion != null && (typeof r.catalogVersion !== 'string' || !r.catalogVersion)) return false
+  if (r.dbVersion != null && (typeof r.dbVersion !== 'string' || !r.dbVersion)) return false
   return true
+}
+
+// Catalogue version a snapshot was drafted from. Missing field (pre-Phase-A
+// saves) is interpreted as the frozen legacy catalogue.
+export function snapshotCatalogVersion(snap) {
+  return snap?.run?.catalogVersion || 'legacy_v1'
 }
 
 // ---------------------------------------------------------------------------
