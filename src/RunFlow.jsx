@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { shortDisplayName, squadDisplayName } from './data'
 import { buildMatchTimeline, matchVerdict } from './matchTimeline'
 import { TACTICAL_APPROACHES, APPROACH_KEYS, approachTradeoffs, approachEmphasis, approachFit, approachFeedback } from './tacticalApproach'
+import { buildUpgradeContext, upgradeLabel, UPGRADES_BY_ID } from './runUpgrades'
 
 // Public stage names (the sim stores 'Quarter-final'/'Semi-final' lowercase).
 const STAGE_DISPLAY = {
@@ -81,7 +82,7 @@ function RunBtn({ children, onClick, variant = 'gold', className = '' }) {
 // approach here; it locks the moment Watch / Quick Sim / Sim All starts the
 // match. Everything shown is a pure preview (no rng, no result exists yet).
 // ---------------------------------------------------------------------------
-export function MatchHub({ pending, teamName, record, matchNumber, firstTime, squadProfile, onWatch, onQuick, onSimAll }) {
+export function MatchHub({ pending, teamName, record, matchNumber, firstTime, squadProfile, upgrades = [], onWatch, onQuick, onSimAll }) {
   const [approach, setApproach] = useState('balanced') // reset per match via key
   const stage = pending.kind === 'league' ? 'League Phase' : (STAGE_DISPLAY[pending.round] || pending.round)
   const label = pending.kind === 'league' ? `League Match ${pending.matchNo} of ${pending.leagueTotal}` : stage
@@ -91,6 +92,11 @@ export function MatchHub({ pending, teamName, record, matchNumber, firstTime, sq
   const fit = approachFit(approach, pending.previews, squadProfile)
   const { helps, costs } = approachTradeoffs(approach)
   const emphasis = approachEmphasis(approach)
+  // Owned upgrades: gold emphasis only for those that would actually fire
+  // for the selected approach against THIS opponent (same canonical funnel).
+  const activeUpgradeIds = upgrades.length && pending.context
+    ? new Set(buildUpgradeContext(upgrades, { ...pending.context, approachKey: approach }, squadProfile).activeIds)
+    : new Set()
   return (
     <div className="max-w-xl mx-auto px-4 py-6 sm:py-8">
       <div className="text-center mb-1"><span className="text-[10px] uppercase tracking-widest text-gold/80">European Run · Match {matchNumber}</span></div>
@@ -160,6 +166,21 @@ export function MatchHub({ pending, teamName, record, matchNumber, firstTime, sq
         )}
         {fit && <div className="text-[11px] text-primary leading-snug">{fit}</div>}
       </div>
+
+      {/* Run upgrades owned so far — gold when active for this matchup. */}
+      {upgrades.length > 0 && (
+        <div className="rounded-lg bg-card border border-border p-3 mb-4">
+          <div className="text-[10px] uppercase tracking-widest text-secondary mb-1.5">Run upgrades</div>
+          <div className="flex flex-wrap gap-1.5">
+            {upgrades.map((o) => (
+              <span
+                key={o.id}
+                className={`px-2 py-0.5 rounded border text-[10px] font-semibold ${activeUpgradeIds.has(o.id) ? 'border-gold/50 bg-gold/10 text-gold' : 'border-border bg-surface text-secondary'}`}
+              >{upgradeLabel(o)}</span>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="rounded-lg bg-surface border border-border p-3 mb-5 text-center text-sm">
         <span className="text-secondary">Run record </span>
@@ -260,6 +281,7 @@ export function PostMatchCard({ squad, item, teamName, tactics, isLast, onContin
         <div className="flex justify-between gap-3"><span className="text-secondary shrink-0">Key event</span><span className="font-semibold text-primary text-right">{keyEvent}</span></div>
         <div className="flex justify-between gap-3"><span className="text-secondary shrink-0">Key player</span><span className="font-semibold text-gold text-right">{keyPlayer || '—'}</span></div>
         {approachName && <div className="flex justify-between gap-3"><span className="text-secondary shrink-0">Approach</span><span className="font-semibold text-primary text-right">{approachName}</span></div>}
+        {m.activeUpgrades?.length > 0 && <div className="flex justify-between gap-3"><span className="text-secondary shrink-0">Upgrades active</span><span className="font-semibold text-gold text-right">{m.activeUpgrades.map((id) => UPGRADES_BY_ID[id]?.name || id).join(', ')}</span></div>}
         {tacticalNote && <div className="flex justify-between gap-3"><span className="text-secondary shrink-0">Tactical note</span><span className="text-gold/80 text-right">{tacticalNote}</span></div>}
       </div>
 

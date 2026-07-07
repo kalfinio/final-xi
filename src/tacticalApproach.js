@@ -103,11 +103,15 @@ export function approachIntents(approachKey, upgradeContext = null) {
 
 // One canonical matchup per approach for the Match Hub preview (pure — no
 // rng). The locked match later stores exactly previews[selectedApproach].
+// Phase 6: `upgradeContext` may be a FUNCTION of the approach key (approach-
+// conditional upgrades produce different contexts per approach) or a plain
+// context object; both flow through the same applyTacticalApproach() hook.
 export function approachMatchupPreviews(baseProfile, opp, upgradeContext = null) {
   const oppProfile = buildOpponentTacticalProfile(opp)
+  const ctxFor = typeof upgradeContext === 'function' ? upgradeContext : () => upgradeContext
   const out = {}
   for (const key of APPROACH_KEYS) {
-    out[key] = resolveTacticalMatchup(applyTacticalApproach(baseProfile, key, upgradeContext), oppProfile)
+    out[key] = resolveTacticalMatchup(applyTacticalApproach(baseProfile, key, ctxFor(key)), oppProfile)
   }
   return out
 }

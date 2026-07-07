@@ -1511,7 +1511,12 @@ function bestWin(matches) {
 // each match resolves exactly once, and Watch / Quick Sim / Replay all read
 // the one stored match object.
 // ---------------------------------------------------------------------------
-export function createRunSimulation({ rating, difficulty = 'classic', squad, rng = Math.random, runSeed = 1 }) {
+// `upgradeContextFor(matchContext, squadProfile)` (Phase 6, optional): pure
+// callback returning a Phase 4 upgradeContext for the upcoming match. It is
+// invoked per approach for hub previews and once for the locked approach at
+// resolution — it consumes zero rng, so omitting it (or returning null)
+// leaves the run byte-identical to Phase 4.
+export function createRunSimulation({ rating, difficulty = 'classic', squad, rng = Math.random, runSeed = 1, upgradeContextFor = null }) {
   const p = squadBaseProb(squad, difficulty)
   const players = squad.map((s) => s.player).filter(Boolean)
   const byId = Object.fromEntries(players.map((pl) => [pl.id, pl]))
@@ -1565,6 +1570,17 @@ export function createRunSimulation({ rating, difficulty = 'classic', squad, rng
     }
   }
 
+  // W-D-L over the matches resolved so far (i.e. BEFORE the pending match).
+  function recordSoFar() {
+    let w = 0, d = 0, l = 0
+    for (const m of allMatches) {
+      if (m.result === 'win' || m.result === 'pens-win') w++
+      else if (m.result === 'loss' || m.result === 'pens-loss') l++
+      else d++
+    }
+    return { w, d, l }
+  }
+
   function prepareNext() {
     if (done) return null
     if (pending) return pending
@@ -1576,7 +1592,6 @@ export function createRunSimulation({ rating, difficulty = 'classic', squad, rng
         stageLabel: 'League Phase',
         opponent: opp.name, opponentMeta: opp, home,
         matchNumber: allMatches.length + 1,
-        previews: approachMatchupPreviews(squadProfile, opp), // pure, no rng
       }
     } else {
       const opp = pickOpponent(rng, usedKOOpponents, koOppWeight(stage.round)) // 1 rng
@@ -1584,9 +1599,21 @@ export function createRunSimulation({ rating, difficulty = 'classic', squad, rng
         kind: 'ko', round: stage.round, stageLabel: stage.round,
         opponent: opp.name, opponentMeta: opp,
         matchNumber: allMatches.length + 1,
-        previews: approachMatchupPreviews(squadProfile, opp),
       }
     }
+    // Pre-match context (Phase 6 timing semantics): runRecord = record BEFORE
+    // this match; prevResult = the immediately previous resolved match;
+    // kind/round describe the upcoming match. Fixed for the pending match's
+    // whole life, so hub previews and resolution see the same facts.
+    pending.context = {
+      kind: pending.kind,
+      round: pending.round || null,
+      opponentMeta: pending.opponentMeta,
+      runRecord: recordSoFar(),
+      prevResult: allMatches.length ? allMatches[allMatches.length - 1].result : null,
+    }
+    const ctxOf = (key) => (upgradeContextFor ? upgradeContextFor({ ...pending.context, approachKey: key }, squadProfile) : null)
+    pending.previews = approachMatchupPreviews(squadProfile, pending.opponentMeta, upgradeContextFor ? ctxOf : null) // pure, no rng
     return pending
   }
 
@@ -1597,7 +1624,9 @@ export function createRunSimulation({ rating, difficulty = 'classic', squad, rng
     if (!pending) prepareNext()
     if (!pending) return null
     const opp = pending.opponentMeta
-    const adjusted = applyTacticalApproach(squadProfile, approachKey)
+    // Phase 6: same pre-match context the hub previewed, for the locked approach.
+    const uctx = upgradeContextFor ? upgradeContextFor({ ...pending.context, approachKey }, squadProfile) : null
+    const adjusted = applyTacticalApproach(squadProfile, approachKey, uctx)
     const matchup = resolveTacticalMatchup(adjusted, buildOpponentTacticalProfile(opp))
     let match
 
@@ -1653,6 +1682,8 @@ export function createRunSimulation({ rating, difficulty = 'classic', squad, rng
       }
     }
 
+    // Only upgrades whose conditions actually applied to this match.
+    if (uctx && Array.isArray(uctx.activeIds)) match.activeUpgrades = uctx.activeIds
     match.detail = buildMatchDetail({ match, runSeed, matchNumber: allMatches.length + 1 })
     allMatches.push(match)
     pending = null

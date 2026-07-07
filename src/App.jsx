@@ -48,7 +48,12 @@ import { buildShareData, buildShareText, downloadShareCard } from './share'
 import { buildTactics } from './tactics'
 import MatchCenter from './MatchCenter'
 import TacticalPitch from './TacticalPitch'
+import UpgradeOffer from './UpgradeOffer'
 import { MatchHub, PostMatchCard, itemForMatch, runRecord, mcStageLabel } from './RunFlow'
+import {
+  buildUpgradeContext, generateUpgradeOffer, shouldOfferUpgrade, recordSimAllSkips,
+  UPGRADES_BY_ID, upgradeLabel,
+} from './runUpgrades'
 
 const TOTAL_REROLLS = 3
 
@@ -848,7 +853,7 @@ function DetailRow({ label, value, accent }) {
   )
 }
 
-function ResultScreen({ squad, result, config, rerollsUsed, onPlayAgain, onViewReport, teamName, tactics }) {
+function ResultScreen({ squad, result, config, rerollsUsed, onPlayAgain, onViewReport, teamName, tactics, upgrades = [] }) {
   const { total } = computeRating(squad)
   const mvp = squadMVP(squad)
   const smart = smartestPick(squad)
@@ -912,6 +917,7 @@ function ResultScreen({ squad, result, config, rerollsUsed, onPlayAgain, onViewR
         <DetailRow label="Smartest pick" value={`${squadDisplayName(smart.name, squadNames)} — ${smart.rarity}%`} accent="text-success" />
         <DetailRow label="Era mix" value={`Legends ${era.legends} / Modern ${era.modern}`} />
         <DetailRow label="Rerolls used" value={`${rerollsUsed} / ${TOTAL_REROLLS}`} />
+        <DetailRow label="Run upgrades" value={upgrades.length ? upgrades.map(upgradeLabel).join(', ') : '—'} accent={upgrades.length ? 'text-gold' : 'text-secondary'} />
       </div>
 
       <div className="p-4 rounded-lg bg-surface border border-border text-left whitespace-pre-wrap font-mono text-xs mb-6 break-words">{shareText}</div>
@@ -951,6 +957,9 @@ export default function App() {
   const pendingRef = useRef(null)      // prepared-but-unresolved match
   const currentMatchRef = useRef(null) // the one locked, resolved match
   const recordedRef = useRef(false)
+  // Phase 6 run-scoped upgrade state: owned upgrades + full offer history.
+  const upgradeStateRef = useRef({ owned: [], offers: [] })
+  const runSeedRef = useRef(0)
 
   function startDraft(cfg) { setConfig(cfg); setScreen('draft') }
 
@@ -980,7 +989,14 @@ export default function App() {
     }
     // Staged run (Phase 4): matches resolve one at a time, each when its
     // tactical approach locks — nothing about a match exists before that.
-    runRef.current = createRunSimulation({ rating: total, difficulty: config.difficulty, squad, rng, runSeed })
+    // Phase 6: run upgrades feed the same pipeline via upgradeContextFor;
+    // with nothing owned the context is empty and the run is byte-identical.
+    upgradeStateRef.current = { owned: [], offers: [] }
+    runSeedRef.current = runSeed
+    runRef.current = createRunSimulation({
+      rating: total, difficulty: config.difficulty, squad, rng, runSeed,
+      upgradeContextFor: (mc, profile) => buildUpgradeContext(upgradeStateRef.current.owned, mc, profile),
+    })
     // Tactical read of the XI — flavours the Match Center, report and result.
     tacticsRef.current = buildTactics(squad, config.formation)
     resultRef.current = null
@@ -1003,9 +1019,31 @@ export default function App() {
     setScreen('postmatch')
   }
 
-  // Continue from a finished match to the next hub (fresh approach choice),
-  // or to the final result if the run is over.
+  // Continue from a finished match: first check the Phase 6 upgrade schedule
+  // (offer BEFORE preparing the next match, so the new context applies to it),
+  // then advance to the next hub or the final result.
   function continueRun() {
+    const ctrl = runRef.current
+    const st = upgradeStateRef.current
+    if (
+      shouldOfferUpgrade(currentMatchRef.current, ctrl, st.offers.length) &&
+      !st.offers.some((o) => o.afterMatch === ctrl.resolvedCount)
+    ) {
+      const offerIndex = st.offers.length + 1
+      const offer = {
+        offerIndex,
+        afterMatch: ctrl.resolvedCount,
+        optionIds: generateUpgradeOffer({ runSeed: runSeedRef.current, offerIndex, owned: st.owned }),
+        chosenId: null,
+      }
+      st.offers.push(offer)
+      setScreen('upgrade')
+      return
+    }
+    advanceToNextMatch()
+  }
+
+  function advanceToNextMatch() {
     const pending = runRef.current.prepareNext()
     if (pending) {
       pendingRef.current = pending
@@ -1016,11 +1054,30 @@ export default function App() {
     }
   }
 
+  // Resolve the open upgrade offer (id = null → skip), then move on. The
+  // pick mutates only run-scoped upgrade state — never simulation RNG.
+  function pickUpgrade(id) {
+    const st = upgradeStateRef.current
+    const offer = st.offers[st.offers.length - 1]
+    if (offer && !offer.chosenId) {
+      offer.chosenId = id || 'skipped'
+      if (id) {
+        const existing = st.owned.find((o) => o.id === id)
+        if (existing) existing.stacks = Math.min((existing.stacks || 1) + 1, UPGRADES_BY_ID[id].stackMax)
+        else st.owned.push({ id, stacks: 1, acquiredAfterMatch: offer.afterMatch })
+      }
+    }
+    advanceToNextMatch()
+  }
+
   // Sim All: the current match uses the approach selected on the hub; every
-  // remaining match uses Balanced. Deterministic.
+  // remaining match uses Balanced. Future upgrade offers are SKIPPED (never
+  // auto-selected) and recorded deterministically for the report.
   function simAll(approach) {
+    const fromCount = runRef.current.resolvedCount
     runRef.current.resolveNext(approach)
     runRef.current.finishRemaining('balanced')
+    recordSimAllSkips(upgradeStateRef.current, runRef.current, fromCount, runSeedRef.current)
     finishRun()
   }
 
@@ -1041,6 +1098,7 @@ export default function App() {
     setConfig(null); setDraftedSquad(null); setSquad(null); setRerollsUsed(0)
     resultRef.current = null; tacticsRef.current = null; recordedRef.current = false
     runRef.current = null; pendingRef.current = null; currentMatchRef.current = null
+    upgradeStateRef.current = { owned: [], offers: [] }; runSeedRef.current = 0
     setMatchNo(0); setScreen('intro')
   }
 
@@ -1059,9 +1117,19 @@ export default function App() {
           matchNumber={matchNo}
           firstTime={!stats?.gamesPlayed}
           squadProfile={runRef.current.squadProfile}
+          upgrades={upgradeStateRef.current.owned}
           onWatch={watchMatch}
           onQuick={quickSim}
           onSimAll={simAll}
+        />
+      )}
+      {screen === 'upgrade' && upgradeStateRef.current.offers.length > 0 && (
+        <UpgradeOffer
+          offer={upgradeStateRef.current.offers[upgradeStateRef.current.offers.length - 1]}
+          owned={upgradeStateRef.current.owned}
+          teamName={teamName}
+          onPick={(id) => pickUpgrade(id)}
+          onSkip={() => pickUpgrade(null)}
         />
       )}
       {screen === 'watch' && currentMatchRef.current && (
@@ -1085,7 +1153,7 @@ export default function App() {
         />
       )}
       {screen === 'sim' && <SimulationScreen result={resultRef.current} onFinish={backToResult} squadNames={new Set(squad.map(s => s.player.name))} teamName={teamName} tactics={tacticsRef.current} />}
-      {screen === 'result' && <ResultScreen squad={squad} result={resultRef.current} config={config} rerollsUsed={rerollsUsed} onPlayAgain={reset} onViewReport={() => setScreen('sim')} teamName={teamName} tactics={tacticsRef.current} />}
+      {screen === 'result' && <ResultScreen squad={squad} result={resultRef.current} config={config} rerollsUsed={rerollsUsed} onPlayAgain={reset} onViewReport={() => setScreen('sim')} teamName={teamName} tactics={tacticsRef.current} upgrades={upgradeStateRef.current.owned} />}
     </div>
   )
 }
