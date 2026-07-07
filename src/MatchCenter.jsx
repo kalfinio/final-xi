@@ -4,6 +4,7 @@ import { buildMatchTimeline, matchVerdict } from './matchTimeline'
 import { projectHomeDots, layoutAwayDots } from './sequenceEngine'
 import { PATTERN_LABELS, buildSeqChain, chainActiveIndex, pathSegments, spreadMarkers, outcomeBanner, placeLabels, ftBallPoint } from './matchCenterView'
 import { TACTICAL_APPROACHES, approachFeedback } from './tacticalApproach'
+import { UPGRADES_BY_ID } from './runUpgrades'
 
 // ---------------------------------------------------------------------------
 // 2D Match Center (Phase 2): participant-based sequence playback.
@@ -651,6 +652,11 @@ export default function MatchCenter({ squad, feature, onContinue, isLast = false
   const approachName = feature.match.approach && feature.match.approach !== 'balanced'
     ? TACTICAL_APPROACHES[feature.match.approach]?.name
     : null
+  // FT summary (Phase 6.1): the locked approach + only the upgrades that
+  // actually fired this match — canonical names, no condition recompute.
+  const ftApproachName = TACTICAL_APPROACHES[feature.match.approach || 'balanced']?.name || 'Balanced'
+  const ftActiveUpgrades = (feature.match.activeUpgrades || [])
+    .map((id) => UPGRADES_BY_ID[id]?.name).filter(Boolean)
 
   // Pitch flags for the active event at its outcome moment. The compact
   // banner derives strictly from the canonical event/sequence outcome.
@@ -728,6 +734,12 @@ export default function MatchCenter({ squad, feature, onContinue, isLast = false
             {timeline.pens && <p className="text-xs text-secondary mb-1">Penalty shootout: {timeline.pens.score} — {timeline.pens.won ? 'won' : 'lost'}</p>}
             {ftTacticalNote && <div className="text-[11px] text-gold/70 mb-1 px-2">{ftTacticalNote}</div>}
             {keyPlayer && <div className="text-[11px] text-secondary">Key player: <span className="text-primary font-semibold">{keyPlayer}</span></div>}
+            <div className="mt-2 pt-2 border-t border-border flex flex-col items-center gap-0.5">
+              <div className="text-[10px] text-secondary"><span className="uppercase tracking-wide text-secondary/80">Approach</span> <span className="text-primary font-semibold">{ftApproachName}</span></div>
+              {ftActiveUpgrades.length > 0 && (
+                <div className="text-[10px] text-secondary"><span className="uppercase tracking-wide text-secondary/80">Upgrades active</span> <span className="text-gold font-semibold">{ftActiveUpgrades.join(' · ')}</span></div>
+              )}
+            </div>
           </div>
 
           <div className="mb-4">

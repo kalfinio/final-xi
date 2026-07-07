@@ -19,11 +19,11 @@ export function posTypeOf(primaryPos) {
 // matchEngine.js can use them without a circular import). Re-exported here so
 // existing `from './data'` imports keep working.
 // ---------------------------------------------------------------------------
-import { makeRng, hashString, combineSeed } from './seedUtils'
+import { makeRng, hashString, combineSeed, randomSeed } from './seedUtils'
 import { buildMatchDetail } from './matchEngine'
 import { buildSquadTacticalProfile, buildOpponentTacticalProfile, resolveTacticalMatchup } from './tacticalMatchup'
 import { applyTacticalApproach, approachMatchupPreviews } from './tacticalApproach'
-export { makeRng, hashString, combineSeed }
+export { makeRng, hashString, combineSeed, randomSeed }
 
 export function dateSeed(d = new Date()) {
   return hashString(todayKey(d))

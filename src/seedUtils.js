@@ -32,3 +32,23 @@ export function combineSeed(base, ...nums) {
   }
   return h >>> 0
 }
+
+// Fresh, non-deterministic 32-bit seed for a new Random Run. Uses the Web
+// Crypto API (browser + Node 19+); returns a uint32 — a safe integer that
+// serializes cleanly into the run snapshot and drives makeRng() exactly like
+// the previous value did, so deterministic reconstruction is unchanged. The
+// tiny fallback (only if crypto is entirely absent) stays crypto- and
+// Math.random-free.
+export function randomSeed() {
+  try {
+    const g = typeof globalThis !== 'undefined' ? globalThis : {}
+    if (g.crypto && typeof g.crypto.getRandomValues === 'function') {
+      const arr = new Uint32Array(1)
+      g.crypto.getRandomValues(arr)
+      return arr[0] >>> 0
+    }
+  } catch { /* fall through to the time-based fallback */ }
+  const now = Date.now()
+  const hi = typeof performance !== 'undefined' && performance.now ? Math.floor(performance.now() * 1000) : 0
+  return (now ^ hi ^ (now >>> 5)) >>> 0
+}

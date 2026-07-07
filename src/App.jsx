@@ -25,6 +25,7 @@ import {
   validateXI,
   posTypeOf,
   makeRng,
+  randomSeed,
   buildSimSeed,
   todayKey,
   loadStats,
@@ -54,6 +55,10 @@ import {
   buildUpgradeContext, generateUpgradeOffer, shouldOfferUpgrade, recordSimAllSkips,
   UPGRADES_BY_ID, upgradeLabel,
 } from './runUpgrades'
+import {
+  createRunSnapshot, saveRunSnapshot, loadRunSnapshot, clearRunSnapshot,
+  snapshotSummary, reconstructRun,
+} from './runPersistence'
 
 const TOTAL_REROLLS = 3
 
@@ -202,7 +207,45 @@ function HowToPlayModal({ onClose }) {
   )
 }
 
-function IntroScreen({ onStart, stats }) {
+// Compact "Resume Run" card + a New Run confirmation modal (Phase 6.1). Shown
+// on the intro screen when a valid active-run snapshot exists.
+function ResumeCard({ summary, onResume }) {
+  if (!summary) return null
+  const { w, d, l } = summary.record
+  return (
+    <div className="fx-in mb-5 p-4 rounded-lg border border-gold/40 bg-gold/5">
+      <div className="text-[10px] uppercase tracking-widest text-gold/80 mb-1">Continue where you left off</div>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="font-black text-lg text-primary truncate">{summary.teamName}</div>
+          <div className="text-xs text-secondary">
+            {summary.mode === 'daily' ? `Daily ${summary.dateKey || ''} · ` : ''}{summary.stageLabel}
+            <span className="mx-1.5">·</span>{w}W-{d}D-{l}L
+            {summary.upgradeCount > 0 && <><span className="mx-1.5">·</span>{summary.upgradeCount} Run Upgrade{summary.upgradeCount > 1 ? 's' : ''}</>}
+          </div>
+        </div>
+        <button onClick={onResume} className="shrink-0 px-5 py-2.5 rounded-md font-semibold fx-press bg-gold text-black hover:bg-gold/90">Resume Run</button>
+      </div>
+    </div>
+  )
+}
+
+function NewRunConfirm({ onKeep, onReplace }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70" onClick={onKeep}>
+      <div className="relative w-full max-w-sm rounded-xl bg-card border border-gold/30 p-5 sm:p-6 fx-in text-center" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-xl font-black text-gold mb-1">Start a new run?</h2>
+        <p className="text-sm text-secondary mb-5">Your current European Run will be replaced. This can't be undone.</p>
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <Button onClick={onKeep} variant="ghost" className="w-full sm:w-auto">Keep Current Run</Button>
+          <Button onClick={onReplace} className="w-full sm:w-auto">Start New Run</Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function IntroScreen({ onStart, stats, savedRun, onResume, resumeError }) {
   // Brand-new players (no recorded games) start on Casual so a first run isn't
   // brutal before they learn roles/synergies. Returning users keep Classic.
   const firstTime = !stats?.gamesPlayed
@@ -212,6 +255,14 @@ function IntroScreen({ onStart, stats }) {
   const [pool, setPool] = useState('modern')
   const [howOpen, setHowOpen] = useState(false)
   const [roleOpen, setRoleOpen] = useState(false)
+  const [confirmNew, setConfirmNew] = useState(false)
+  const summary = savedRun ? snapshotSummary(savedRun) : null
+  // Starting a run replaces any active save — confirm first when one exists.
+  function requestStart() {
+    const cfg = { formation, mode, difficulty, pool }
+    if (summary) setConfirmNew(cfg)
+    else onStart(cfg)
+  }
   // Auto-show the onboarding modal only the first time the game is opened.
   const [showModal, setShowModal] = useState(() => {
     try { return !localStorage.getItem(HOWTO_KEY) } catch { return false }
@@ -225,6 +276,7 @@ function IntroScreen({ onStart, stats }) {
   return (
     <div className="relative">
       {showModal && <HowToPlayModal onClose={closeModal} />}
+      {confirmNew && <NewRunConfirm onKeep={() => setConfirmNew(false)} onReplace={() => { setConfirmNew(false); onStart(confirmNew) }} />}
       <IntroBackdrop />
       <div className="relative z-10 max-w-3xl mx-auto px-4 py-8 sm:py-10">
         <div className="text-center mb-7 sm:mb-8">
@@ -232,6 +284,9 @@ function IntroScreen({ onStart, stats }) {
           <p className="fx-in fx-d1 text-secondary text-base sm:text-lg">Draft 11 legends. Conquer Europe.</p>
           <button onClick={() => setShowModal(true)} className="fx-in fx-d1 mt-2 text-xs text-gold/80 hover:text-gold underline-offset-2 hover:underline">How to Play</button>
         </div>
+
+        {resumeError && <div className="fx-in mb-4 p-3 rounded-lg border border-danger/40 bg-danger/5 text-center text-xs text-danger">Saved run could not be restored. Start a new run to continue.</div>}
+        <ResumeCard summary={summary} onResume={onResume} />
 
         <div className="fx-in fx-d2 grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
           <button onClick={() => setMode('random')} className={`fx-lift p-4 rounded-lg border text-left ${mode === 'random' ? 'border-gold bg-card' : 'border-border bg-surface'}`}>
@@ -300,8 +355,8 @@ function IntroScreen({ onStart, stats }) {
         </div>
 
         <div className="fx-in fx-d5 text-center mb-10">
-          <Button onClick={() => onStart({ formation, mode, difficulty, pool })} disabled={!formation} className="fx-lift w-full sm:w-auto">
-            Start {mode === 'daily' ? 'Daily Challenge' : 'Draft'}
+          <Button onClick={requestStart} disabled={!formation} className="fx-lift w-full sm:w-auto">
+            {summary ? 'Start New Run' : `Start ${mode === 'daily' ? 'Daily Challenge' : 'Draft'}`}
           </Button>
         </div>
 
@@ -960,6 +1015,35 @@ export default function App() {
   // Phase 6 run-scoped upgrade state: owned upgrades + full offer history.
   const upgradeStateRef = useRef({ owned: [], offers: [] })
   const runSeedRef = useRef(0)
+  // Phase 6.1 persistence: daily date-key for the active run, the hub's
+  // currently-selected (unlocked) approach, and the intro Resume snapshot.
+  const dailyDateRef = useRef(null)
+  const selectedApproachRef = useRef('balanced')
+  const [savedRun, setSavedRun] = useState(() => loadRunSnapshot())
+  const [resumeError, setResumeError] = useState(false)
+
+  // Persist the active run at a checkpoint. Cheap, called only at real state
+  // transitions — never per frame. Rebuilds a minimal snapshot from refs.
+  function persistRun(screen, extra = {}) {
+    const ctrl = runRef.current
+    if (!ctrl || !squad || !config) return
+    try {
+      saveRunSnapshot(createRunSnapshot({
+        config: { ...config, dateKey: dailyDateRef.current },
+        runSeed: runSeedRef.current,
+        teamName, squad, rerollsUsed,
+        matches: ctrl.matches,
+        upgradeState: upgradeStateRef.current,
+        checkpoint: {
+          screen,
+          resolvedMatchCount: ctrl.resolvedCount,
+          currentMatchIndex: extra.currentMatchIndex ?? null,
+          selectedApproach: selectedApproachRef.current,
+          stageLabel: extra.stageLabel ?? pendingRef.current?.stageLabel ?? null,
+        },
+      }))
+    } catch { /* storage best-effort */ }
+  }
 
   function startDraft(cfg) { setConfig(cfg); setScreen('draft') }
 
@@ -975,24 +1059,33 @@ export default function App() {
     const clean = saveTeamName(rawName)   // sanitize + persist last used
     setTeamName(clean)
     const { total } = computeRating(squad)
-    // runSeed feeds only the canonical MatchDetail presentation layer (stats /
-    // timelines). Daily: same seed as the sim → fully deterministic details.
-    // Random runs: one random seed fixed for the whole run.
-    let rng = Math.random
-    let runSeed = Math.floor(Math.random() * 4294967296) >>> 0
+    // Both modes seed the sim RNG (Phase 6.1): the whole run is reproducible
+    // from runSeed, which is what run persistence stores and replays. Daily's
+    // seed is content-derived (same draft → same run for everyone); a random
+    // run picks one fixed seed once. Only the seed pick uses Math.random; the
+    // simulation itself never does. Balance/distribution are unchanged.
+    let dateKey = null
+    let runSeed
     if (config.mode === 'daily') {
+      dateKey = todayKey()
       const ids = squad.map((s) => s.player.id)
       const slots = squad.map((s) => s.slot)
-      const seed = buildSimSeed({ dateKey: todayKey(), formation: config.formation, ids, slots, difficulty: config.difficulty, pool: config.pool, rerollsUsed })
-      rng = makeRng(seed)
-      runSeed = seed
+      runSeed = buildSimSeed({ dateKey, formation: config.formation, ids, slots, difficulty: config.difficulty, pool: config.pool, rerollsUsed })
+    } else {
+      runSeed = randomSeed()
     }
+    const rng = makeRng(runSeed)
+    // A new run replaces any active save.
+    clearRunSnapshot()
+    setSavedRun(null)
     // Staged run (Phase 4): matches resolve one at a time, each when its
     // tactical approach locks — nothing about a match exists before that.
     // Phase 6: run upgrades feed the same pipeline via upgradeContextFor;
     // with nothing owned the context is empty and the run is byte-identical.
     upgradeStateRef.current = { owned: [], offers: [] }
     runSeedRef.current = runSeed
+    dailyDateRef.current = dateKey
+    selectedApproachRef.current = 'balanced'
     runRef.current = createRunSimulation({
       rating: total, difficulty: config.difficulty, squad, rng, runSeed,
       upgradeContextFor: (mc, profile) => buildUpgradeContext(upgradeStateRef.current.owned, mc, profile),
@@ -1004,6 +1097,7 @@ export default function App() {
     currentMatchRef.current = null
     pendingRef.current = runRef.current.prepareNext()
     setMatchNo(1)
+    persistRun('hub', { stageLabel: pendingRef.current?.stageLabel })
     setScreen('hub')
   }
 
@@ -1012,10 +1106,12 @@ export default function App() {
   // both then read the same stored canonical match object.
   function watchMatch(approach) {
     currentMatchRef.current = runRef.current.resolveNext(approach)
+    persistRun('watch', { currentMatchIndex: runRef.current.resolvedCount - 1 })
     setScreen('watch')
   }
   function quickSim(approach) {
     currentMatchRef.current = runRef.current.resolveNext(approach)
+    persistRun('postmatch', { currentMatchIndex: runRef.current.resolvedCount - 1 })
     setScreen('postmatch')
   }
 
@@ -1037,6 +1133,7 @@ export default function App() {
         chosenId: null,
       }
       st.offers.push(offer)
+      persistRun('upgrade', { currentMatchIndex: ctrl.resolvedCount - 1 })
       setScreen('upgrade')
       return
     }
@@ -1047,7 +1144,9 @@ export default function App() {
     const pending = runRef.current.prepareNext()
     if (pending) {
       pendingRef.current = pending
+      selectedApproachRef.current = 'balanced' // fresh hub defaults to Balanced
       setMatchNo((n) => n + 1)
+      persistRun('hub', { stageLabel: pending.stageLabel })
       setScreen('hub')
     } else {
       finishRun()
@@ -1089,22 +1188,54 @@ export default function App() {
       setStats(updated)
       recordedRef.current = true
     }
+    persistRun('result', { stageLabel: 'Run complete' })
     setScreen('result')
   }
 
-  function backToResult() { setScreen('result') }
+  function backToResult() { persistRun('result', { stageLabel: 'Run complete' }); setScreen('result') }
+  function viewReport() { persistRun('sim', { stageLabel: 'Run complete' }); setScreen('sim') }
+
+  // Restore a saved run deterministically and jump to its checkpoint. Any
+  // divergence (corrupt/incompatible snapshot) fails safely back to intro.
+  function resumeRun() {
+    const snap = loadRunSnapshot()
+    const rec = snap ? reconstructRun(snap) : { ok: false }
+    if (!rec.ok) {
+      clearRunSnapshot(); setSavedRun(null); setResumeError(true); setScreen('intro'); return
+    }
+    runRef.current = rec.ctrl
+    upgradeStateRef.current = rec.upgradeState
+    runSeedRef.current = rec.runSeed
+    dailyDateRef.current = rec.config.dateKey
+    tacticsRef.current = buildTactics(rec.squad, rec.config.formation)
+    selectedApproachRef.current = rec.selectedApproach
+    pendingRef.current = rec.pending
+    currentMatchRef.current = rec.currentMatch
+    resultRef.current = rec.result
+    recordedRef.current = (rec.screen === 'result' || rec.screen === 'sim') // already recorded when first finished
+    setConfig({ formation: rec.config.formation, mode: rec.config.mode, difficulty: rec.config.difficulty, pool: rec.config.pool })
+    setSquad(rec.squad)
+    setTeamName(rec.teamName)
+    setRerollsUsed(rec.rerollsUsed)
+    setResumeError(false)
+    setMatchNo(rec.matchNo)
+    setScreen(rec.screen)
+  }
 
   function reset() {
+    clearRunSnapshot(); setSavedRun(null); setResumeError(false)
     setConfig(null); setDraftedSquad(null); setSquad(null); setRerollsUsed(0)
     resultRef.current = null; tacticsRef.current = null; recordedRef.current = false
     runRef.current = null; pendingRef.current = null; currentMatchRef.current = null
     upgradeStateRef.current = { owned: [], offers: [] }; runSeedRef.current = 0
+    dailyDateRef.current = null; selectedApproachRef.current = 'balanced'
     setMatchNo(0); setScreen('intro')
   }
 
+  const activeRunScreen = ['hub', 'watch', 'postmatch', 'upgrade', 'result', 'sim'].includes(screen)
   return (
     <div className="min-h-full">
-      {screen === 'intro' && <IntroScreen onStart={startDraft} stats={stats} />}
+      {screen === 'intro' && <IntroScreen onStart={startDraft} stats={stats} savedRun={savedRun} onResume={resumeRun} resumeError={resumeError} />}
       {screen === 'draft' && <DraftScreen config={config} onComplete={finishDraft} />}
       {screen === 'setxi' && <SetXIScreen config={config} draftedSquad={draftedSquad} onConfirm={confirmXI} />}
       {screen === 'bonuses' && <BonusesScreen squad={squad} config={config} rerollsUsed={rerollsUsed} onSimulate={runSimulation} initialTeamName={teamName} />}
@@ -1118,6 +1249,8 @@ export default function App() {
           firstTime={!stats?.gamesPlayed}
           squadProfile={runRef.current.squadProfile}
           upgrades={upgradeStateRef.current.owned}
+          initialApproach={selectedApproachRef.current}
+          onApproachChange={(a) => { selectedApproachRef.current = a; persistRun('hub') }}
           onWatch={watchMatch}
           onQuick={quickSim}
           onSimAll={simAll}
@@ -1153,7 +1286,12 @@ export default function App() {
         />
       )}
       {screen === 'sim' && <SimulationScreen result={resultRef.current} onFinish={backToResult} squadNames={new Set(squad.map(s => s.player.name))} teamName={teamName} tactics={tacticsRef.current} />}
-      {screen === 'result' && <ResultScreen squad={squad} result={resultRef.current} config={config} rerollsUsed={rerollsUsed} onPlayAgain={reset} onViewReport={() => setScreen('sim')} teamName={teamName} tactics={tacticsRef.current} upgrades={upgradeStateRef.current.owned} />}
+      {screen === 'result' && <ResultScreen squad={squad} result={resultRef.current} config={config} rerollsUsed={rerollsUsed} onPlayAgain={reset} onViewReport={viewReport} teamName={teamName} tactics={tacticsRef.current} upgrades={upgradeStateRef.current.owned} />}
+      {activeRunScreen && (
+        <div className="text-center pb-4 -mt-1">
+          <span className="text-[10px] text-secondary/60">Run saved on this device</span>
+        </div>
+      )}
     </div>
   )
 }

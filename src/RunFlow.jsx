@@ -82,8 +82,12 @@ function RunBtn({ children, onClick, variant = 'gold', className = '' }) {
 // approach here; it locks the moment Watch / Quick Sim / Sim All starts the
 // match. Everything shown is a pure preview (no rng, no result exists yet).
 // ---------------------------------------------------------------------------
-export function MatchHub({ pending, teamName, record, matchNumber, firstTime, squadProfile, upgrades = [], onWatch, onQuick, onSimAll }) {
-  const [approach, setApproach] = useState('balanced') // reset per match via key
+export function MatchHub({ pending, teamName, record, matchNumber, firstTime, squadProfile, upgrades = [], initialApproach = 'balanced', onApproachChange, onWatch, onQuick, onSimAll }) {
+  // Seeded from the persisted selection so a refresh at the hub restores the
+  // approach the player had chosen (but had not locked). `key={matchNo}` in
+  // App remounts this per match, so a fresh match starts from initialApproach.
+  const [approach, setApproachState] = useState(initialApproach)
+  const setApproach = (a) => { setApproachState(a); onApproachChange && onApproachChange(a) }
   const stage = pending.kind === 'league' ? 'League Phase' : (STAGE_DISPLAY[pending.round] || pending.round)
   const label = pending.kind === 'league' ? `League Match ${pending.matchNo} of ${pending.leagueTotal}` : stage
   const meta = pending.opponentMeta
