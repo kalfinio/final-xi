@@ -1,7 +1,9 @@
 // Phase A — audit the transfer-intel artifact against the V2 database.
 //   npm run db:audit:transfers
 import { readFileSync } from 'node:fs'
-import { validateTransferIntel } from '../src/data/v2/validate.js'
+import { loadViteModule } from './vite-ssr-loader.mjs'
+
+const { validateTransferIntel } = await loadViteModule('/src/data/v2/validate.js')
 
 const intel = JSON.parse(readFileSync(new URL('../data/transferIntel.2026-07-07.json', import.meta.url), 'utf8'))
 const byStatus = {}

@@ -2,7 +2,9 @@
 // bundle is built. Exits non-zero on any hard schema/referential problem.
 //   npm run db:validate
 import { readFileSync } from 'node:fs'
-import { validateV2 } from '../src/data/v2/validate.js'
+import { loadViteModule } from './vite-ssr-loader.mjs'
+
+const { validateV2 } = await loadViteModule('/src/data/v2/validate.js')
 
 const intel = JSON.parse(readFileSync(new URL('../data/transferIntel.2026-07-07.json', import.meta.url), 'utf8'))
 const { problems, warnings } = validateV2(intel)

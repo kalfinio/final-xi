@@ -37,9 +37,10 @@ export const ROLE_KEYS = [
 ]
 export const ROLE_KEY_SET = new Set(ROLE_KEYS)
 
-// Role suitability levels (future Tactical HQ; stored, not yet calibrated).
-export const ROLE_SUITABILITY_LEVELS = ['natural', 'accomplished', 'unconvincing']
-export const ROLE_SUITABILITY_SET = new Set(ROLE_SUITABILITY_LEVELS)
+// Role suitability levels (future Tactical HQ; stored sparsely per player).
+// 3 = natural, 2 = accomplished, 1 = unconvincing.
+export const ROLE_SUITABILITY_VALUES = [1, 2, 3]
+export const ROLE_SUITABILITY_SET = new Set(ROLE_SUITABILITY_VALUES)
 
 // Signatures — a controlled behavioural vocabulary. Deliberately small so
 // players are differentiated rather than every star owning every good trait.

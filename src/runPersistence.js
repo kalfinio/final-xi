@@ -20,15 +20,15 @@
 // aborts the restore safely.
 // ---------------------------------------------------------------------------
 
-import { PLAYERS, FORMATIONS, DIFFICULTIES, computeRating, makeRng, createRunSimulation } from './data'
+import { FORMATIONS, DIFFICULTIES, computeRating, makeRng, createRunSimulation } from './data'
 import { APPROACH_KEYS } from './tacticalApproach'
 import { buildUpgradeContext, shouldOfferUpgrade, generateUpgradeOffer, UPGRADES_BY_ID, MAX_UPGRADES_PER_RUN } from './runUpgrades'
+import { DEFAULT_CATALOG_VERSION, getCatalogue, resolvePlayer } from './data/v2/catalogues'
 
 export const SCHEMA_VERSION = 1
 export const ENGINE_VERSION = 'phase6.1'
 export const STORAGE_KEY = 'finalxi.activeRun.v1'
 
-const PLAYER_BY_ID = Object.fromEntries(PLAYERS.map((p) => [p.id, p]))
 const VALID_POOLS = new Set(['modern', 'legends'])
 const VALID_MODES = new Set(['random', 'daily'])
 // Checkpoints we can safely restore to.
@@ -107,6 +107,8 @@ export function validateRunSnapshot(snap) {
   if (snap.engineVersion !== ENGINE_VERSION) return false
   const r = snap.run
   if (!r || typeof r !== 'object') return false
+  const catalogVersion = snapshotCatalogVersion(snap)
+  if (typeof catalogVersion !== 'string' || !catalogVersion || !getCatalogue(catalogVersion)) return false
   if (!VALID_MODES.has(r.mode)) return false
   if (!Number.isFinite(r.runSeed)) return false
   const c = r.config
@@ -118,7 +120,7 @@ export function validateRunSnapshot(snap) {
   const seenPlayers = new Set()
   for (let i = 0; i < r.squadSelections.length; i++) {
     const sel = r.squadSelections[i]
-    if (!sel || !PLAYER_BY_ID[sel.playerId]) return false
+    if (!sel || !resolvePlayer(sel.playerId, catalogVersion)) return false
     if (seenPlayers.has(sel.playerId)) return false // no duplicate players in an XI
     seenPlayers.add(sel.playerId)
     if (sel.slot !== slots[i]) return false
@@ -161,7 +163,7 @@ export function validateRunSnapshot(snap) {
 // Catalogue version a snapshot was drafted from. Missing field (pre-Phase-A
 // saves) is interpreted as the frozen legacy catalogue.
 export function snapshotCatalogVersion(snap) {
-  return snap?.run?.catalogVersion || 'legacy_v1'
+  return snap?.run?.catalogVersion || DEFAULT_CATALOG_VERSION
 }
 
 // ---------------------------------------------------------------------------
@@ -219,7 +221,9 @@ export function reconstructRun(snap) {
   if (!validateRunSnapshot(snap)) return { ok: false, reason: 'invalid' }
   const r = snap.run
   try {
-    const squad = r.squadSelections.map((s) => ({ slot: s.slot, player: PLAYER_BY_ID[s.playerId] }))
+    const catalogVersion = snapshotCatalogVersion(snap)
+    const squad = r.squadSelections.map((s) => ({ slot: s.slot, player: resolvePlayer(s.playerId, catalogVersion) }))
+    if (squad.some((s) => !s.player)) return { ok: false, reason: 'unknown-player' }
     const { total } = computeRating(squad)
     const upgradeState = { owned: [], offers: [] }
     const ctrl = createRunSimulation({
@@ -257,7 +261,7 @@ export function reconstructRun(snap) {
     }
 
     const screen = r.checkpoint.screen
-    const out = { ok: true, ctrl, upgradeState, squad, config: { ...r.config, mode: r.mode, dateKey: r.dailyContext?.dateKey || null }, teamName: r.teamName, runSeed: r.runSeed, rerollsUsed: r.rerollsUsed, screen, pending: null, currentMatch: null, matchNo: target, selectedApproach: r.checkpoint.selectedApproach || 'balanced', result: null }
+    const out = { ok: true, ctrl, upgradeState, squad, config: { ...r.config, mode: r.mode, dateKey: r.dailyContext?.dateKey || null }, catalogVersion, dbVersion: r.dbVersion || getCatalogue(catalogVersion)?.dbVersion || null, teamName: r.teamName, runSeed: r.runSeed, rerollsUsed: r.rerollsUsed, screen, pending: null, currentMatch: null, matchNo: target, selectedApproach: r.checkpoint.selectedApproach || 'balanced', result: null }
 
     if (screen === 'hub') {
       out.pending = ctrl.prepareNext() // same rng position → same opponent

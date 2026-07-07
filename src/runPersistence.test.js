@@ -1,8 +1,9 @@
 // Phase 6.1 test suite — deterministic run persistence.
 import { describe, it, expect, beforeEach } from 'vitest'
 import baseline from './simBaseline.fixture.json'
-import { PLAYERS, computeRating, createRunSimulation, makeRng } from './data'
+import { PLAYERS, FORMATIONS, computeRating, createRunSimulation, makeRng } from './data'
 import { buildUpgradeContext, shouldOfferUpgrade, generateUpgradeOffer, UPGRADES_BY_ID } from './runUpgrades'
+import { catalogueEligiblePlayers } from './data/v2/catalogues'
 import {
   SCHEMA_VERSION, ENGINE_VERSION, STORAGE_KEY,
   createRunSnapshot, serializeRunSnapshot, parseRunSnapshot, validateRunSnapshot,
@@ -66,6 +67,43 @@ function snapFor(run, drv, screen) {
   })
 }
 
+function v2Squad() {
+  const used = []
+  return FORMATIONS['4-3-3'].slots.map((slot) => {
+    const player = catalogueEligiblePlayers('modern_mix_v2_2026_07_07', slot, used, 'modern')
+      .find((p) => !byId[p.id])
+    used.push(player.id)
+    return { slot, player }
+  })
+}
+
+function v2Snap({ screen = 'hub', resolved = 0 } = {}) {
+  const squad = v2Squad()
+  const { total } = computeRating(squad)
+  const state = { owned: [], offers: [] }
+  const ctrl = createRunSimulation({
+    rating: total, difficulty: 'classic', squad,
+    rng: makeRng(24680), runSeed: 24680,
+    upgradeContextFor: (mc, p) => buildUpgradeContext(state.owned, mc, p),
+  })
+  for (let i = 0; i < resolved; i++) {
+    ctrl.prepareNext()
+    ctrl.resolveNext('balanced')
+  }
+  return createRunSnapshot({
+    config: { mode: 'random', formation: '4-3-3', pool: 'modern', difficulty: 'classic' },
+    dbVersion: 'v2',
+    catalogVersion: 'modern_mix_v2_2026_07_07',
+    runSeed: 24680,
+    teamName: 'V2 XI',
+    squad,
+    rerollsUsed: 0,
+    matches: ctrl.matches,
+    upgradeState: state,
+    checkpoint: { screen, resolvedMatchCount: ctrl.resolvedCount, selectedApproach: 'balanced', stageLabel: 'League Phase' },
+  })
+}
+
 // ---------------------------------------------------------------------------
 describe('A. snapshot round trip', () => {
   it('create → serialize → parse → validate preserves reconstruction data', () => {
@@ -116,6 +154,7 @@ describe('B. corruption handling — all fail safely', () => {
     expect(validateRunSnapshot(mut((r) => { r.config.formation = '9-9-9' }))).toBe(false)
     expect(validateRunSnapshot(mut((r) => { r.config.pool = 'aliens' }))).toBe(false)
     expect(validateRunSnapshot(mut((r) => { r.config.difficulty = 'nightmare' }))).toBe(false)
+    expect(validateRunSnapshot(mut((r) => { r.catalogVersion = 'unknown_catalogue' }))).toBe(false)
     expect(validateRunSnapshot(mut((r) => { r.runSeed = 'abc' }))).toBe(false)
     expect(validateRunSnapshot(mut((r) => { r.squadSelections[0].playerId = 'nobody' }))).toBe(false)
     expect(validateRunSnapshot(mut((r) => { r.squadSelections[1] = { ...r.squadSelections[0] } }))).toBe(false) // dup player
@@ -142,6 +181,50 @@ describe('B. corruption handling — all fail safely', () => {
     const rec = reconstructRun(snap)
     expect(rec.ok).toBe(false)
     expect(rec.reason).toBe('signature-mismatch')
+  })
+})
+
+// ---------------------------------------------------------------------------
+describe('B2. catalogue-aware player resolution', () => {
+  it('old snapshots without catalogVersion default to legacy_v1 and reconstruct', () => {
+    const snap = snapFor(baseline.runs[0], drive(baseline.runs[0], { stopAfter: 2 }), 'hub')
+    delete snap.run.catalogVersion
+    delete snap.run.dbVersion
+    expect(validateRunSnapshot(snap)).toBe(true)
+    const rec = reconstructRun(snap)
+    expect(rec.ok).toBe(true)
+    expect(rec.catalogVersion).toBe('legacy_v1')
+  })
+
+  it('known V2 catalogue snapshots resolve V2-only ids and reconstruct', () => {
+    const snap = v2Snap()
+    const v2OnlyIds = snap.run.squadSelections.map((s) => s.playerId).filter((id) => !byId[id])
+    expect(v2OnlyIds.length).toBeGreaterThan(0)
+    expect(validateRunSnapshot(snap)).toBe(true)
+    const rec = reconstructRun(snap)
+    expect(rec.ok).toBe(true)
+    expect(rec.catalogVersion).toBe('modern_mix_v2_2026_07_07')
+    expect(rec.squad.map((s) => s.player.id)).toEqual(snap.run.squadSelections.map((s) => s.playerId))
+  })
+
+  it('unknown catalogue and corrupted V2 ids fail gracefully', () => {
+    const unknown = v2Snap()
+    unknown.run.catalogVersion = 'missing_catalogue'
+    expect(validateRunSnapshot(unknown)).toBe(false)
+    expect(reconstructRun(unknown)).toEqual({ ok: false, reason: 'invalid' })
+
+    const corrupt = v2Snap()
+    corrupt.run.squadSelections[0].playerId = 'not_a_player'
+    expect(validateRunSnapshot(corrupt)).toBe(false)
+    expect(reconstructRun(corrupt)).toEqual({ ok: false, reason: 'invalid' })
+  })
+
+  it('V2 watch checkpoint refresh preserves deterministic match signature', () => {
+    const snap = v2Snap({ screen: 'watch', resolved: 1 })
+    const rec = reconstructRun(snap)
+    expect(rec.ok).toBe(true)
+    expect(rec.screen).toBe('watch')
+    expect(matchSignature(rec.currentMatch, 0)).toBe(snap.run.signatures.resolvedMatches[0])
   })
 })
 

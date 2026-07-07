@@ -8,9 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "db:validate": "vite-node scripts/validate-player-db.mjs",
-    "db:audit": "vite-node scripts/audit-player-db.mjs",
-    "db:audit:transfers": "vite-node scripts/audit-transfer-intel.mjs"
+    "db:validate": "node scripts/validate-player-db.mjs",
+    "db:audit": "node scripts/audit-player-db.mjs",
+    "db:audit:transfers": "node scripts/audit-transfer-intel.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

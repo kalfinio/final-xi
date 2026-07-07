@@ -11,9 +11,11 @@
 import {
   POSITIONS, ROLE_KEY_SET, SIGNATURE_SET, CHARACTER_SET, DEV_PROFILE_SET,
   ERA_SET, TIER_SET, GOAT_REQUIRED, posTypeOf, TRANSFER_STATUSES, CONFIDENCE_BANDS, SOURCE_TYPES,
+  ROLE_SUITABILITY_SET,
 } from './schema'
 import { NATIONS, LEAGUES, CLUBS, V2_PLAYERS, nationById, leagueById, clubById, leagueOfClub, v2PlayerById } from './index'
 import { CATALOGUES } from './catalogues'
+import { PLAYERS as V1_PLAYERS } from '../../data'
 
 const POS_SET = new Set(POSITIONS)
 
@@ -22,6 +24,43 @@ function dupes(ids) {
   const out = []
   for (const id of ids) { if (seen.has(id)) out.push(id); seen.add(id) }
   return out
+}
+
+export function validateLegacyV1Order(orderedIds = CATALOGUES.legacy_v1?.orderedIds) {
+  const problems = []
+  const expected = V1_PLAYERS.map((p) => p.id)
+  if (!Array.isArray(orderedIds)) return ['legacy_v1 orderedIds must be an array']
+
+  const duplicates = dupes(orderedIds)
+  if (duplicates.length) problems.push(`legacy_v1 duplicate ids: ${duplicates.join(', ')}`)
+  if (orderedIds.length !== expected.length) {
+    problems.push(`legacy_v1 length ${orderedIds.length} does not match V1 length ${expected.length}`)
+  }
+
+  const actualSet = new Set(orderedIds)
+  for (const id of expected) if (!actualSet.has(id)) problems.push(`legacy_v1 missing id: ${id}`)
+  const expectedSet = new Set(expected)
+  for (const id of orderedIds) if (!expectedSet.has(id)) problems.push(`legacy_v1 unexpected id: ${id}`)
+
+  const n = Math.min(orderedIds.length, expected.length)
+  for (let i = 0; i < n; i++) {
+    if (orderedIds[i] !== expected[i]) {
+      problems.push(`legacy_v1 order mismatch at ${i}: expected ${expected[i]}, got ${orderedIds[i]}`)
+    }
+  }
+  return problems
+}
+
+export function roleSuitabilityProblems(p) {
+  const map = p.roleSuitability
+  if (map == null) return []
+  if (typeof map !== 'object' || Array.isArray(map)) return [`${p.id} roleSuitability must be an object`]
+  const problems = []
+  for (const [role, value] of Object.entries(map)) {
+    if (!ROLE_KEY_SET.has(role)) problems.push(`${p.id} roleSuitability has bad role ${role}`)
+    if (!ROLE_SUITABILITY_SET.has(value)) problems.push(`${p.id} roleSuitability ${role} has bad value ${value}`)
+  }
+  return problems
 }
 
 export function validateV2(transferIntel = null) {
@@ -71,6 +110,7 @@ export function validateV2(transferIntel = null) {
     if (!DEV_PROFILE_SET.has(p.developmentProfile)) P(`${p.id} bad developmentProfile ${p.developmentProfile}`)
     if (!ERA_SET.has(p.era)) P(`${p.id} bad era ${p.era}`)
     if (!TIER_SET.has(p.tier)) P(`${p.id} bad tier ${p.tier}`)
+    for (const msg of roleSuitabilityProblems(p)) P(msg)
 
     // --- anomaly checks ---
     const pt = posTypeOf(p.primaryPosition)
@@ -97,6 +137,7 @@ export function validateV2(transferIntel = null) {
   for (const cat of Object.values(CATALOGUES)) {
     if (!Array.isArray(cat.orderedIds)) { P(`Catalogue ${cat.id} has no orderedIds`); continue }
     if (dupes(cat.orderedIds).length) P(`Catalogue ${cat.id} duplicate ids: ${dupes(cat.orderedIds)}`)
+    if (cat.id === 'legacy_v1') for (const msg of validateLegacyV1Order(cat.orderedIds)) P(msg)
     if (cat.source === 'v2') {
       for (const id of cat.orderedIds) if (!v2PlayerById[id]) P(`Catalogue ${cat.id} references missing V2 player ${id}`)
       // modern player accidentally in legends_v2 / legend in modern set anomalies
@@ -129,6 +170,9 @@ export function validateTransferIntel(intel, sink = null) {
     if (e.confidenceBand && !CONFIDENCE_BANDS.includes(e.confidenceBand)) P(`transferIntel ${e.playerId}: bad confidenceBand`)
     if (e.targetClubId && !clubById[e.targetClubId]) P(`transferIntel ${e.playerId}: bad targetClubId ${e.targetClubId}`)
     if (e.canonicalClubId && !clubById[e.canonicalClubId]) P(`transferIntel ${e.playerId}: bad canonicalClubId ${e.canonicalClubId}`)
+    if (e.canonicalClubId && e.canonicalClubId !== player.clubId) {
+      P(`transferIntel ${e.playerId}: canonicalClubId ${e.canonicalClubId} does not match player clubId ${player.clubId}`)
+    }
     // A PENDING rumour whose target is already the player's club is contradictory.
     if (e.status !== 'confirmed' && e.targetClubId && e.targetClubId === player.clubId) {
       W(`transferIntel ${e.playerId}: pending target equals current club`)
@@ -180,6 +224,7 @@ export function auditV2() {
     byTier: count(V2_PLAYERS, 'tier'),
     byEra: count(V2_PLAYERS, 'era'),
     bySignature: sigCounts,
+    roleSuitabilityCoverage: V2_PLAYERS.filter((p) => p.roleSuitability && Object.keys(p.roleSuitability).length > 0).length,
     nationsUsed: new Set(V2_PLAYERS.map((p) => p.nationId)).size,
     leaguesUsed: new Set(modern.map((p) => leagueOfClub(p.clubId))).size,
     catalogueSizes: Object.fromEntries(Object.values(CATALOGUES).map((c) => [c.id, c.orderedIds.length])),

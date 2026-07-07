@@ -57,13 +57,22 @@ export const getCatalogue = (id) => CATALOGUES[id] || null
 
 const V2_ADAPTED_BY_ID = Object.fromEntries(V2_ADAPTED.map((p) => [p.id, p]))
 const V1_BY_ID = Object.fromEntries(V1_PLAYERS.map((p) => [p.id, p]))
+const CATALOGUE_ID_SETS = Object.fromEntries(Object.values(CATALOGUES).map((c) => [c.id, new Set(c.orderedIds)]))
+
+export function catalogueMembers(catalogVersion = DEFAULT_CATALOG_VERSION) {
+  const cat = CATALOGUES[catalogVersion]
+  if (!cat) return []
+  const byId = cat.source === 'v1' ? V1_BY_ID : V2_ADAPTED_BY_ID
+  return cat.orderedIds.map((id) => byId[id]).filter(Boolean)
+}
 
 // Resolve a player id within a given catalogue version to a legacy-shaped
 // object. Old snapshots (no catalogVersion) resolve through legacy_v1 → the
 // frozen V1 object, so saves stay byte-identical.
 export function resolvePlayer(id, catalogVersion = DEFAULT_CATALOG_VERSION) {
-  if (catalogVersion === 'legacy_v1') return V1_BY_ID[id] || null
-  return V2_ADAPTED_BY_ID[id] || V1_BY_ID[id] || null
+  const cat = CATALOGUES[catalogVersion]
+  if (!cat || !CATALOGUE_ID_SETS[catalogVersion]?.has(id)) return null
+  return (cat.source === 'v1' ? V1_BY_ID[id] : V2_ADAPTED_BY_ID[id]) || null
 }
 
 // Deterministic eligible-player list for a slot, in the catalogue's explicit
@@ -73,7 +82,7 @@ export function catalogueEligiblePlayers(catalogVersion, slotLabel, usedIds, poo
   if (catalogVersion === 'legacy_v1') return v1Eligible(slotLabel, usedIds, pool)
   const cat = CATALOGUES[catalogVersion]
   if (!cat || cat.source !== 'v2') return []
-  return V2_ADAPTED.filter(
+  return catalogueMembers(catalogVersion).filter(
     (p) =>
       p.eligibleSlots.includes(slotLabel) &&
       !usedIds.includes(p.id) &&

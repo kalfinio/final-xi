@@ -14,6 +14,9 @@
 
 import { posTypeOf } from './schema'
 import { nationById, clubById, leagueOfClub } from './index'
+import { PLAYERS as V1_PLAYERS } from '../../data'
+
+const V1_BY_ID = Object.fromEntries(V1_PLAYERS.map((p) => [p.id, p]))
 
 // Club → "core" chemistry tag (matches the engine's existing tag vocabulary).
 const CLUB_CORE_TAG = {
@@ -48,6 +51,25 @@ function deriveTags(p) {
 
 // Convert one V2 player into the legacy engine shape.
 export function adaptPlayerV2ToLegacyShape(p) {
+  const legacy = p.era === 'legend' ? V1_BY_ID[p.id] : null
+  if (legacy) {
+    return {
+      id: legacy.id,
+      name: legacy.name,
+      primaryPos: legacy.primaryPos,
+      posType: legacy.posType,
+      eligibleSlots: [...legacy.eligibleSlots],
+      country: legacy.country,
+      club: legacy.club,
+      tags: [...legacy.tags],
+      rarity: legacy.rarity,
+      role: legacy.role,
+      secondaryRole: legacy.secondaryRole ?? null,
+      sourceRole: legacy.sourceRole,
+      era: legacy.era,
+    }
+  }
+
   return {
     id: p.id,
     name: p.name,
