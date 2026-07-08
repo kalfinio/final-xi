@@ -21,6 +21,15 @@ export const posTypeOf = (pos) => POS_TYPE[pos]
 
 // Tactical role keys — exactly the game's approved Final XI role names, so the
 // adapter can map a V2 player's primaryRole straight onto the legacy `role`.
+//
+// Each key must describe a distinct TACTICAL FUNCTION (how a player operates on
+// the pitch). "Big Game Scorer" was removed from this taxonomy in the Phase A
+// remediation: it describes clutch/pressure BEHAVIOUR (when a player delivers),
+// not a tactical function, and is already represented in V2 by the Character
+// "Big Stage" + the derived `big_game_player` tag. It survives ONLY inside the
+// frozen legacy engine (data.js et al.), where it is a V1 role with real
+// scoring dependencies; it is intentionally not a V2 role surface. See
+// LEGACY_PRESSURE_DESCRIPTORS + PHASE_A_REMEDIATION_REPORT.md §14.
 export const ROLE_KEYS = [
   // GK
   'Shot Stopper', 'Sweeper Keeper', 'Big Match Keeper',
@@ -33,9 +42,13 @@ export const ROLE_KEYS = [
   // Wide / Attacking Mid
   'Creative Magician', 'Inside Forward', 'Touchline Winger', 'Direct Runner',
   // Strikers
-  'Complete Striker', 'Box Finisher', 'Link-Up Striker', 'Big Game Scorer',
+  'Complete Striker', 'Box Finisher', 'Link-Up Striker',
 ]
 export const ROLE_KEY_SET = new Set(ROLE_KEYS)
+
+// Legacy-only descriptors deliberately excluded from the V2 tactical role
+// taxonomy (they encode pressure/clutch behaviour, not tactical function).
+export const LEGACY_PRESSURE_DESCRIPTORS = ['Big Game Scorer']
 
 // Role suitability levels (future Tactical HQ; stored sparsely per player).
 // 3 = natural, 2 = accomplished, 1 = unconvincing.

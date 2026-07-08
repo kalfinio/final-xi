@@ -18,13 +18,47 @@
 // ---------------------------------------------------------------------------
 
 import { PLAYERS as V1_PLAYERS, getEligiblePlayers as v1Eligible } from '../../data'
-import { V2_PLAYERS } from './index'
+import { V2_PLAYERS, v2PlayerById } from './index'
 import { adaptPlayerV2ToLegacyShape } from './adapter'
 
 export const DEFAULT_CATALOG_VERSION = 'legacy_v1'
 
 // V2 players adapted once into legacy shape, preserving V2_PLAYERS order.
 const V2_ADAPTED = V2_PLAYERS.map(adaptPlayerV2ToLegacyShape)
+
+// ---------------------------------------------------------------------------
+// Curated activation membership (Phase A remediation).
+//
+// The full master catalogue (modern_mix_v2_2026_07_07 = all 544 players) is a
+// faithful database view, but a deterministic 5-formation / multi-seed draft
+// sweep showed it drafts MUCH weaker XIs than the live legacy Modern pool
+// (avg XI ~118 vs ~184) because ~240 quality/squad players with thin chemistry
+// tags dilute every offer. Rather than inflate points or retune the engine
+// (both forbidden), the ACTIVATION pool is a curated subset:
+//
+//   • all legends (premium excitement + GOAT exposure),
+//   • all elite/star modern players (recognisable strength + coverage),
+//   • quality-tier players ONLY where they fill a scarce, tactically important
+//     role (keepers-of-note, wing-backs, ball-winning / shielding midfielders,
+//     touchline wingers) so role access and formation variety stay healthy.
+//
+// This recovers most of the strength (sim avg XI ~145, offer pts ~12.5 vs
+// legacy 13.3) while roughly TRIPLING draft variety vs legacy and keeping every
+// formation 100% completable. The master DB is untouched; this only chooses
+// which explicitly-ordered members are eligible when the curated pool is drafted.
+// ---------------------------------------------------------------------------
+const CURATED_PREMIUM_TIERS = new Set(['goat', 'goat_candidate', 'elite', 'star'])
+export const CURATED_SPECIALIST_ROLES = new Set([
+  'Defensive Shield', 'Ball Winner', 'Defensive Wingback', 'Balanced Wingback',
+  'Defensive Fullback', 'Touchline Winger', 'Sweeper Keeper', 'Big Match Keeper',
+])
+export function isCuratedActivationMember(adapted) {
+  const p = v2PlayerById[adapted.id]
+  if (!p) return false
+  if (p.era === 'legend') return true
+  if (CURATED_PREMIUM_TIERS.has(p.tier)) return true
+  return p.tier === 'quality' && CURATED_SPECIALIST_ROLES.has(p.primaryRole)
+}
 
 export const CATALOGUES = {
   legacy_v1: {
@@ -38,10 +72,21 @@ export const CATALOGUES = {
   modern_mix_v2_2026_07_07: {
     id: 'modern_mix_v2_2026_07_07',
     dbVersion: 'v2',
-    label: 'Modern Mix (2026-07-07)',
+    label: 'Modern Mix — Full Master (2026-07-07)',
     source: 'v2',
     eras: ['legend', 'modern'],
+    // The complete database view (all valid V2 players). Not the activation pool.
     orderedIds: V2_ADAPTED.map((p) => p.id),
+  },
+  modern_mix_v2_curated: {
+    id: 'modern_mix_v2_curated',
+    dbVersion: 'v2',
+    label: 'Modern Mix — Curated Activation (2026-07-07)',
+    source: 'v2',
+    eras: ['legend', 'modern'],
+    activation: true,
+    // Curated subset of the master, kept in explicit master order via filter.
+    orderedIds: V2_ADAPTED.filter(isCuratedActivationMember).map((p) => p.id),
   },
   legends_v2: {
     id: 'legends_v2',

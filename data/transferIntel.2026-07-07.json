@@ -1,17 +1,42 @@
 {
   "snapshotDate": "2026-07-07",
   "researchCutoffUtc": "2026-07-07T13:25:05Z",
-  "note": "Confirmed summer-2026 moves for players present in the V2 database. Canonical player.clubId already reflects these. Kept intentionally conservative: only completed/officially-corroborated moves are recorded; weak rumours are excluded. Sources captured via club/official announcements and Tier-1 aggregators at the cutoff.",
+  "note": "Confirmed summer-2026 (and late-2025) moves for players in the V2 database. Canonical player.clubId already reflects these. This file was re-audited on 2026-07-07 against the source hierarchy after the independent Codex review: several entries previously marked confirmed were NOT supported by primary reporting and were reverted (see PHASE_A_REMEDIATION_REPORT.md §1). Only completed/officially-corroborated moves are recorded here; interest and unconfirmed rumours are excluded entirely. Every source is at or before the research cutoff.",
   "entries": [
+    {
+      "playerId": "donnarumma",
+      "canonicalClubId": "man_city",
+      "targetClubId": "man_city",
+      "status": "confirmed",
+      "confidenceBand": "near_certain",
+      "note": "From Paris Saint-Germain. Completed 2 Sep 2025.",
+      "sources": [
+        { "sourceType": "official_club", "publishedAt": "2025-09-02", "checkedAt": "2026-07-07", "url": "https://www.mancity.com/news/mens/manchester-city-sign-psg-goalkeeper-gianluigi-donnarumma-63892398" },
+        { "sourceType": "tier_one_reporter", "publishedAt": "2025-09-02", "checkedAt": "2026-07-07", "url": "https://www.skysports.com/football/news/11095/13423571/gianluigi-donnarumma-joins-man-city-goalkeeper-signs-for-lb26m-from-paris-saint-germain-as-ederson-moves-to-fenerbahce" }
+      ]
+    },
+    {
+      "playerId": "ederson",
+      "canonicalClubId": "fenerbahce",
+      "targetClubId": "fenerbahce",
+      "status": "confirmed",
+      "confidenceBand": "near_certain",
+      "note": "From Manchester City, €14m. Completed 2 Sep 2025.",
+      "sources": [
+        { "sourceType": "official_club", "publishedAt": "2025-09-02", "checkedAt": "2026-07-07", "url": "https://www.mancity.com/news/mens/ederson-leaves-manchester-city-fenerbahce-transfer-63892390" },
+        { "sourceType": "tier_one_reporter", "publishedAt": "2025-09-02", "checkedAt": "2026-07-07", "url": "https://www.skysports.com/football/news/11095/13423571/gianluigi-donnarumma-joins-man-city-goalkeeper-signs-for-lb26m-from-paris-saint-germain-as-ederson-moves-to-fenerbahce" }
+      ]
+    },
     {
       "playerId": "cucurella",
       "canonicalClubId": "real_madrid",
       "targetClubId": "real_madrid",
       "status": "confirmed",
       "confidenceBand": "near_certain",
+      "note": "From Chelsea, ~€60m. Real Madrid official announcement 15 Jun 2026.",
       "sources": [
-        { "sourceType": "official_club", "publishedAt": "2026-06-15", "checkedAt": "2026-07-07", "url": "https://www.si.com/soccer/real-madrid-2026-27-transfers-new-signings-targets-outgoings" },
-        { "sourceType": "tier_one_reporter", "publishedAt": "2026-06-15", "checkedAt": "2026-07-07", "url": "https://www.espn.com/soccer/story/_/id/48990955/summer-transfer-window-grading-big-signings-mens-soccer" }
+        { "sourceType": "official_club", "publishedAt": "2026-06-15", "checkedAt": "2026-07-07", "url": "https://www.realmadrid.com/en-US/news/club/announcements/comunicado-oficial-cucurella-15-06-2026" },
+        { "sourceType": "tier_one_reporter", "publishedAt": "2026-06-15", "checkedAt": "2026-07-07", "url": "https://www.skysports.com/football/news/11095/13554263/marc-cucurella-transfer-news-real-madrid-sign-defender-from-chelsea-in-deal-worth-lb51-8m" }
       ]
     },
     {
@@ -20,8 +45,10 @@
       "targetClubId": "real_madrid",
       "status": "confirmed",
       "confidenceBand": "near_certain",
+      "note": "From Manchester City on a free (contract expired). Real Madrid official announcement 17 Jun 2026.",
       "sources": [
-        { "sourceType": "tier_one_reporter", "publishedAt": "2026-06-30", "checkedAt": "2026-07-07", "url": "https://onefootball.com/en/news/every-completed-real-madrid-transfer-in-summer-2026-signings-sales-loans-42956343" }
+        { "sourceType": "official_club", "publishedAt": "2026-06-17", "checkedAt": "2026-07-07", "url": "https://www.realmadrid.com/en-US/news/club/announcements/comunicado-oficial-bernardo-silva-17-06-2026" },
+        { "sourceType": "tier_one_reporter", "publishedAt": "2026-06-17", "checkedAt": "2026-07-07", "url": "https://www.skysports.com/football/news/11095/13554908/bernardo-silva-real-madrid-sign-manchester-city-midfielder-on-free-transfer-as-jose-mourinho-impact-continues" }
       ]
     },
     {
@@ -30,8 +57,10 @@
       "targetClubId": "real_madrid",
       "status": "confirmed",
       "confidenceBand": "near_certain",
+      "note": "From Liverpool on a free (contract expired). Real Madrid official announcement 18 Jun 2026.",
       "sources": [
-        { "sourceType": "tier_one_reporter", "publishedAt": "2026-06-30", "checkedAt": "2026-07-07", "url": "https://www.sportsmole.co.uk/football/real-madrid/transfer-talk/feature/real-madrid-summer-transfers-all-confirmed-ins-and-outs-for-2026_599076.html" }
+        { "sourceType": "official_club", "publishedAt": "2026-06-18", "checkedAt": "2026-07-07", "url": "https://www.realmadrid.com/en-US/news/club/announcements/comunicado-oficial-konate-18-06-2026" },
+        { "sourceType": "tier_one_reporter", "publishedAt": "2026-06-18", "checkedAt": "2026-07-07", "url": "https://www.espn.com/soccer/story/_/id/48956684/ibrahima-konate-completes-switch-real-madrid-liverpool" }
       ]
     },
     {
@@ -40,38 +69,10 @@
       "targetClubId": "real_madrid",
       "status": "confirmed",
       "confidenceBand": "near_certain",
+      "note": "From Inter, €20m release clause. Real Madrid official announcement 5 Jul 2026.",
       "sources": [
-        { "sourceType": "tier_one_reporter", "publishedAt": "2026-07-05", "checkedAt": "2026-07-07", "url": "https://onefootball.com/en/news/every-completed-real-madrid-transfer-in-summer-2026-signings-sales-loans-42956343" }
-      ]
-    },
-    {
-      "playerId": "olise",
-      "canonicalClubId": "barcelona",
-      "targetClubId": "barcelona",
-      "status": "confirmed",
-      "confidenceBand": "near_certain",
-      "sources": [
-        { "sourceType": "tier_one_reporter", "publishedAt": "2026-06-28", "checkedAt": "2026-07-07", "url": "https://www.sportsmole.co.uk/football/barcelona/transfer-talk/feature/barcelona-summer-transfers-all-confirmed-ins-and-outs-for-2026_599077.html" }
-      ]
-    },
-    {
-      "playerId": "xavisimons",
-      "canonicalClubId": "barcelona",
-      "targetClubId": "barcelona",
-      "status": "confirmed",
-      "confidenceBand": "near_certain",
-      "sources": [
-        { "sourceType": "tier_one_reporter", "publishedAt": "2026-06-28", "checkedAt": "2026-07-07", "url": "https://www.sportsmole.co.uk/football/barcelona/transfer-talk/feature/barcelona-summer-transfers-all-confirmed-ins-and-outs-for-2026_599077.html" }
-      ]
-    },
-    {
-      "playerId": "kimmich",
-      "canonicalClubId": "barcelona",
-      "targetClubId": "barcelona",
-      "status": "confirmed",
-      "confidenceBand": "near_certain",
-      "sources": [
-        { "sourceType": "tier_one_reporter", "publishedAt": "2026-06-28", "checkedAt": "2026-07-07", "url": "https://www.teamtalk.com/news/every-completed-barcelona-transfer-summer-2026-signings-sales-loans" }
+        { "sourceType": "official_club", "publishedAt": "2026-07-05", "checkedAt": "2026-07-07", "url": "https://www.realmadrid.com/en-US/news/club/announcements/comunicado-oficial-dumfries-05-07-2026" },
+        { "sourceType": "tier_one_reporter", "publishedAt": "2026-07-05", "checkedAt": "2026-07-07", "url": "https://www.espn.com/soccer/story/_/id/49275192/real-madrid-sign-denzel-dumfries-inter-milan-four-year-contract" }
       ]
     },
     {
@@ -80,38 +81,10 @@
       "targetClubId": "barcelona",
       "status": "confirmed",
       "confidenceBand": "near_certain",
+      "note": "From Newcastle United, ~€70m, five-year deal. Announced by Barcelona late May 2026.",
       "sources": [
-        { "sourceType": "tier_one_reporter", "publishedAt": "2026-06-20", "checkedAt": "2026-07-07", "url": "https://www.espn.com/soccer/story/_/id/48955344/premier-league-2026-summer-transfers-all-confirmed-ins-outs-every-club" }
-      ]
-    },
-    {
-      "playerId": "jonathandavid",
-      "canonicalClubId": "barcelona",
-      "targetClubId": "barcelona",
-      "status": "confirmed",
-      "confidenceBand": "near_certain",
-      "sources": [
-        { "sourceType": "tier_one_reporter", "publishedAt": "2026-06-25", "checkedAt": "2026-07-07", "url": "https://www.teamtalk.com/news/every-completed-barcelona-transfer-summer-2026-signings-sales-loans" }
-      ]
-    },
-    {
-      "playerId": "frenkie",
-      "canonicalClubId": "man_united",
-      "targetClubId": "man_united",
-      "status": "confirmed",
-      "confidenceBand": "near_certain",
-      "sources": [
-        { "sourceType": "tier_one_reporter", "publishedAt": "2026-06-25", "checkedAt": "2026-07-07", "url": "https://www.teamtalk.com/news/every-completed-barcelona-transfer-summer-2026-signings-sales-loans" }
-      ]
-    },
-    {
-      "playerId": "christensen",
-      "canonicalClubId": "bayern",
-      "targetClubId": "bayern",
-      "status": "confirmed",
-      "confidenceBand": "near_certain",
-      "sources": [
-        { "sourceType": "tier_one_reporter", "publishedAt": "2026-06-25", "checkedAt": "2026-07-07", "url": "https://www.bavarianfootballworks.com/bayern-munich-transfer-news-rumors/201663/bayern-munichs-2026-summer-transfer-window-all-updates" }
+        { "sourceType": "tier_one_reporter", "publishedAt": "2026-05-30", "checkedAt": "2026-07-07", "url": "https://www.espn.com/soccer/story/_/id/48904926/barcelona-anthony-gordon-newcastle-united-transfer" },
+        { "sourceType": "tier_one_reporter", "publishedAt": "2026-05-30", "checkedAt": "2026-07-07", "url": "https://www.aljazeera.com/sports/2026/5/30/barcelona-sign-england-winger-anthony-gordon-from-newcastle" }
       ]
     },
     {
@@ -120,18 +93,10 @@
       "targetClubId": "chicago_fire",
       "status": "confirmed",
       "confidenceBand": "near_certain",
+      "note": "From Barcelona on a free (contract expired). Chicago Fire (MLS) official signing, two-year deal, 29 Jun 2026.",
       "sources": [
-        { "sourceType": "tier_one_reporter", "publishedAt": "2026-06-25", "checkedAt": "2026-07-07", "url": "https://www.teamtalk.com/news/every-completed-barcelona-transfer-summer-2026-signings-sales-loans" }
-      ]
-    },
-    {
-      "playerId": "jackson",
-      "canonicalClubId": "chelsea",
-      "targetClubId": "chelsea",
-      "status": "confirmed",
-      "confidenceBand": "near_certain",
-      "sources": [
-        { "sourceType": "tier_one_reporter", "publishedAt": "2026-07-01", "checkedAt": "2026-07-07", "url": "https://www.bavarianfootballworks.com/bayern-munich-transfer-news-rumors/201663/bayern-munichs-2026-summer-transfer-window-all-updates" }
+        { "sourceType": "official_club", "publishedAt": "2026-06-29", "checkedAt": "2026-07-07", "url": "https://www.chicagofirefc.com/news/a-defining-moment-in-chicago-sports-chicago-fire-fc-acquires-global-football-icon-robert-lewandowski" },
+        { "sourceType": "tier_one_reporter", "publishedAt": "2026-06-29", "checkedAt": "2026-07-07", "url": "https://www.espn.com/soccer/story/_/id/49218680/chicago-fire-complete-signing-robert-lewandowski" }
       ]
     }
   ]

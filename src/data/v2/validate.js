@@ -209,7 +209,32 @@ export function auditV2() {
   const legends = V2_PLAYERS.filter((p) => p.era === 'legend')
   const sigCounts = {}
   for (const p of V2_PLAYERS) for (const s of p.signatures || []) sigCounts[s] = (sigCounts[s] || 0) + 1
+
+  // Per-role suitability breakdown (level 3/2/1, position family, tier).
+  const posFamily = (pos) => {
+    const t = posTypeOf(pos)
+    if (t === 'GK') return 'GK'
+    if (pos === 'CB') return 'CB'
+    if (['RB', 'LB', 'RWB', 'LWB'].includes(pos)) return 'FB/WB'
+    if (['CDM', 'CM', 'CAM'].includes(pos)) return 'MID'
+    if (['RM', 'LM', 'RW', 'LW'].includes(pos)) return 'WIDE'
+    return 'ST'
+  }
+  const roleBreakdown = {}
+  for (const p of V2_PLAYERS) {
+    for (const [role, lvl] of Object.entries(p.roleSuitability || {})) {
+      const r = roleBreakdown[role] || (roleBreakdown[role] = { l3: 0, l2: 0, l1: 0, byPosFamily: {}, byTier: {} })
+      r[`l${lvl}`]++
+      r.byPosFamily[posFamily(p.primaryPosition)] = (r.byPosFamily[posFamily(p.primaryPosition)] || 0) + 1
+      r.byTier[p.tier] = (r.byTier[p.tier] || 0) + 1
+    }
+  }
+  const roleSizeDist = {}
+  for (const p of V2_PLAYERS) { const n = Object.keys(p.roleSuitability || {}).length; roleSizeDist[n] = (roleSizeDist[n] || 0) + 1 }
+
   return {
+    roleBreakdown,
+    roleSuitabilitySizeDist: roleSizeDist,
     players: V2_PLAYERS.length,
     modern: modern.length,
     legends: legends.length,
