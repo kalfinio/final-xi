@@ -4,11 +4,11 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import {
-  PLAYERS as V1_PLAYERS, getEligiblePlayers, computeRating, makeRng, shuffle, FORMATIONS, dateSeed, combineSeed,
+  PLAYERS as V1_PLAYERS, getEligiblePlayers, computeRating, makeRng, shuffle, FORMATIONS, dateSeed, combineSeed, slotOptions,
 } from '../../data'
 import { V2_PLAYERS, v2PlayerById, LEGEND_PLAYERS, NATIONS, LEAGUES, CLUBS, deriveRoleSuitability } from './index'
 import { adaptPlayerV2ToLegacyShape } from './adapter'
-import { CATALOGUES, catalogueEligiblePlayers, resolvePlayer, getCatalogue, isCuratedActivationMember, CURATED_SPECIALIST_ROLES } from './catalogues'
+import { CATALOGUES, catalogueEligiblePlayers, resolvePlayer, getCatalogue, isCuratedActivationMember, CURATED_SPECIALIST_ROLES, activationCatalogVersion, catalogueSlotOptions, ACTIVATION_CATALOG_BY_POOL, ACTIVATION_CATALOG_BY_MODE } from './catalogues'
 import { simulateCatalogue } from './draftSim'
 import { validateV2, validateTransferIntel, validateLegacyV1Order, roleSuitabilityProblems } from './validate'
 import { createRunSnapshot, snapshotCatalogVersion, validateRunSnapshot } from '../../runPersistence'
@@ -292,6 +292,76 @@ describe('activation-catalogue simulation guardrails', () => {
   it('offers real variety (busiest 10 players are a small share of all offers)', () => {
     expect(sim.concentrationTop10Pct).toBeLessThan(15)
     expect(sim.distinctOffered).toBeGreaterThan(200)
+  })
+})
+
+// ---------------------------------------------------------------------------
+describe('Modern Mix activation wiring (Phase A V2)', () => {
+  const CUR = 'modern_mix_v2_curated'
+  const seededOffer = (catalogVersion, slot, slotIndex, rerollCount, usedIds = [], pool = 'modern') =>
+    catalogueSlotOptions({ catalogVersion, mode: 'daily', slotLabel: slot, slotIndex, rerollCount, usedIds, pool }).map((p) => p.id)
+
+  it('a new normal Modern Mix run selects the curated V2 catalogue', () => {
+    expect(activationCatalogVersion({ mode: 'random', pool: 'modern' })).toBe(CUR)
+    expect(ACTIVATION_CATALOG_BY_POOL.modern).toBe(CUR)
+  })
+  it('the full-master V2 catalogue is NOT a live activation default', () => {
+    expect(Object.values(ACTIVATION_CATALOG_BY_POOL)).not.toContain('modern_mix_v2_2026_07_07')
+    expect(Object.values(ACTIVATION_CATALOG_BY_MODE.daily)).not.toContain('modern_mix_v2_2026_07_07')
+    expect(activationCatalogVersion({ mode: 'random', pool: 'modern' })).not.toBe('modern_mix_v2_2026_07_07')
+    expect(activationCatalogVersion()).toBe('legacy_v1') // unknown pool → safe legacy default
+  })
+  it('Legends Only keeps its frozen legacy boundary (never inherits curated)', () => {
+    expect(activationCatalogVersion({ mode: 'random', pool: 'legends' })).toBe('legacy_v1')
+    expect(activationCatalogVersion({ mode: 'daily', pool: 'legends' })).toBe('legacy_v1')
+    // legends offers are legend-era only, drawn from the legacy pool
+    const ids = seededOffer('legacy_v1', 'ST', 0, 0, [], 'legends')
+    for (const id of ids) expect(V1_PLAYERS.find((p) => p.id === id).era).toBe('legend')
+  })
+  it('Daily Challenge remains on legacy_v1 and keeps legacy slotOptions semantics', () => {
+    expect(activationCatalogVersion({ mode: 'daily', pool: 'modern' })).toBe('legacy_v1')
+    expect(activationCatalogVersion({ mode: 'daily', pool: 'legends' })).toBe('legacy_v1')
+    for (const slot of ['GK', 'RB', 'CB', 'CM', 'RW', 'ST', 'LW', 'CAM', 'CDM', 'RM', 'LM']) {
+      for (const rc of [0, 1, 2, 3]) {
+        for (const pool of ['modern', 'legends']) {
+          const a = seededOffer('legacy_v1', slot, 3, rc, [], pool)
+          const b = slotOptions({ mode: 'daily', slotLabel: slot, slotIndex: 3, rerollCount: rc, usedIds: [], pool }).map((p) => p.id)
+          expect(a).toEqual(b)
+        }
+      }
+    }
+  })
+  it('curated seeded offers are deterministic, reroll-stable, and never escape the catalogue', () => {
+    const curatedIds = new Set(getCatalogue(CUR).orderedIds)
+    // pinned golden (moves only if curation changes)
+    expect(seededOffer(CUR, 'ST', 9, 1)).toEqual(['inzaghi', 'icardi', 'endrick'])
+    for (const slot of ['GK', 'RB', 'CB', 'LB', 'CDM', 'CM', 'CAM', 'RW', 'LW', 'ST', 'RWB', 'LWB']) {
+      for (const rc of [0, 1, 2, 3]) {
+        const o1 = seededOffer(CUR, slot, 4, rc)
+        const o2 = seededOffer(CUR, slot, 4, rc)
+        expect(o1).toEqual(o2) // deterministic
+        for (const id of o1) {
+          expect(curatedIds.has(id)).toBe(true) // never escapes the run catalogue
+          expect(resolvePlayer(id, CUR)).toBeTruthy() // resolves for save/restore
+        }
+      }
+    }
+  })
+  it('a rerolled offer excludes already-used players (no duplicate corruption)', () => {
+    const first = seededOffer(CUR, 'ST', 9, 0)
+    const withUsed = seededOffer(CUR, 'ST', 9, 1, [first[0]])
+    expect(withUsed).not.toContain(first[0])
+  })
+  it('a new curated Modern Mix snapshot explicitly persists catalogVersion, and legacy defaults hold', () => {
+    const squad = FORMATIONS['4-3-3'].slots.map((slot) => ({ slot, player: { id: 'x' } }))
+    const base = { runSeed: 1, teamName: 'T', rerollsUsed: 0, squad, matches: [], upgradeState: { owned: [], offers: [] }, checkpoint: { screen: 'hub', resolvedMatchCount: 0, selectedApproach: 'balanced' } }
+    const v2 = createRunSnapshot({ ...base, config: { mode: 'random', formation: '4-3-3', pool: 'modern' }, catalogVersion: CUR, dbVersion: 'v2' })
+    expect(v2.run.catalogVersion).toBe(CUR)
+    expect(snapshotCatalogVersion(v2)).toBe(CUR)
+    // a run with no explicit catalogVersion still resolves as legacy_v1
+    const legacy = createRunSnapshot({ ...base, config: { mode: 'random', formation: '4-3-3', pool: 'legends' } })
+    expect(legacy.run.catalogVersion).toBe('legacy_v1')
+    expect(snapshotCatalogVersion({ run: {} })).toBe('legacy_v1')
   })
 })
 

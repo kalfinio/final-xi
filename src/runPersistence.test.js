@@ -67,18 +67,18 @@ function snapFor(run, drv, screen) {
   })
 }
 
-function v2Squad() {
+function v2Squad(catalogVersion = 'modern_mix_v2_2026_07_07', { preferV2Only = true } = {}) {
   const used = []
   return FORMATIONS['4-3-3'].slots.map((slot) => {
-    const player = catalogueEligiblePlayers('modern_mix_v2_2026_07_07', slot, used, 'modern')
-      .find((p) => !byId[p.id])
+    const eligible = catalogueEligiblePlayers(catalogVersion, slot, used, 'modern')
+    const player = (preferV2Only ? eligible.find((p) => !byId[p.id]) : eligible[0]) || eligible[0]
     used.push(player.id)
     return { slot, player }
   })
 }
 
-function v2Snap({ screen = 'hub', resolved = 0 } = {}) {
-  const squad = v2Squad()
+function v2Snap({ screen = 'hub', resolved = 0, catalogVersion = 'modern_mix_v2_2026_07_07' } = {}) {
+  const squad = v2Squad(catalogVersion, { preferV2Only: catalogVersion !== 'modern_mix_v2_curated' })
   const { total } = computeRating(squad)
   const state = { owned: [], offers: [] }
   const ctrl = createRunSimulation({
@@ -93,7 +93,7 @@ function v2Snap({ screen = 'hub', resolved = 0 } = {}) {
   return createRunSnapshot({
     config: { mode: 'random', formation: '4-3-3', pool: 'modern', difficulty: 'classic' },
     dbVersion: 'v2',
-    catalogVersion: 'modern_mix_v2_2026_07_07',
+    catalogVersion,
     runSeed: 24680,
     teamName: 'V2 XI',
     squad,
@@ -194,6 +194,87 @@ describe('B2. catalogue-aware player resolution', () => {
     const rec = reconstructRun(snap)
     expect(rec.ok).toBe(true)
     expect(rec.catalogVersion).toBe('legacy_v1')
+  })
+
+  it('old snapshots without catalogVersion are not migrated to V2 when re-saved', () => {
+    const original = snapFor(baseline.runs[0], drive(baseline.runs[0], { stopAfter: 2 }), 'hub')
+    delete original.run.catalogVersion
+    delete original.run.dbVersion
+    saveRunSnapshot(original)
+    const rec = reconstructRun(loadRunSnapshot())
+    expect(rec.ok).toBe(true)
+    expect(rec.catalogVersion).toBe('legacy_v1')
+
+    const reSaved = createRunSnapshot({
+      config: rec.config,
+      catalogVersion: rec.catalogVersion,
+      dbVersion: rec.dbVersion,
+      runSeed: rec.runSeed,
+      teamName: rec.teamName,
+      squad: rec.squad,
+      rerollsUsed: rec.rerollsUsed,
+      matches: rec.ctrl.matches,
+      upgradeState: rec.upgradeState,
+      checkpoint: { screen: rec.screen, resolvedMatchCount: rec.ctrl.resolvedCount, selectedApproach: rec.selectedApproach, stageLabel: 'League Phase' },
+    })
+    expect(reSaved.run.catalogVersion).toBe('legacy_v1')
+    expect(reSaved.run.dbVersion).toBe('v1')
+  })
+
+  it('explicit legacy_v1 snapshots remain legacy through save/load/reconstruct/re-save', () => {
+    const snap = snapFor(baseline.runs[1], drive(baseline.runs[1], { stopAfter: 3 }), 'hub')
+    snap.run.catalogVersion = 'legacy_v1'
+    snap.run.dbVersion = 'v1'
+    saveRunSnapshot(snap)
+
+    const rec = reconstructRun(loadRunSnapshot())
+    expect(rec.ok).toBe(true)
+    expect(rec.catalogVersion).toBe('legacy_v1')
+    const reSaved = createRunSnapshot({
+      config: rec.config,
+      catalogVersion: rec.catalogVersion,
+      dbVersion: rec.dbVersion,
+      runSeed: rec.runSeed,
+      teamName: rec.teamName,
+      squad: rec.squad,
+      rerollsUsed: rec.rerollsUsed,
+      matches: rec.ctrl.matches,
+      upgradeState: rec.upgradeState,
+      checkpoint: { screen: rec.screen, resolvedMatchCount: rec.ctrl.resolvedCount, selectedApproach: rec.selectedApproach, stageLabel: 'League Phase' },
+    })
+    expect(reSaved.run.catalogVersion).toBe('legacy_v1')
+    expect(reconstructRun(reSaved).catalogVersion).toBe('legacy_v1')
+  })
+
+  it('curated V2 snapshots persist catalogue and restore the exact watch checkpoint', () => {
+    const snap = v2Snap({ screen: 'watch', resolved: 1, catalogVersion: 'modern_mix_v2_curated' })
+    expect(snap.run.catalogVersion).toBe('modern_mix_v2_curated')
+    expect(snap.run.dbVersion).toBe('v2')
+    saveRunSnapshot(snap)
+
+    const loaded = loadRunSnapshot()
+    expect(loaded.run.catalogVersion).toBe('modern_mix_v2_curated')
+    const rec = reconstructRun(loaded)
+    expect(rec.ok).toBe(true)
+    expect(rec.catalogVersion).toBe('modern_mix_v2_curated')
+    expect(rec.screen).toBe('watch')
+    expect(rec.ctrl.resolvedCount).toBe(1)
+    expect(matchSignature(rec.currentMatch, 0)).toBe(snap.run.signatures.resolvedMatches[0])
+
+    const reSaved = createRunSnapshot({
+      config: rec.config,
+      catalogVersion: rec.catalogVersion,
+      dbVersion: rec.dbVersion,
+      runSeed: rec.runSeed,
+      teamName: rec.teamName,
+      squad: rec.squad,
+      rerollsUsed: rec.rerollsUsed,
+      matches: rec.ctrl.matches,
+      upgradeState: rec.upgradeState,
+      checkpoint: { screen: rec.screen, resolvedMatchCount: rec.ctrl.resolvedCount, currentMatchIndex: 0, selectedApproach: rec.selectedApproach, stageLabel: 'League Phase' },
+    })
+    expect(reSaved.run.catalogVersion).toBe('modern_mix_v2_curated')
+    expect(matchSignature(reconstructRun(reSaved).currentMatch, 0)).toBe(snap.run.signatures.resolvedMatches[0])
   })
 
   it('known V2 catalogue snapshots resolve V2-only ids and reconstruct', () => {

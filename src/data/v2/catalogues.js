@@ -17,7 +17,7 @@
 // draft path exists and is tested, ready for a future phase to enable.
 // ---------------------------------------------------------------------------
 
-import { PLAYERS as V1_PLAYERS, getEligiblePlayers as v1Eligible } from '../../data'
+import { PLAYERS as V1_PLAYERS, getEligiblePlayers as v1Eligible, dateSeed, combineSeed, makeRng, shuffle } from '../../data'
 import { V2_PLAYERS, v2PlayerById } from './index'
 import { adaptPlayerV2ToLegacyShape } from './adapter'
 
@@ -133,4 +133,42 @@ export function catalogueEligiblePlayers(catalogVersion, slotLabel, usedIds, poo
       !usedIds.includes(p.id) &&
       (pool === 'modern' || p.era === 'legend'),
   )
+}
+
+// ---------------------------------------------------------------------------
+// Activation (Phase A V2). A NEW normal run drafts from a specific catalogue.
+// Modern Mix normal runs are now activated on the CURATED V2 pool; Legends Only
+// and Daily Challenge stay on the frozen legacy catalogue (their boundaries and
+// deterministic fixtures are unchanged). The full-master V2 catalogue is
+// deliberately NOT a live default — it remains a database/audit view only.
+// ---------------------------------------------------------------------------
+export const ACTIVATION_CATALOG_BY_POOL = {
+  modern: 'modern_mix_v2_curated',
+  legends: 'legacy_v1',
+}
+export const ACTIVATION_CATALOG_BY_MODE = {
+  random: ACTIVATION_CATALOG_BY_POOL,
+  daily: {
+    modern: 'legacy_v1',
+    legends: 'legacy_v1',
+  },
+}
+export function activationCatalogVersion({ mode = 'random', pool } = {}) {
+  return ACTIVATION_CATALOG_BY_MODE[mode]?.[pool] || DEFAULT_CATALOG_VERSION
+}
+
+// Catalogue-aware draft offer. Mirrors data.js slotOptions EXACTLY — same daily
+// seed derivation, same shuffle+slice — but resolves the eligible pool through
+// the given catalogue. For 'legacy_v1' the result is byte-identical to
+// slotOptions (catalogueEligiblePlayers('legacy_v1',…) === getEligiblePlayers),
+// so legacy/Legends-Only drafts are unchanged. For a V2 catalogue every offered
+// id is a catalogue member, so the drafted XI round-trips through resolvePlayer
+// on save/restore. Rerolls stay in-catalogue because the same catalogVersion
+// drives every call for the run.
+export function catalogueSlotOptions({ catalogVersion = DEFAULT_CATALOG_VERSION, mode, slotLabel, slotIndex, rerollCount, usedIds, pool = 'modern' }) {
+  const eligible = catalogueEligiblePlayers(catalogVersion, slotLabel, usedIds, pool)
+  const rng = mode === 'daily'
+    ? makeRng(combineSeed(dateSeed(), slotIndex, rerollCount, pool === 'modern' ? 1 : 0))
+    : Math.random
+  return shuffle(eligible, rng).slice(0, 3)
 }

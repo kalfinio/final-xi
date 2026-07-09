@@ -4,7 +4,6 @@ import {
   SLOT_NAMES,
   TAG_LABELS,
   DIFFICULTIES,
-  slotOptions,
   playerPoints,
   playerBreakdown,
   canPlay,
@@ -59,6 +58,7 @@ import {
   createRunSnapshot, saveRunSnapshot, loadRunSnapshot, clearRunSnapshot,
   snapshotSummary, reconstructRun,
 } from './runPersistence'
+import { catalogueSlotOptions, activationCatalogVersion, getCatalogue } from './data/v2/catalogues'
 
 const TOTAL_REROLLS = 3
 
@@ -258,8 +258,11 @@ function IntroScreen({ onStart, stats, savedRun, onResume, resumeError }) {
   const [confirmNew, setConfirmNew] = useState(false)
   const summary = savedRun ? snapshotSummary(savedRun) : null
   // Starting a run replaces any active save — confirm first when one exists.
+  // The activation catalogue is fixed at run creation from the chosen mode/pool
+  // (normal Modern Mix → curated V2; Daily/Legends → frozen legacy) and stays
+  // constant for the whole run, so offers, rerolls and restore use one catalogue.
   function requestStart() {
-    const cfg = { formation, mode, difficulty, pool }
+    const cfg = { formation, mode, difficulty, pool, catalogVersion: activationCatalogVersion({ mode, pool }) }
     if (summary) setConfirmNew(cfg)
     else onStart(cfg)
   }
@@ -469,7 +472,7 @@ function SquadPreview({ squad, activeIndex }) {
 // Draft
 // ---------------------------------------------------------------------------
 function DraftScreen({ config, onComplete }) {
-  const { formation, mode, difficulty, pool } = config
+  const { formation, mode, difficulty, pool, catalogVersion } = config
   const slots = FORMATIONS[formation].slots
   const [squad, setSquad] = useState(() => slots.map((slot) => ({ slot, player: null })))
   const [index, setIndex] = useState(0)
@@ -480,7 +483,7 @@ function DraftScreen({ config, onComplete }) {
   useEffect(() => {
     if (index < slots.length) {
       const usedIds = squad.filter((s) => s.player).map((s) => s.player.id)
-      setChoices(slotOptions({ mode, slotLabel: slots[index], slotIndex: index, rerollCount: slotRerolls, usedIds, pool }))
+      setChoices(catalogueSlotOptions({ catalogVersion, mode, slotLabel: slots[index], slotIndex: index, rerollCount: slotRerolls, usedIds, pool }))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index, slotRerolls])
@@ -1030,6 +1033,10 @@ export default function App() {
     try {
       saveRunSnapshot(createRunSnapshot({
         config: { ...config, dateKey: dailyDateRef.current },
+        // Persist the exact catalogue this run drafted from so restore resolves
+        // the same players; absent/legacy runs still default to legacy_v1.
+        catalogVersion: config.catalogVersion,
+        dbVersion: getCatalogue(config.catalogVersion)?.dbVersion,
         runSeed: runSeedRef.current,
         teamName, squad, rerollsUsed,
         matches: ctrl.matches,
@@ -1213,7 +1220,7 @@ export default function App() {
     currentMatchRef.current = rec.currentMatch
     resultRef.current = rec.result
     recordedRef.current = (rec.screen === 'result' || rec.screen === 'sim') // already recorded when first finished
-    setConfig({ formation: rec.config.formation, mode: rec.config.mode, difficulty: rec.config.difficulty, pool: rec.config.pool })
+    setConfig({ formation: rec.config.formation, mode: rec.config.mode, difficulty: rec.config.difficulty, pool: rec.config.pool, catalogVersion: rec.catalogVersion })
     setSquad(rec.squad)
     setTeamName(rec.teamName)
     setRerollsUsed(rec.rerollsUsed)

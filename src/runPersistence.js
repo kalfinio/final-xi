@@ -52,9 +52,8 @@ export function createRunSnapshot(state) {
     run: {
       mode: config.mode,
       runSeed: runSeed >>> 0,
-      // Player-DB / catalogue version this run was drafted from (Phase A). The
-      // live game still drafts from the frozen legacy pool, so current runs are
-      // 'legacy_v1'. Old snapshots have no field → interpreted as legacy_v1.
+      // Player-DB / catalogue version this run was drafted from (Phase A).
+      // Old snapshots have no field → interpreted as legacy_v1.
       dbVersion: state.dbVersion || 'v1',
       catalogVersion: state.catalogVersion || 'legacy_v1',
       dailyContext: config.mode === 'daily' ? { dateKey: config.dateKey || null } : null,
