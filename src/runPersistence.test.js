@@ -4,11 +4,13 @@ import baseline from './simBaseline.fixture.json'
 import { PLAYERS, FORMATIONS, computeRating, createRunSimulation, makeRng } from './data'
 import { buildUpgradeContext, shouldOfferUpgrade, generateUpgradeOffer, UPGRADES_BY_ID } from './runUpgrades'
 import { catalogueEligiblePlayers } from './data/v2/catalogues'
+import { buildMatchTimeline } from './matchTimeline'
 import {
   SCHEMA_VERSION, ENGINE_VERSION, STORAGE_KEY,
+  ACTIVE_ENGINE_VERSION, LEGACY_ENGINE_VERSION, M1_ENGINE_VERSION,
   createRunSnapshot, serializeRunSnapshot, parseRunSnapshot, validateRunSnapshot,
   saveRunSnapshot, loadRunSnapshot, clearRunSnapshot, snapshotSummary,
-  reconstructRun, matchSignature,
+  reconstructRun, matchSignature, canonicalMatchSignature, snapshotEngineVersion,
 } from './runPersistence'
 
 // Minimal localStorage polyfill (vitest runs in node).
@@ -116,6 +118,8 @@ describe('A. snapshot round trip', () => {
     expect(validateRunSnapshot(round)).toBe(true)
     expect(round.run.squadSelections).toHaveLength(11)
     expect(round.run.signatures.resolvedMatches).toEqual(sigList(drv.ctrl))
+    expect(round.run.signatures.canonicalMatches)
+      .toEqual(drv.ctrl.matches.map((match, index) => canonicalMatchSignature(match, index)))
     expect(round.run.approachHistory.map((a) => a.approachKey)).toEqual(drv.ctrl.matches.map((m) => m.approach))
   })
 
@@ -476,5 +480,171 @@ describe('E. Sim All + Daily persistence', () => {
     expect(rec.ok).toBe(true)
     expect(rec.config.mode).toBe('daily')
     expect(sigList(rec.ctrl)).toEqual(sigList(drv.ctrl))
+  })
+
+  it('new strong canonical signatures catch detail drift while old snapshots remain compatible', () => {
+    const run = baseline.runs[0]
+    const makeSnapshot = () => snapFor(run, drive(run, { stopAfter: 3 }), 'hub')
+    const snap = makeSnapshot()
+    snap.run.signatures.canonicalMatches[1] = '00000000'
+    const rec = reconstructRun(snap)
+    expect(rec.ok).toBe(false)
+    expect(rec.reason).toBe('canonical-signature-mismatch')
+
+    const historical = makeSnapshot()
+    delete historical.run.signatures.canonicalMatches
+    expect(validateRunSnapshot(historical)).toBe(true)
+    expect(reconstructRun(historical).ok).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+describe('F. M0.1 run-level engine version compatibility and lock', () => {
+  const good = (run = baseline.runs[0], stopAfter = 4, screen = 'hub') => {
+    const drv = drive(run, { stopAfter })
+    return { run, drv, snap: snapFor(run, drv, screen) }
+  }
+
+  it('missing engineVersion defaults to legacy_v1 and reconstructs through the legacy resolver', () => {
+    const { snap, drv } = good()
+    delete snap.engineVersion
+    expect(snapshotEngineVersion(snap)).toBe(LEGACY_ENGINE_VERSION)
+    expect(validateRunSnapshot(snap)).toBe(true)
+    const rec = reconstructRun(snap)
+    expect(rec.ok).toBe(true)
+    expect(rec.engineVersion).toBe(LEGACY_ENGINE_VERSION)
+    expect(rec.ctrl.engineVersion).toBe(LEGACY_ENGINE_VERSION)
+    expect(sigList(rec.ctrl)).toEqual(sigList(drv.ctrl))
+  })
+
+  it('historical phase6.1 and explicit legacy_v1 snapshots both restore as legacy_v1', () => {
+    for (const persistedVersion of ['phase6.1', LEGACY_ENGINE_VERSION]) {
+      const { snap, drv } = good()
+      snap.engineVersion = persistedVersion
+      expect(validateRunSnapshot(snap)).toBe(true)
+      expect(snapshotEngineVersion(snap)).toBe(LEGACY_ENGINE_VERSION)
+      const rec = reconstructRun(snap)
+      expect(rec.ok).toBe(true)
+      expect(rec.engineVersion).toBe(LEGACY_ENGINE_VERSION)
+      expect(sigList(rec.ctrl)).toEqual(sigList(drv.ctrl))
+    }
+  })
+
+  it('unknown, malformed, and known-but-unimplemented m1 versions fail safely', () => {
+    for (const invalid of ['future_v99', M1_ENGINE_VERSION, '', null, 7]) {
+      const { snap } = good()
+      snap.engineVersion = invalid
+      expect(validateRunSnapshot(snap)).toBe(false)
+      expect(reconstructRun(snap)).toEqual({ ok: false, reason: 'invalid' })
+    }
+  })
+
+  it('an old missing-version snapshot re-saves with canonical legacy_v1 without a schema bump', () => {
+    const { snap } = good()
+    delete snap.engineVersion
+    const rec = reconstructRun(snap)
+    expect(rec.ok).toBe(true)
+    const reSaved = createRunSnapshot({
+      engineVersion: rec.ctrl.engineVersion,
+      config: rec.config,
+      catalogVersion: rec.catalogVersion,
+      dbVersion: rec.dbVersion,
+      runSeed: rec.runSeed,
+      teamName: rec.teamName,
+      squad: rec.squad,
+      rerollsUsed: rec.rerollsUsed,
+      matches: rec.ctrl.matches,
+      upgradeState: rec.upgradeState,
+      checkpoint: { screen: rec.screen, resolvedMatchCount: rec.ctrl.resolvedCount, selectedApproach: rec.selectedApproach, stageLabel: 'League Phase' },
+    })
+    expect(reSaved.schemaVersion).toBe(SCHEMA_VERSION)
+    expect(reSaved.engineVersion).toBe(LEGACY_ENGINE_VERSION)
+    expect(reSaved.run.signatures.canonicalMatches).toHaveLength(rec.ctrl.resolvedCount)
+  })
+
+  it('new controllers and snapshots receive the active legacy version explicitly', () => {
+    const run = baseline.runs[0]
+    const squad = squadFromFixture(run)
+    const ctrl = createRunSimulation({
+      rating: computeRating(squad).total,
+      difficulty: run.config.difficulty,
+      squad,
+      rng: makeRng(run.seed),
+      runSeed: run.seed,
+      engineVersion: ACTIVE_ENGINE_VERSION,
+    })
+    expect(ACTIVE_ENGINE_VERSION).toBe(LEGACY_ENGINE_VERSION)
+    expect(ctrl.engineVersion).toBe(LEGACY_ENGINE_VERSION)
+    const state = { owned: [], offers: [] }
+    const snap = createRunSnapshot({
+      engineVersion: ctrl.engineVersion,
+      config: cfgOf(run), runSeed: run.seed, teamName: 'New XI', squad, rerollsUsed: 0,
+      matches: ctrl.matches, upgradeState: state,
+      checkpoint: { screen: 'hub', resolvedMatchCount: 0, selectedApproach: 'balanced', stageLabel: 'League Phase' },
+    })
+    expect(snap.engineVersion).toBe(LEGACY_ENGINE_VERSION)
+  })
+
+  it('hub, Watch, post-match, knockout, and completed checkpoints retain one engine version', () => {
+    const run = baseline.runs[0]
+    const cases = [
+      { stopAfter: 4, screen: 'hub' },
+      { stopAfter: 4, screen: 'watch' },
+      { stopAfter: 4, screen: 'postmatch' },
+      { stopAfter: 9, screen: 'watch' },
+      { stopAfter: Infinity, screen: 'result' },
+    ]
+    for (const testCase of cases) {
+      const drv = drive(run, { stopAfter: testCase.stopAfter })
+      const snap = snapFor(run, drv, testCase.screen)
+      expect(snap.engineVersion).toBe(LEGACY_ENGINE_VERSION)
+      const rec = reconstructRun(snap)
+      expect(rec.ok).toBe(true)
+      expect(rec.engineVersion).toBe(LEGACY_ENGINE_VERSION)
+      expect(rec.ctrl.engineVersion).toBe(LEGACY_ENGINE_VERSION)
+      expect(rec.ctrl.resolvedCount).toBe(drv.ctrl.resolvedCount)
+    }
+  })
+
+  it('Watch Match canonical detail and timeline are byte-identical after refresh + Resume', () => {
+    const run = baseline.runs[0]
+    const drv = drive(run, { stopAfter: 4 })
+    const original = drv.ctrl.matches[3]
+    const snap = snapFor(run, drv, 'watch')
+    const rec = reconstructRun(parseRunSnapshot(serializeRunSnapshot(snap)))
+    expect(rec.ok).toBe(true)
+    const originalTimeline = buildMatchTimeline(original, drv.squad.map((s) => s.player), 'League Phase', 'Test XI', null, drv.squad)
+    const resumedTimeline = buildMatchTimeline(rec.currentMatch, rec.squad.map((s) => s.player), 'League Phase', 'Test XI', null, rec.squad)
+    expect(JSON.stringify(rec.currentMatch.detail)).toBe(JSON.stringify(original.detail))
+    expect(JSON.stringify(resumedTimeline)).toBe(JSON.stringify(originalTimeline))
+  })
+
+  it('a resumed legacy run stays legacy through future knockout resolution and re-save', () => {
+    const run = baseline.runs[0]
+    const partial = drive(run, { stopAfter: 8 })
+    const old = snapFor(run, partial, 'hub')
+    old.engineVersion = 'phase6.1'
+    const rec = reconstructRun(old)
+    expect(rec.ok).toBe(true)
+    while (!rec.ctrl.isDone) {
+      rec.ctrl.prepareNext()
+      if (!rec.ctrl.isDone) rec.ctrl.resolveNext('balanced')
+      expect(rec.ctrl.engineVersion).toBe(LEGACY_ENGINE_VERSION)
+    }
+    const reSaved = createRunSnapshot({
+      engineVersion: rec.ctrl.engineVersion,
+      config: rec.config,
+      catalogVersion: rec.catalogVersion,
+      dbVersion: rec.dbVersion,
+      runSeed: rec.runSeed,
+      teamName: rec.teamName,
+      squad: rec.squad,
+      rerollsUsed: rec.rerollsUsed,
+      matches: rec.ctrl.matches,
+      upgradeState: rec.upgradeState,
+      checkpoint: { screen: 'result', resolvedMatchCount: rec.ctrl.resolvedCount, selectedApproach: 'balanced', stageLabel: 'Run complete' },
+    })
+    expect(reSaved.engineVersion).toBe(LEGACY_ENGINE_VERSION)
+    expect(reconstructRun(reSaved).engineVersion).toBe(LEGACY_ENGINE_VERSION)
   })
 })

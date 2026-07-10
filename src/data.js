@@ -23,6 +23,11 @@ import { makeRng, hashString, combineSeed, randomSeed } from './seedUtils'
 import { buildMatchDetail } from './matchEngine'
 import { buildSquadTacticalProfile, buildOpponentTacticalProfile, resolveTacticalMatchup } from './tacticalMatchup'
 import { applyTacticalApproach, approachMatchupPreviews } from './tacticalApproach'
+import {
+  ACTIVE_ENGINE_VERSION,
+  assertRunnableEngineVersion,
+  resolveMatchByEngineVersion,
+} from './matchEngineVersions'
 export { makeRng, hashString, combineSeed, randomSeed }
 
 export function dateSeed(d = new Date()) {
@@ -1516,7 +1521,18 @@ function bestWin(matches) {
 // invoked per approach for hub previews and once for the locked approach at
 // resolution — it consumes zero rng, so omitting it (or returning null)
 // leaves the run byte-identical to Phase 4.
-export function createRunSimulation({ rating, difficulty = 'classic', squad, rng = Math.random, runSeed = 1, upgradeContextFor = null }) {
+export function createRunSimulation({
+  rating,
+  difficulty = 'classic',
+  squad,
+  rng = Math.random,
+  runSeed = 1,
+  upgradeContextFor = null,
+  engineVersion = ACTIVE_ENGINE_VERSION,
+}) {
+  // Immutable for the controller lifetime: a run can never switch engines
+  // between matches. M1 is known to the registry but remains non-runnable.
+  const lockedEngineVersion = assertRunnableEngineVersion(engineVersion)
   const p = squadBaseProb(squad, difficulty)
   const players = squad.map((s) => s.player).filter(Boolean)
   const byId = Object.fromEntries(players.map((pl) => [pl.id, pl]))
@@ -1619,7 +1635,7 @@ export function createRunSimulation({ rating, difficulty = 'classic', squad, rng
 
   // Lock the approach and resolve the pending match. Exactly one resolution
   // per match; the stored canonical matchup is previews[approach].
-  function resolveNext(approachKey = 'balanced') {
+  function resolveNextLegacy(approachKey = 'balanced') {
     if (done) return null
     if (!pending) prepareNext()
     if (!pending) return null
@@ -1708,6 +1724,16 @@ export function createRunSimulation({ rating, difficulty = 'classic', squad, rng
     return match
   }
 
+  // Public contract preserved. Dispatch happens before the legacy resolver
+  // consumes RNG or mutates pending state, so an unavailable engine fails
+  // without partially resolving a match.
+  function resolveNext(approachKey = 'balanced') {
+    return resolveMatchByEngineVersion({
+      engineVersion: lockedEngineVersion,
+      legacyResolver: () => resolveNextLegacy(approachKey),
+    })
+  }
+
   // Sim All: resolve every remaining match with the given approach (Balanced
   // by default — future matches are never auto-optimized). Deterministic.
   function finishRemaining(defaultApproach = 'balanced') {
@@ -1749,6 +1775,7 @@ export function createRunSimulation({ rating, difficulty = 'classic', squad, rng
     finishRemaining,
     finish,
     squadProfile,
+    get engineVersion() { return lockedEngineVersion },
     get matches() { return allMatches },
     get isDone() { return done },
     get resolvedCount() { return allMatches.length },
