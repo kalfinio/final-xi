@@ -31,6 +31,7 @@ export const STORAGE_KEY = 'finalxi.activeRun.v1'
 
 const VALID_POOLS = new Set(['modern', 'legends'])
 const VALID_MODES = new Set(['random', 'daily'])
+const VALID_CLUB_IDENTITIES = new Set(['control', 'press', 'transition', 'fortress'])
 // Checkpoints we can safely restore to.
 const VALID_SCREENS = new Set(['hub', 'watch', 'postmatch', 'upgrade', 'result', 'sim'])
 
@@ -57,7 +58,9 @@ export function createRunSnapshot(state) {
       dbVersion: state.dbVersion || 'v1',
       catalogVersion: state.catalogVersion || 'legacy_v1',
       dailyContext: config.mode === 'daily' ? { dateKey: config.dateKey || null } : null,
-      config: { formation: config.formation, pool: config.pool, difficulty: config.difficulty },
+      // Club Identity is run philosophy metadata only. Missing/null remains a
+      // valid legacy state and never changes simulation reconstruction.
+      config: { formation: config.formation, pool: config.pool, difficulty: config.difficulty, clubIdentity: config.clubIdentity || null },
       teamName,
       squadSelections: squad.map((s) => ({ slot: s.slot, playerId: s.player.id })),
       rerollsUsed: rerollsUsed | 0,
@@ -112,6 +115,7 @@ export function validateRunSnapshot(snap) {
   if (!Number.isFinite(r.runSeed)) return false
   const c = r.config
   if (!c || !FORMATIONS[c.formation] || !VALID_POOLS.has(c.pool) || !DIFFICULTIES[c.difficulty]) return false
+  if (c.clubIdentity != null && !VALID_CLUB_IDENTITIES.has(c.clubIdentity)) return false
 
   // squad: exact XI size, valid players, valid slots for the formation
   const slots = FORMATIONS[c.formation].slots
@@ -208,6 +212,7 @@ export function snapshotSummary(snap) {
     record: { w, d, l },
     upgradeCount: r.upgradeState.owned.length,
     resolvedMatchCount: r.checkpoint.resolvedMatchCount,
+    clubIdentity: r.config.clubIdentity ? r.config.clubIdentity.toUpperCase() : null,
   }
 }
 
@@ -260,7 +265,7 @@ export function reconstructRun(snap) {
     }
 
     const screen = r.checkpoint.screen
-    const out = { ok: true, ctrl, upgradeState, squad, config: { ...r.config, mode: r.mode, dateKey: r.dailyContext?.dateKey || null }, catalogVersion, dbVersion: r.dbVersion || getCatalogue(catalogVersion)?.dbVersion || null, teamName: r.teamName, runSeed: r.runSeed, rerollsUsed: r.rerollsUsed, screen, pending: null, currentMatch: null, matchNo: target, selectedApproach: r.checkpoint.selectedApproach || 'balanced', result: null }
+    const out = { ok: true, ctrl, upgradeState, squad, config: { ...r.config, clubIdentity: r.config.clubIdentity || null, mode: r.mode, dateKey: r.dailyContext?.dateKey || null }, catalogVersion, dbVersion: r.dbVersion || getCatalogue(catalogVersion)?.dbVersion || null, teamName: r.teamName, runSeed: r.runSeed, rerollsUsed: r.rerollsUsed, screen, pending: null, currentMatch: null, matchNo: target, selectedApproach: r.checkpoint.selectedApproach || 'balanced', result: null }
 
     if (screen === 'hub') {
       out.pending = ctrl.prepareNext() // same rng position → same opponent

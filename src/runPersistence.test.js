@@ -139,6 +139,43 @@ describe('A. snapshot round trip', () => {
   })
 })
 
+describe('A5. Club Identity persistence', () => {
+  it('persists and reconstructs all four identities without changing schema version', () => {
+    for (const clubIdentity of ['control', 'press', 'transition', 'fortress']) {
+      const run = baseline.runs[0]
+      const drv = drive(run, { stopAfter: 2 })
+      const snap = createRunSnapshot({
+        config: { ...cfgOf(run), clubIdentity }, runSeed: run.seed, teamName: 'Identity XI', squad: drv.squad, rerollsUsed: 1,
+        matches: drv.ctrl.matches, upgradeState: drv.state,
+        checkpoint: { screen: 'hub', resolvedMatchCount: drv.ctrl.resolvedCount, selectedApproach: 'balanced', stageLabel: 'League Phase' },
+      })
+      expect(snap.schemaVersion).toBe(1)
+      expect(snap.run.config.clubIdentity).toBe(clubIdentity)
+      expect(snapshotSummary(snap).clubIdentity).toBe(clubIdentity.toUpperCase())
+      const rec = reconstructRun(snap)
+      expect(rec.ok).toBe(true)
+      expect(rec.config.clubIdentity).toBe(clubIdentity)
+      expect(sigList(rec.ctrl)).toEqual(sigList(drv.ctrl))
+    }
+  })
+
+  it('restores pre-A5 snapshots with identity safely unset', () => {
+    const snap = snapFor(baseline.runs[0], drive(baseline.runs[0], { stopAfter: 2 }), 'hub')
+    delete snap.run.config.clubIdentity
+    expect(validateRunSnapshot(snap)).toBe(true)
+    expect(snapshotSummary(snap).clubIdentity).toBeNull()
+    const rec = reconstructRun(snap)
+    expect(rec.ok).toBe(true)
+    expect(rec.config.clubIdentity).toBeNull()
+  })
+
+  it('rejects unknown identity metadata', () => {
+    const snap = snapFor(baseline.runs[0], drive(baseline.runs[0], { stopAfter: 2 }), 'hub')
+    snap.run.config.clubIdentity = 'total-football-plus'
+    expect(validateRunSnapshot(snap)).toBe(false)
+  })
+})
+
 // ---------------------------------------------------------------------------
 describe('B. corruption handling — all fail safely', () => {
   const good = () => snapFor(baseline.runs[0], drive(baseline.runs[0], { stopAfter: 3 }), 'hub')

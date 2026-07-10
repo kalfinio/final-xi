@@ -11,7 +11,8 @@
     "db:validate": "node scripts/validate-player-db.mjs",
     "db:audit": "node scripts/audit-player-db.mjs",
     "db:audit:transfers": "node scripts/audit-transfer-intel.mjs",
-    "db:sim": "node scripts/sim-catalogues.mjs"
+    "db:sim": "node scripts/sim-catalogues.mjs",
+    "draft:fit-audit": "node scripts/audit-draft-clarity.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

@@ -59,6 +59,21 @@ import {
   snapshotSummary, reconstructRun,
 } from './runPersistence'
 import { catalogueSlotOptions, activationCatalogVersion, getCatalogue } from './data/v2/catalogues'
+import {
+  CLUB_IDENTITIES,
+  acknowledgeDraftGuidance,
+  analyzeSquadNeed,
+  buildPickFeedback,
+  calculateIdentityFit,
+  clubIdentity,
+  hasSeenDraftGuidance,
+  playerArchetype,
+  playerKeyStrengths,
+  playerQualityTier,
+  playerRoleSuitability,
+  playerSignatures,
+  playerTradeoff,
+} from './draftClarity'
 
 const TOTAL_REROLLS = 3
 
@@ -152,13 +167,13 @@ function HowToPlay() {
       <HowToStep n={1} title="Choose your run">Random Run gives a fresh draft each time. Daily Challenge gives everyone the same draft for the day.</HowToStep>
       <HowToStep n={2} title="Choose difficulty">Casual is easier, Classic is balanced, Legendary is harder.</HowToStep>
       <HowToStep n={3} title="Choose your player pool">Legends Only is classic icons. Modern Mix adds modern stars.</HowToStep>
-      <HowToStep n={4} title="Pick a formation">The formation decides which positions you need to fill.</HowToStep>
-      <HowToStep n={5} title="Draft your XI">For each position, pick 1 of 3 players. You have 3 rerolls — each refreshes only the current position.</HowToStep>
-      <HowToStep n={6} title="Set Your XI">Rearrange players into their real eligible positions (e.g. Messi can move between RW and CAM). Illegal moves are blocked.</HowToStep>
-      <HowToStep n={7} title="Build your rating">Base points + traits + chemistry + role synergies − weaknesses. A higher Final Rating improves your European Run odds.</HowToStep>
-      <HowToStep n={8} title="Simulate the European Run">Play the League Phase. Finish top 8 for a direct Round of 16; 9th–24th means a Knockout Play-Off; 25th–36th is eliminated. Survive the knockouts to Conquer Europe.</HowToStep>
-      <HowToStep n={9} title="Share your result">Copy your result, download your share card, then try to beat your best run.</HowToStep>
-      <div className="pt-1 border-t border-border text-xs text-gold/80">Scoring in one sentence: Final Rating = player value + traits + chemistry + role synergies − weaknesses.</div>
+      <HowToStep n={4} title="Choose a Club Identity">Decide what kind of team you want to build. Identity guides recruitment; it does not lock your match plan.</HowToStep>
+      <HowToStep n={5} title="Pick a formation">The formation decides which positions you need to fill.</HowToStep>
+      <HowToStep n={6} title="Draft your XI">Compare Player Quality, Identity Fit, and Squad Need. The biggest name is not always the best pick.</HowToStep>
+      <HowToStep n={7} title="Set Your XI">Rearrange players into their real eligible positions. Illegal moves are blocked.</HowToStep>
+      <HowToStep n={8} title="Build your squad rating">Player value + traits + chemistry + role synergies − weaknesses. A higher Final Rating improves your European Run odds.</HowToStep>
+      <HowToStep n={9} title="Play the European Run">Finish in the top 24 to reach the knockouts, then survive each tie to Conquer Europe.</HowToStep>
+      <div className="pt-1 border-t border-border text-xs text-gold/80">A strong XI combines individual quality, tactical fit, and squad balance.</div>
     </div>
   )
 }
@@ -196,8 +211,8 @@ function HowToPlayModal({ onClose }) {
         <h2 className="text-xl font-black text-gold mb-1">Welcome to Final XI</h2>
         <p className="text-xs text-secondary mb-4">The whole game in four steps.</p>
         <div className="space-y-3 mb-5">
-          <HowToStep n={1} title="Draft your XI">For each position, pick 1 of 3 players. You get 3 rerolls to refresh the current choice.</HowToStep>
-          <HowToStep n={2} title="Build chemistry">Roles, eras, GOAT aura and tactical balance combine into your Final Rating.</HowToStep>
+          <HowToStep n={1} title="Choose your style">Pick a Club Identity, then a formation for the team you want to build.</HowToStep>
+          <HowToStep n={2} title="Draft with a reason">Compare Player Quality, Identity Fit, and Squad Need. Star power alone is not enough.</HowToStep>
           <HowToStep n={3} title="Name & plan">Name your team, then open Tactical Breakdown to see your in / out-of-possession shape.</HowToStep>
           <HowToStep n={4} title="Play the European Run">Go match by match — Watch Match, Quick Sim, or Sim All to the final result.</HowToStep>
         </div>
@@ -220,6 +235,7 @@ function ResumeCard({ summary, onResume }) {
           <div className="font-black text-lg text-primary truncate">{summary.teamName}</div>
           <div className="text-xs text-secondary">
             {summary.mode === 'daily' ? `Daily ${summary.dateKey || ''} · ` : ''}{summary.stageLabel}
+            {summary.clubIdentity && <><span className="mx-1.5">·</span>{summary.clubIdentity}</>}
             <span className="mx-1.5">·</span>{w}W-{d}D-{l}L
             {summary.upgradeCount > 0 && <><span className="mx-1.5">·</span>{summary.upgradeCount} Run Upgrade{summary.upgradeCount > 1 ? 's' : ''}</>}
           </div>
@@ -253,6 +269,7 @@ function IntroScreen({ onStart, stats, savedRun, onResume, resumeError }) {
   const [mode, setMode] = useState('random')
   const [difficulty, setDifficulty] = useState(firstTime ? 'casual' : 'classic')
   const [pool, setPool] = useState('modern')
+  const [identity, setIdentity] = useState(null)
   const [howOpen, setHowOpen] = useState(false)
   const [roleOpen, setRoleOpen] = useState(false)
   const [confirmNew, setConfirmNew] = useState(false)
@@ -262,7 +279,7 @@ function IntroScreen({ onStart, stats, savedRun, onResume, resumeError }) {
   // (normal Modern Mix → curated V2; Daily/Legends → frozen legacy) and stays
   // constant for the whole run, so offers, rerolls and restore use one catalogue.
   function requestStart() {
-    const cfg = { formation, mode, difficulty, pool, catalogVersion: activationCatalogVersion({ mode, pool }) }
+    const cfg = { formation, mode, difficulty, pool, clubIdentity: identity, catalogVersion: activationCatalogVersion({ mode, pool }) }
     if (summary) setConfirmNew(cfg)
     else onStart(cfg)
   }
@@ -328,6 +345,39 @@ function IntroScreen({ onStart, stats, savedRun, onResume, resumeError }) {
         </div>
         {firstTime && <p className="fx-in fx-d3 text-[11px] text-secondary -mt-3 mb-5">New? Casual is recommended for your first run.</p>}
 
+        <h2 className="fx-in fx-d4 text-xs uppercase tracking-widest text-secondary mb-2">Club Identity</h2>
+        <p className="fx-in fx-d4 text-xs text-secondary mb-3">What kind of team are you trying to build? This guides recruitment, not your match-by-match plan.</p>
+        <div className="fx-in fx-d4 grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+          {CLUB_IDENTITIES.map((option) => {
+            const active = identity === option.key
+            return (
+              <button key={option.key} onClick={() => setIdentity(option.key)} className={`fx-lift p-4 rounded-lg border text-left ${active ? 'border-gold bg-card ring-1 ring-gold/40' : 'border-border bg-surface'}`}>
+                <div className={`font-black text-lg ${active ? 'text-gold' : 'text-primary'}`}>{option.name}</div>
+                <div className="text-sm font-semibold text-primary">{option.slogan}</div>
+                <div className="text-xs text-secondary mt-1 leading-snug">{option.description}</div>
+              </button>
+            )
+          })}
+        </div>
+        {identity && (() => {
+          const selected = clubIdentity(identity)
+          return (
+            <div className="fx-in mb-6 p-4 rounded-lg border border-border bg-card text-xs">
+              <div className="grid sm:grid-cols-[1fr_auto] gap-3">
+                <div>
+                  <div className="text-[10px] uppercase tracking-widest text-gold/80 mb-1">Values</div>
+                  <div className="text-secondary">{selected.values.join(' · ')}</div>
+                </div>
+                <div className="sm:max-w-[15rem]">
+                  <div className="text-[10px] uppercase tracking-widest text-gold/80 mb-1">Tradeoff</div>
+                  <div className="text-secondary">{selected.tradeoff}</div>
+                </div>
+              </div>
+              <div className="mt-3 pt-3 border-t border-border text-secondary">Style reference: {selected.inspiredBy}</div>
+            </div>
+          )
+        })()}
+
         <div className="fx-in fx-d4 mb-6">
           <button onClick={() => setHowOpen((o) => !o)} className="w-full flex items-center justify-between p-3 rounded-lg border border-border bg-surface text-left">
             <span className="text-sm font-semibold">Detailed Guide</span>
@@ -358,7 +408,7 @@ function IntroScreen({ onStart, stats, savedRun, onResume, resumeError }) {
         </div>
 
         <div className="fx-in fx-d5 text-center mb-10">
-          <Button onClick={requestStart} disabled={!formation} className="fx-lift w-full sm:w-auto">
+          <Button onClick={requestStart} disabled={!formation || !identity} className="fx-lift w-full sm:w-auto">
             {summary ? 'Start New Run' : `Start ${mode === 'daily' ? 'Daily Challenge' : 'Draft'}`}
           </Button>
         </div>
@@ -400,53 +450,114 @@ function FormationMini({ slots }) {
 }
 
 // ---------------------------------------------------------------------------
-// Player card with "Why these points?"
+// Draft card: plain-language decision layer first, expert detail on demand.
 // ---------------------------------------------------------------------------
-function WhyPoints({ player, slot }) {
+function PlayerDetails({ player, slot, fit, tradeoff }) {
   const b = playerBreakdown(player)
+  const suitability = playerRoleSuitability(player)
+  const signatures = playerSignatures(player)
+  const suitabilityLabel = (level) => level >= 3 ? 'Natural' : level >= 2 ? 'Accomplished' : 'Alternative'
   return (
-    <div className="mt-2 p-2.5 rounded bg-bg border border-border text-[11px] space-y-1">
-      <div className="flex justify-between"><span className="text-secondary">Base: {b.basePos}</span><span className="text-primary">+{b.base}</span></div>
-      {b.traits.map((t, i) => (
-        <div key={i} className="flex justify-between"><span className="text-secondary">{t.label}</span><span className="text-primary">+{t.pts}</span></div>
-      ))}
-      {b.extras.map((x, i) => (
-        <div key={`x${i}`} className="flex justify-between"><span className="text-secondary">{x.label}</span><span className="text-gold">+{x.pts}</span></div>
-      ))}
-      <div className="flex justify-between text-secondary"><span>Role</span><span className="text-gold/80">{slotAwareRole(player, slot || player.primaryPos)}{b.secondaryRole ? ` · ${b.secondaryRole}` : ''}</span></div>
-      <div className="flex justify-between border-t border-border pt-1 font-bold"><span>Player value</span><span className="text-gold">{b.total}</span></div>
-      <div className="border-t border-border pt-1.5 mt-1 space-y-1">
-        <div className="text-secondary leading-snug"><span className="text-primary font-semibold">Why this role: </span>{roleReasonText(player)}</div>
+    <div className="mt-3 p-3 rounded bg-bg border border-border text-[11px] space-y-3">
+      <div>
+        <div className="text-[10px] uppercase tracking-widest text-gold/80 mb-1">Advanced role</div>
+        <div className="font-semibold text-primary">{slotAwareRole(player, slot || player.primaryPos)}{b.secondaryRole ? ` · ${b.secondaryRole}` : ''}</div>
+        <div className="text-secondary leading-snug mt-1">{roleReasonText(player)}</div>
+      </div>
+      <div>
+        <div className="text-[10px] uppercase tracking-widest text-gold/80 mb-1">Role suitability</div>
+        <div className="flex flex-wrap gap-1.5">
+          {Object.entries(suitability).sort((a, b) => b[1] - a[1]).map(([role, level]) => (
+            <span key={role} className="px-2 py-1 rounded border border-border bg-surface text-secondary"><span className="text-primary">{role}</span> · {suitabilityLabel(level)}</span>
+          ))}
+        </div>
+      </div>
+      {signatures.length > 0 && (
+        <div>
+          <div className="text-[10px] uppercase tracking-widest text-gold/80 mb-1">Signatures</div>
+          <div className="flex flex-wrap gap-1.5">
+            {signatures.map((signature) => <span key={signature} className="px-2 py-1 rounded border border-border bg-surface text-secondary">{signature}</span>)}
+          </div>
+        </div>
+      )}
+      <div>
+        <div className="text-[10px] uppercase tracking-widest text-gold/80 mb-1">{fit.identityName} fit: {fit.label}</div>
+        <div className="space-y-1 text-secondary">
+          {fit.why.map((reason) => <div key={reason}><span className="text-success">+</span> {reason}</div>)}
+          {tradeoff && <div><span className="text-gold">Tradeoff:</span> {tradeoff}</div>}
+        </div>
+      </div>
+      <div>
+        <div className="text-[10px] uppercase tracking-widest text-gold/80 mb-1">Final XI value breakdown</div>
+        <div className="text-secondary mb-2">Internal draft value used by the game. This is not a football rating.</div>
+        <div className="space-y-1">
+          <div className="flex justify-between"><span className="text-secondary">Base: {b.basePos}</span><span className="text-primary">+{b.base}</span></div>
+          {b.traits.map((trait, i) => <div key={i} className="flex justify-between"><span className="text-secondary">{trait.label}</span><span className="text-primary">+{trait.pts}</span></div>)}
+          {b.extras.map((extra, i) => <div key={`x${i}`} className="flex justify-between"><span className="text-secondary">{extra.label}</span><span className="text-gold">+{extra.pts}</span></div>)}
+          <div className="flex justify-between border-t border-border pt-1 font-bold"><span>Draft value</span><span className="text-gold">{b.total}</span></div>
+        </div>
+      </div>
+      <div className="border-t border-border pt-2">
+        <Badges player={player} className="mb-2" />
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {player.tags.map((tag) => <span key={tag} className="px-2 py-0.5 rounded bg-surface border border-border text-[10px] text-secondary">{TAG_LABELS[tag]}</span>)}
+        </div>
         <div className="text-secondary leading-snug"><span className="text-primary font-semibold">Evidence: </span>{roleEvidenceText(player)}</div>
+        <div className="text-secondary mt-1">Historical pick rate: {player.rarity}%</div>
       </div>
     </div>
   )
 }
 
-function PlayerCard({ player, onPick, slot }) {
+function fitStyle(label) {
+  if (label === 'EXCELLENT') return 'text-success border-success/40 bg-success/5'
+  if (label === 'GOOD') return 'text-gold border-gold/40 bg-gold/5'
+  if (label === 'WEAK') return 'text-danger border-danger/40 bg-danger/5'
+  return 'text-primary border-border bg-surface'
+}
+
+function PlayerCard({ player, onPick, slot, identityKey, squadNeed }) {
   const [open, setOpen] = useState(false)
+  const fit = calculateIdentityFit(player, identityKey)
+  const quality = playerQualityTier(player)
+  const strengths = playerKeyStrengths(player)
+  const tradeoff = playerTradeoff(player, { fit, squadNeed })
   return (
-    <div className="w-full p-4 rounded-lg bg-card border border-border text-left">
-      <button onClick={onPick} className="w-full text-left">
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <span className="font-bold text-lg leading-tight">{player.name}</span>
-          <PosBadge type={player.posType} label={player.primaryPos} />
+    <div className="w-full p-4 rounded-lg bg-card border border-border text-left flex flex-col">
+      <div className="flex items-start justify-between gap-3 mb-2">
+        <div className="min-w-0">
+          <div className="font-bold text-lg leading-tight break-words">{player.name}</div>
+          <div className="text-xs text-secondary mt-1">{player.country} · {player.club}</div>
         </div>
-        <div className="text-sm text-secondary">{player.country} · {player.club}</div>
-        <div className="text-xs text-gold/80 mb-2">{slotAwareRole(player, slot || player.primaryPos)}{player.secondaryRole ? <span className="text-secondary"> · {player.secondaryRole}</span> : ''}</div>
-        <Badges player={player} className="mb-2" />
-        <div className="flex flex-wrap gap-1.5 mb-2">
-          {player.tags.map((t) => (
-            <span key={t} className="px-2 py-0.5 rounded bg-surface border border-border text-[10px] text-secondary">{TAG_LABELS[t]}</span>
-          ))}
+        <div className="shrink-0 text-right max-w-[8rem]">
+          <div className="text-[9px] uppercase tracking-widest text-secondary">Player Quality</div>
+          <div className="text-sm leading-tight font-black text-gold">{quality.label}</div>
+          <div className="mt-1"><PosBadge type={player.posType} label={player.primaryPos} /></div>
         </div>
-        <div className="flex items-center justify-between">
-          <span className="text-gold font-bold text-sm">{playerPoints(player)} pts</span>
-          <span className="text-[10px] text-secondary">{player.rarity}% pick rate</span>
+      </div>
+
+      <div className="mb-3">
+        <div className="text-[9px] uppercase tracking-widest text-secondary">Archetype</div>
+        <div className="text-sm font-black text-primary">{playerArchetype(player)}</div>
+      </div>
+      <div className="space-y-1.5 text-sm mb-3 min-h-[3.25rem]">
+        {strengths.map((strength) => <div key={strength} className="text-secondary"><span className="text-success font-bold">+</span> {strength}</div>)}
+      </div>
+
+      <div className={`rounded border p-2.5 mb-2 text-xs ${fitStyle(fit.label)}`}>
+        <div className="flex justify-between gap-2 font-bold">
+          <span>{fit.identityName} FIT</span>
+          <span>{fit.label}</span>
         </div>
-      </button>
-      <button onClick={() => setOpen((o) => !o)} className="mt-2 text-[11px] text-secondary hover:text-gold">{open ? 'Hide breakdown' : 'Why these points?'}</button>
-      {open && <WhyPoints player={player} slot={slot} />}
+        {squadNeed && <div className="mt-2 pt-2 border-t border-current/20"><span className="font-bold">{squadNeed.label}</span><span className="block mt-0.5 opacity-80">{squadNeed.detail}</span></div>}
+      </div>
+      {tradeoff && <div className="text-[11px] text-secondary mb-3"><span className="text-gold font-semibold">Tradeoff:</span> {tradeoff}</div>}
+
+      <div className="mt-auto grid grid-cols-2 gap-2 pt-1">
+        <button onClick={() => setOpen((value) => !value)} aria-expanded={open} className="px-3 py-2 rounded-md text-[11px] font-semibold border border-border bg-surface text-secondary hover:text-gold hover:border-gold">{open ? 'HIDE DETAILS' : 'VIEW DETAILS'}</button>
+        <button onClick={onPick} className="px-3 py-2 rounded-md text-[11px] font-bold bg-gold text-black hover:bg-gold/90 fx-press">SELECT</button>
+      </div>
+      {open && <PlayerDetails player={player} slot={slot} fit={fit} tradeoff={tradeoff} />}
     </div>
   )
 }
@@ -471,14 +582,51 @@ function SquadPreview({ squad, activeIndex }) {
 // ---------------------------------------------------------------------------
 // Draft
 // ---------------------------------------------------------------------------
+function DraftGuidance({ identityKey, onClose }) {
+  const [exampleOpen, setExampleOpen] = useState(false)
+  const identity = clubIdentity(identityKey)
+  return (
+    <div className="mb-5 p-4 rounded-lg border border-gold/40 bg-gold/5">
+      <div className="text-[10px] uppercase tracking-widest text-gold/80 mb-1">A strong team is more than star power</div>
+      <div className="font-bold text-primary mb-1">The highest-rated player is not always the best pick.</div>
+      <p className="text-xs text-secondary leading-snug">Player Quality shows broad individual level. Look at Quality, {identity.name} Fit, and Squad Need together.</p>
+      {exampleOpen && (
+        <div className="mt-3 p-3 rounded bg-bg border border-border text-xs text-secondary leading-snug">
+          A creative star may have the stronger individual profile, while a midfielder who protects the defence can be the better choice when that profile is missing. Fit and Need explain that opportunity cost.
+        </div>
+      )}
+      <div className="flex flex-wrap gap-2 mt-3">
+        <button onClick={onClose} className="px-4 py-2 rounded-md bg-gold text-black text-xs font-bold fx-press">GOT IT</button>
+        <button onClick={() => setExampleOpen((value) => !value)} className="px-4 py-2 rounded-md border border-border bg-card text-primary text-xs font-semibold">{exampleOpen ? 'HIDE EXAMPLE' : 'SHOW ME AN EXAMPLE'}</button>
+      </div>
+    </div>
+  )
+}
+
+function PickFeedback({ feedback, onClose }) {
+  if (!feedback) return null
+  return (
+    <div role="status" className="mb-5 p-3 rounded-lg border border-border bg-surface relative">
+      <button onClick={onClose} aria-label="Dismiss selection feedback" className="absolute top-2 right-3 text-secondary hover:text-primary text-lg leading-none">×</button>
+      <div className="text-xs uppercase tracking-widest text-gold font-bold pr-6">{feedback.title}</div>
+      <div className="mt-1.5 grid sm:grid-cols-2 gap-1 text-xs text-secondary">
+        {feedback.positives.map((positive) => <div key={positive}><span className="text-success font-bold">+</span> {positive}</div>)}
+        {feedback.warning && <div><span className="text-gold font-bold">Tradeoff:</span> {feedback.warning}</div>}
+      </div>
+    </div>
+  )
+}
+
 function DraftScreen({ config, onComplete }) {
-  const { formation, mode, difficulty, pool, catalogVersion } = config
+  const { formation, mode, difficulty, pool, catalogVersion, clubIdentity: identityKey } = config
   const slots = FORMATIONS[formation].slots
   const [squad, setSquad] = useState(() => slots.map((slot) => ({ slot, player: null })))
   const [index, setIndex] = useState(0)
   const [choices, setChoices] = useState([])
   const [rerollsLeft, setRerollsLeft] = useState(TOTAL_REROLLS)
   const [slotRerolls, setSlotRerolls] = useState(0)
+  const [feedback, setFeedback] = useState(null)
+  const [showGuidance, setShowGuidance] = useState(() => !hasSeenDraftGuidance())
 
   useEffect(() => {
     if (index < slots.length) {
@@ -490,8 +638,10 @@ function DraftScreen({ config, onComplete }) {
 
   function pick(player) {
     const next = squad.map((s, i) => (i === index ? { ...s, player } : s))
+    const nextFeedback = buildPickFeedback({ player, identityKey, squad, pickIndex: index, formationSlots: slots })
     setSquad(next)
-    if (index + 1 >= slots.length) onComplete(next, TOTAL_REROLLS - rerollsLeft)
+    setFeedback(nextFeedback)
+    if (index + 1 >= slots.length) onComplete(next, TOTAL_REROLLS - rerollsLeft, nextFeedback)
     else { setIndex(index + 1); setSlotRerolls(0) }
   }
 
@@ -502,11 +652,16 @@ function DraftScreen({ config, onComplete }) {
   }
 
   const slot = slots[index]
+  function closeGuidance() {
+    acknowledgeDraftGuidance()
+    setShowGuidance(false)
+  }
   return (
     <div className="max-w-3xl mx-auto px-4 py-6 sm:py-8">
+      {showGuidance && <DraftGuidance identityKey={identityKey} onClose={closeGuidance} />}
       <div className="mb-6">
         <div className="flex justify-between items-center gap-2 text-xs text-secondary mb-1.5">
-          <span className="flex items-center gap-2 min-w-0 truncate"><ModeBadge mode={mode} /><span className="truncate">{formation} · {DIFFICULTIES[difficulty].name}</span></span>
+          <span className="flex items-center gap-2 min-w-0 truncate"><ModeBadge mode={mode} /><span className="truncate">{formation} · {clubIdentity(identityKey).name} · {DIFFICULTIES[difficulty].name}</span></span>
           <span className="shrink-0 font-semibold text-primary">{index} / 11</span>
         </div>
         <div className="h-1.5 rounded-full bg-surface overflow-hidden"><div className="h-full bg-gold transition-all" style={{ width: `${(index / 11) * 100}%` }} /></div>
@@ -515,10 +670,16 @@ function DraftScreen({ config, onComplete }) {
       <div className="text-center mb-6">
         <p className="text-secondary text-xs sm:text-sm uppercase tracking-widest">Pick your</p>
         <h2 className="text-2xl sm:text-3xl font-black text-gold">{SLOT_NAMES[slot]}</h2>
+        <p className="text-[11px] text-secondary mt-2">Compare broad quality with tactical fit and what your squad still needs.</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
-        {choices.map((pl) => <PlayerCard key={pl.id} player={pl} onPick={() => pick(pl)} slot={slot} />)}
+      <PickFeedback feedback={feedback} onClose={() => setFeedback(null)} />
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4 items-start">
+        {choices.map((player) => {
+          const squadNeed = analyzeSquadNeed({ squad, candidate: player, pickIndex: index, formationSlots: slots })
+          return <PlayerCard key={player.id} player={player} onPick={() => pick(player)} slot={slot} identityKey={identityKey} squadNeed={squadNeed} />
+        })}
       </div>
 
       <div className="flex items-center justify-center gap-3 mb-8">
@@ -537,10 +698,19 @@ function DraftScreen({ config, onComplete }) {
 // ---------------------------------------------------------------------------
 // Set Your XI
 // ---------------------------------------------------------------------------
-function SetXIScreen({ config, draftedSquad, onConfirm, onReset }) {
+function SetXIScreen({ config, draftedSquad, onConfirm, onReset, lastPickFeedback, onDismissFeedback }) {
   const [squad, setSquad] = useState(draftedSquad)
   const [selected, setSelected] = useState(null) // index of tapped player
   const [message, setMessage] = useState(null)
+  const [showFinalFeedback, setShowFinalFeedback] = useState(true)
+  const finalSelection = draftedSquad[draftedSquad.length - 1]
+  const finalFeedback = lastPickFeedback || buildPickFeedback({
+    player: finalSelection.player,
+    identityKey: config.clubIdentity,
+    squad: draftedSquad.slice(0, -1),
+    pickIndex: draftedSquad.length - 1,
+    formationSlots: FORMATIONS[config.formation].slots,
+  })
 
   function tapSlot(i) {
     const squadNames = new Set(squad.map(s => s.player?.name).filter(Boolean))
@@ -599,6 +769,8 @@ function SetXIScreen({ config, draftedSquad, onConfirm, onReset }) {
       <h2 className="text-2xl sm:text-3xl font-black text-gold text-center mb-1">Set Your XI</h2>
       <p className="text-center text-secondary text-sm mb-4">Tap a player, then tap a highlighted slot to swap. Moves are limited to each player's positions.</p>
 
+      <PickFeedback feedback={showFinalFeedback ? finalFeedback : null} onClose={() => { setShowFinalFeedback(false); onDismissFeedback?.() }} />
+
       {selPlayer && (
         <div className="mb-3 p-2.5 rounded-lg bg-card border border-gold/40 text-sm text-center">
           <span className="font-semibold text-gold">{squadDisplayName(selPlayer.name, squadNames)}</span>
@@ -655,7 +827,7 @@ function StatBox({ label, value, accent }) {
 
 function BonusesScreen({ squad, config, rerollsUsed, onSimulate, initialTeamName }) {
   const { base, bonusTotal, total, bonuses, weaknesses } = computeRating(squad)
-  const identity = tacticalIdentity(squad)
+  const squadProfile = tacticalIdentity(squad)
   const [howOpen, setHowOpen] = useState(false)
   const [tacticsOpen, setTacticsOpen] = useState(false)
   const [teamName, setTeamName] = useState(initialTeamName || DEFAULT_TEAM_NAME)
@@ -665,7 +837,7 @@ function BonusesScreen({ squad, config, rerollsUsed, onSimulate, initialTeamName
     <div className="max-w-2xl mx-auto px-4 py-6 sm:py-8">
       <div className="flex items-center justify-center gap-2 mb-1 flex-wrap"><ModeBadge mode={config.mode} /><span className="text-xs text-secondary">{config.formation} · {DIFFICULTIES[config.difficulty].name}</span></div>
       <h2 className="text-2xl sm:text-3xl font-black text-gold text-center mb-1">Squad Rating</h2>
-      <p className="text-center text-secondary text-sm mb-6">Identity: <span className="text-primary font-semibold">{identity}</span><span className="mx-2">·</span>Rerolls used: <span className="text-primary font-semibold">{rerollsUsed}</span></p>
+      <p className="text-center text-secondary text-sm mb-6">Club Identity: <span className="text-primary font-semibold">{clubIdentity(config.clubIdentity)?.name || 'UNSET'}</span><span className="mx-2">·</span>Squad profile: <span className="text-primary font-semibold">{squadProfile}</span><span className="mx-2">·</span>Rerolls: <span className="text-primary font-semibold">{rerollsUsed}</span></p>
 
       <div className="flex gap-2 sm:gap-3 mb-4">
         <StatBox label="Player Value" value={base} />
@@ -1004,6 +1176,7 @@ export default function App() {
   const [draftedSquad, setDraftedSquad] = useState(null)
   const [squad, setSquad] = useState(null)
   const [rerollsUsed, setRerollsUsed] = useState(0)
+  const [lastPickFeedback, setLastPickFeedback] = useState(null)
   const [stats, setStats] = useState(() => loadStats())
   const [teamName, setTeamName] = useState(() => loadTeamName())
   // Phase 4 staged run: matchNo counts hubs shown (also keys the hub so the
@@ -1038,7 +1211,7 @@ export default function App() {
         catalogVersion: config.catalogVersion,
         dbVersion: getCatalogue(config.catalogVersion)?.dbVersion,
         runSeed: runSeedRef.current,
-        teamName, squad, rerollsUsed,
+        teamName: extra.teamName ?? teamName, squad, rerollsUsed,
         matches: ctrl.matches,
         upgradeState: upgradeStateRef.current,
         checkpoint: {
@@ -1054,9 +1227,10 @@ export default function App() {
 
   function startDraft(cfg) { setConfig(cfg); setScreen('draft') }
 
-  function finishDraft(finalSquad, usedRerolls) {
+  function finishDraft(finalSquad, usedRerolls, feedback) {
     setDraftedSquad(finalSquad)
     setRerollsUsed(usedRerolls)
+    setLastPickFeedback(feedback)
     setScreen('setxi')
   }
 
@@ -1104,7 +1278,9 @@ export default function App() {
     currentMatchRef.current = null
     pendingRef.current = runRef.current.prepareNext()
     setMatchNo(1)
-    persistRun('hub', { stageLabel: pendingRef.current?.stageLabel })
+    // React has not committed setTeamName(clean) yet, so pass the sanitized
+    // value directly into this first checkpoint.
+    persistRun('hub', { stageLabel: pendingRef.current?.stageLabel, teamName: clean })
     setScreen('hub')
   }
 
@@ -1220,7 +1396,7 @@ export default function App() {
     currentMatchRef.current = rec.currentMatch
     resultRef.current = rec.result
     recordedRef.current = (rec.screen === 'result' || rec.screen === 'sim') // already recorded when first finished
-    setConfig({ formation: rec.config.formation, mode: rec.config.mode, difficulty: rec.config.difficulty, pool: rec.config.pool, catalogVersion: rec.catalogVersion })
+    setConfig({ formation: rec.config.formation, mode: rec.config.mode, difficulty: rec.config.difficulty, pool: rec.config.pool, clubIdentity: rec.config.clubIdentity || null, catalogVersion: rec.catalogVersion })
     setSquad(rec.squad)
     setTeamName(rec.teamName)
     setRerollsUsed(rec.rerollsUsed)
@@ -1231,7 +1407,7 @@ export default function App() {
 
   function reset() {
     clearRunSnapshot(); setSavedRun(null); setResumeError(false)
-    setConfig(null); setDraftedSquad(null); setSquad(null); setRerollsUsed(0)
+    setConfig(null); setDraftedSquad(null); setSquad(null); setRerollsUsed(0); setLastPickFeedback(null)
     resultRef.current = null; tacticsRef.current = null; recordedRef.current = false
     runRef.current = null; pendingRef.current = null; currentMatchRef.current = null
     upgradeStateRef.current = { owned: [], offers: [] }; runSeedRef.current = 0
@@ -1244,7 +1420,7 @@ export default function App() {
     <div className="min-h-full">
       {screen === 'intro' && <IntroScreen onStart={startDraft} stats={stats} savedRun={savedRun} onResume={resumeRun} resumeError={resumeError} />}
       {screen === 'draft' && <DraftScreen config={config} onComplete={finishDraft} />}
-      {screen === 'setxi' && <SetXIScreen config={config} draftedSquad={draftedSquad} onConfirm={confirmXI} />}
+      {screen === 'setxi' && <SetXIScreen config={config} draftedSquad={draftedSquad} onConfirm={confirmXI} lastPickFeedback={lastPickFeedback} onDismissFeedback={() => setLastPickFeedback(null)} />}
       {screen === 'bonuses' && <BonusesScreen squad={squad} config={config} rerollsUsed={rerollsUsed} onSimulate={runSimulation} initialTeamName={teamName} />}
       {screen === 'hub' && pendingRef.current && runRef.current && (
         <MatchHub
