@@ -20,13 +20,30 @@
 // aborts the restore safely.
 // ---------------------------------------------------------------------------
 
-import { FORMATIONS, DIFFICULTIES, computeRating, makeRng, createRunSimulation } from './data'
+import { FORMATIONS, DIFFICULTIES, computeRating, hashString, makeRng, createRunSimulation } from './data'
 import { APPROACH_KEYS } from './tacticalApproach'
 import { buildUpgradeContext, shouldOfferUpgrade, generateUpgradeOffer, UPGRADES_BY_ID, MAX_UPGRADES_PER_RUN } from './runUpgrades'
 import { DEFAULT_CATALOG_VERSION, getCatalogue, resolvePlayer } from './data/v2/catalogues'
+import {
+  ACTIVE_ENGINE_VERSION,
+  ENGINE_VERSIONS,
+  LEGACY_ENGINE_VERSION,
+  LEGACY_PHASE61_ENGINE_ALIAS,
+  M1_ENGINE_VERSION,
+  assertRunnableEngineVersion,
+  isRunnableEngineVersion,
+} from './matchEngineVersions'
 
 export const SCHEMA_VERSION = 1
-export const ENGINE_VERSION = 'phase6.1'
+// Backward-compatible export for existing consumers. New code should prefer
+// ACTIVE_ENGINE_VERSION / the explicit registry exports below.
+export const ENGINE_VERSION = ACTIVE_ENGINE_VERSION
+export {
+  ACTIVE_ENGINE_VERSION,
+  ENGINE_VERSIONS,
+  LEGACY_ENGINE_VERSION,
+  M1_ENGINE_VERSION,
+}
 export const STORAGE_KEY = 'finalxi.activeRun.v1'
 
 const VALID_POOLS = new Set(['modern', 'legends'])
@@ -41,14 +58,46 @@ export function matchSignature(m, i) {
   return `${i}|${stage}|${m.opponent}|${m.gf}-${m.ga}|${m.result}`
 }
 
+// Strong optional signature for snapshots written from M0 onward. Unlike the
+// historical headline signature, this covers goal timing/participants, legacy
+// stats, tactical metadata, and canonical MatchDetail. Old snapshots omit it
+// and remain valid; once present, reconstruction must reproduce it exactly.
+export function canonicalMatchSignature(m, i) {
+  const canonical = {
+    index: i,
+    type: m.type,
+    matchNo: m.matchNo ?? null,
+    round: m.round ?? null,
+    opponent: m.opponent,
+    opponentId: m.opponentMeta?.id || null,
+    approach: m.approach || 'balanced',
+    home: m.home ?? null,
+    score: m.score,
+    normalScore: m.normalScore ?? null,
+    result: m.result,
+    points: m.points ?? null,
+    gf: m.gf,
+    ga: m.ga,
+    pens: m.pens ?? null,
+    eliminated: m.eliminated ?? null,
+    events: m.events || [],
+    stats: m.stats || null,
+    matchup: m.matchup || null,
+    detail: m.detail || null,
+    activeUpgrades: m.activeUpgrades || null,
+  }
+  return hashString(JSON.stringify(canonical)).toString(16).padStart(8, '0')
+}
+
 // ---------------------------------------------------------------------------
 // Snapshot construction (pure). `state` is gathered by App at a checkpoint.
 // ---------------------------------------------------------------------------
 export function createRunSnapshot(state) {
   const { config, runSeed, teamName, squad, rerollsUsed, matches, upgradeState, checkpoint } = state
+  const engineVersion = assertRunnableEngineVersion(state.engineVersion ?? ACTIVE_ENGINE_VERSION)
   return {
     schemaVersion: SCHEMA_VERSION,
-    engineVersion: ENGINE_VERSION,
+    engineVersion,
     savedAt: Date.now(),
     run: {
       mode: config.mode,
@@ -80,7 +129,10 @@ export function createRunSnapshot(state) {
         selectedApproach: checkpoint.selectedApproach || 'balanced',
         stageLabel: checkpoint.stageLabel || null,
       },
-      signatures: { resolvedMatches: matches.map((m, i) => matchSignature(m, i)) },
+      signatures: {
+        resolvedMatches: matches.map((m, i) => matchSignature(m, i)),
+        canonicalMatches: matches.map((m, i) => canonicalMatchSignature(m, i)),
+      },
     },
   }
 }
@@ -106,7 +158,10 @@ export function parseRunSnapshot(raw) {
 export function validateRunSnapshot(snap) {
   if (!snap || typeof snap !== 'object') return false
   if (snap.schemaVersion !== SCHEMA_VERSION) return false
-  if (snap.engineVersion !== ENGINE_VERSION) return false
+  const engineVersion = snapshotEngineVersion(snap)
+  // Known-but-unimplemented versions (currently m1) cannot be reconstructed
+  // safely. Unknown future values are rejected rather than silently downgraded.
+  if (!engineVersion || !isRunnableEngineVersion(engineVersion)) return false
   const r = snap.run
   if (!r || typeof r !== 'object') return false
   const catalogVersion = snapshotCatalogVersion(snap)
@@ -153,6 +208,11 @@ export function validateRunSnapshot(snap) {
   if (!(cp.resolvedMatchCount >= 0 && cp.resolvedMatchCount <= 15)) return false
   if (!r.signatures || !Array.isArray(r.signatures.resolvedMatches)) return false
   if (r.signatures.resolvedMatches.length !== cp.resolvedMatchCount) return false
+  if (r.signatures.canonicalMatches != null) {
+    if (!Array.isArray(r.signatures.canonicalMatches)) return false
+    if (r.signatures.canonicalMatches.length !== cp.resolvedMatchCount) return false
+    if (r.signatures.canonicalMatches.some((signature) => typeof signature !== 'string' || !/^[0-9a-f]{8}$/.test(signature))) return false
+  }
   if (r.approachHistory.length !== cp.resolvedMatchCount) return false
   if (cp.selectedApproach && !APPROACH_KEYS.includes(cp.selectedApproach)) return false
   // Catalogue/db version are optional (absent → legacy_v1); if present they
@@ -167,6 +227,20 @@ export function validateRunSnapshot(snap) {
 // saves) is interpreted as the frozen legacy catalogue.
 export function snapshotCatalogVersion(snap) {
   return snap?.run?.catalogVersion || DEFAULT_CATALOG_VERSION
+}
+
+// Canonical run-engine interpretation for persistence only:
+//   missing field / historical phase6.1 marker -> legacy_v1
+//   canonical registered value                   -> itself
+//   malformed or unknown value                   -> null (reject safely)
+export function snapshotEngineVersion(snap) {
+  if (!snap || typeof snap !== 'object') return null
+  if (!Object.prototype.hasOwnProperty.call(snap, 'engineVersion')) return LEGACY_ENGINE_VERSION
+  if (snap.engineVersion === LEGACY_PHASE61_ENGINE_ALIAS) return LEGACY_ENGINE_VERSION
+  if (typeof snap.engineVersion === 'string' && Object.hasOwn(ENGINE_VERSIONS, snap.engineVersion)) {
+    return snap.engineVersion
+  }
+  return null
 }
 
 // ---------------------------------------------------------------------------
@@ -213,6 +287,7 @@ export function snapshotSummary(snap) {
     upgradeCount: r.upgradeState.owned.length,
     resolvedMatchCount: r.checkpoint.resolvedMatchCount,
     clubIdentity: r.config.clubIdentity ? r.config.clubIdentity.toUpperCase() : null,
+    engineVersion: snapshotEngineVersion(snap),
   }
 }
 
@@ -225,6 +300,7 @@ export function reconstructRun(snap) {
   if (!validateRunSnapshot(snap)) return { ok: false, reason: 'invalid' }
   const r = snap.run
   try {
+    const engineVersion = snapshotEngineVersion(snap)
     const catalogVersion = snapshotCatalogVersion(snap)
     const squad = r.squadSelections.map((s) => ({ slot: s.slot, player: resolvePlayer(s.playerId, catalogVersion) }))
     if (squad.some((s) => !s.player)) return { ok: false, reason: 'unknown-player' }
@@ -233,6 +309,7 @@ export function reconstructRun(snap) {
     const ctrl = createRunSimulation({
       rating: total, difficulty: r.config.difficulty, squad,
       rng: makeRng(r.runSeed), runSeed: r.runSeed,
+      engineVersion,
       upgradeContextFor: (mc, profile) => buildUpgradeContext(upgradeState.owned, mc, profile),
     })
 
@@ -247,6 +324,12 @@ export function reconstructRun(snap) {
       // signature check — abort on any divergence from the stored run
       if (matchSignature(match, i) !== r.signatures.resolvedMatches[i]) {
         return { ok: false, reason: 'signature-mismatch' }
+      }
+      if (
+        r.signatures.canonicalMatches &&
+        canonicalMatchSignature(match, i) !== r.signatures.canonicalMatches[i]
+      ) {
+        return { ok: false, reason: 'canonical-signature-mismatch' }
       }
       // Apply the upgrade offer that triggers after this match, exactly as App
       // does (offer created after post-match, applied before the next match).
@@ -265,7 +348,7 @@ export function reconstructRun(snap) {
     }
 
     const screen = r.checkpoint.screen
-    const out = { ok: true, ctrl, upgradeState, squad, config: { ...r.config, clubIdentity: r.config.clubIdentity || null, mode: r.mode, dateKey: r.dailyContext?.dateKey || null }, catalogVersion, dbVersion: r.dbVersion || getCatalogue(catalogVersion)?.dbVersion || null, teamName: r.teamName, runSeed: r.runSeed, rerollsUsed: r.rerollsUsed, screen, pending: null, currentMatch: null, matchNo: target, selectedApproach: r.checkpoint.selectedApproach || 'balanced', result: null }
+    const out = { ok: true, ctrl, engineVersion, upgradeState, squad, config: { ...r.config, clubIdentity: r.config.clubIdentity || null, mode: r.mode, dateKey: r.dailyContext?.dateKey || null }, catalogVersion, dbVersion: r.dbVersion || getCatalogue(catalogVersion)?.dbVersion || null, teamName: r.teamName, runSeed: r.runSeed, rerollsUsed: r.rerollsUsed, screen, pending: null, currentMatch: null, matchNo: target, selectedApproach: r.checkpoint.selectedApproach || 'balanced', result: null }
 
     if (screen === 'hub') {
       out.pending = ctrl.prepareNext() // same rng position → same opponent

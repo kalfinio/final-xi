@@ -1,0 +1,198 @@
+{
+  "fixtureVersion": 1,
+  "capturedFrom": "pre-M0.1 legacy resolver at e63b82c",
+  "engineVersion": "legacy_v1",
+  "exactMatches": [
+    {
+      "fixtureRunIndex": 0,
+      "matchIndex": 0,
+      "expected": {
+        "opponent": "Athens Greens",
+        "opponentId": "athens-greens",
+        "result": "win",
+        "score": "3-1",
+        "gf": 3,
+        "ga": 1,
+        "pens": null,
+        "goals": [
+          { "minute": 7, "side": "us", "scorer": "Ronaldinho", "scorerId": "ronaldinho", "assist": null, "assisterId": null, "label": null, "assistLabel": null },
+          { "minute": 32, "side": "us", "scorer": "Cristiano Ronaldo", "scorerId": "ronaldo", "assist": "Andrea Pirlo", "assisterId": "pirlo", "label": null, "assistLabel": null },
+          { "minute": 69, "side": "us", "scorer": "Arjen Robben", "scorerId": "robben", "assist": "Ronaldinho", "assisterId": "ronaldinho", "label": null, "assistLabel": null },
+          { "minute": 90, "side": "opp", "scorer": "Set-piece header", "scorerId": null, "assist": null, "assisterId": null, "label": null, "assistLabel": null }
+        ],
+        "stats": { "possession": 73, "shots": 23, "shotsOnTarget": 11, "xg": "4.5", "saves": 1, "fouls": 9, "potm": "Ronaldinho" },
+        "tacticalMetadataSignature": "4efd1167",
+        "matchDetailSignature": "0893b046",
+        "timelineSignature": "e3c6275a",
+        "canonicalReplaySignature": "47d70c17"
+      }
+    },
+    {
+      "fixtureRunIndex": 0,
+      "matchIndex": 11,
+      "expected": {
+        "opponent": "Milano Reds",
+        "opponentId": "milano-reds",
+        "result": "win",
+        "score": "3-2",
+        "gf": 3,
+        "ga": 2,
+        "pens": null,
+        "goals": [
+          { "minute": 21, "side": "opp", "scorer": "Opponent Striker", "scorerId": null, "assist": null, "assisterId": null, "label": null, "assistLabel": null },
+          { "minute": 24, "side": "us", "scorer": "Ronaldinho", "scorerId": "ronaldinho", "assist": "Cafu", "assisterId": "cafu", "label": null, "assistLabel": null },
+          { "minute": 31, "side": "opp", "scorer": "Opponent Striker", "scorerId": null, "assist": null, "assisterId": null, "label": null, "assistLabel": null },
+          { "minute": 62, "side": "us", "scorer": "Ronaldinho", "scorerId": "ronaldinho", "assist": "Arjen Robben", "assisterId": "robben", "label": null, "assistLabel": null },
+          { "minute": 71, "side": "us", "scorer": "Cristiano Ronaldo", "scorerId": "ronaldo", "assist": "Roberto Carlos", "assisterId": "robertocarlos", "label": null, "assistLabel": null }
+        ],
+        "stats": { "possession": 74, "shots": 18, "shotsOnTarget": 9, "xg": "4.3", "saves": 6, "fouls": 8, "potm": "Ronaldinho" },
+        "tacticalMetadataSignature": "2e874d2c",
+        "matchDetailSignature": "5eca2206",
+        "timelineSignature": "d7a8d140",
+        "canonicalReplaySignature": "50c97f5a"
+      }
+    },
+    {
+      "fixtureRunIndex": 1,
+      "matchIndex": 8,
+      "expected": {
+        "opponent": "Catalan Kings",
+        "opponentId": "catalan-kings",
+        "result": "pens-loss",
+        "score": "0-0 (pens 5-4)",
+        "gf": 0,
+        "ga": 0,
+        "pens": { "won": false, "score": "5-4", "hero": null },
+        "goals": [],
+        "stats": { "possession": 70, "shots": 17, "shotsOnTarget": 6, "xg": "1.3", "saves": 3, "fouls": 6, "potm": "Sergio Ramos" },
+        "tacticalMetadataSignature": "5fd39b4a",
+        "matchDetailSignature": "5d3ca9e9",
+        "timelineSignature": "0ce241c7",
+        "canonicalReplaySignature": "4dc9f65f"
+      }
+    },
+    {
+      "fixtureRunIndex": 7,
+      "matchIndex": 8,
+      "expected": {
+        "opponent": "Mersey Reds",
+        "opponentId": "mersey-reds",
+        "result": "loss",
+        "score": "0-2",
+        "gf": 0,
+        "ga": 2,
+        "pens": null,
+        "goals": [
+          { "minute": 10, "side": "opp", "scorer": "Opponent Striker", "scorerId": null, "assist": null, "assisterId": null, "label": null, "assistLabel": null },
+          { "minute": 52, "side": "opp", "scorer": "Long-range strike", "scorerId": null, "assist": null, "assisterId": null, "label": null, "assistLabel": null }
+        ],
+        "stats": { "possession": 71, "shots": 21, "shotsOnTarget": 7, "xg": "1.4", "saves": 2, "fouls": 10, "potm": "Sergio Ramos" },
+        "tacticalMetadataSignature": "6dff66e8",
+        "matchDetailSignature": "0ada8139",
+        "timelineSignature": "0c496d76",
+        "canonicalReplaySignature": "32635d58"
+      }
+    },
+    {
+      "fixtureRunIndex": 15,
+      "matchIndex": 0,
+      "expected": {
+        "opponent": "Prague Royals",
+        "opponentId": "prague-royals",
+        "result": "win",
+        "score": "3-0",
+        "gf": 3,
+        "ga": 0,
+        "pens": null,
+        "goals": [
+          { "minute": 40, "side": "us", "scorer": "Thierry Henry", "scorerId": "henry", "assist": "Dani Alves", "assisterId": "danialves", "label": null, "assistLabel": null },
+          { "minute": 60, "side": "us", "scorer": "Rivaldo", "scorerId": "rivaldo", "assist": "Ashley Cole", "assisterId": "ashleycole", "label": null, "assistLabel": "flick-on by" },
+          { "minute": 72, "side": "us", "scorer": "Rivaldo", "scorerId": "rivaldo", "assist": "Xabi Alonso", "assisterId": "xabialonso", "label": null, "assistLabel": null }
+        ],
+        "stats": { "possession": 71, "shots": 19, "shotsOnTarget": 9, "xg": "4.3", "saves": 3, "fouls": 12, "potm": "Thierry Henry" },
+        "tacticalMetadataSignature": "c7322696",
+        "matchDetailSignature": "99aa2c18",
+        "timelineSignature": "5257b8fd",
+        "canonicalReplaySignature": "d345d2bf"
+      }
+    }
+  ],
+  "exactRuns": [
+    {
+      "fixtureRunIndex": 0,
+      "seed": 12345,
+      "config": { "formation": "4-3-3", "difficulty": "classic", "pool": "modern" },
+      "expected": {
+        "opponentSequence": ["athens-greens", "london-blues", "piraeus-reds", "chamartin", "andalusian-reds", "milano-blue", "french-riviera", "zagreb-blues", "andalusian-reds", "north-london-spurs", "lisbon-eagles", "milano-reds"],
+        "results": ["win", "win", "win", "win", "draw", "win", "win", "draw", "win", "win", "win", "win"],
+        "scorelines": ["3-1", "1-0", "3-1", "2-0", "1-1", "3-2", "3-2", "1-1", "1-0", "1-0", "3-0", "3-2"],
+        "qualification": "direct",
+        "leagueRecord": { "w": 6, "d": 2, "l": 0 },
+        "leaguePosition": 1,
+        "knockoutProgression": ["Round of 16", "Quarter-final", "Semi-final", "Final"],
+        "exitStage": "Final",
+        "champion": true,
+        "resolvedCount": 12,
+        "runCheckpoint": "12|direct|Final|champion|Milano Reds|3-2",
+        "runSignature": "d12c07fe"
+      }
+    },
+    {
+      "fixtureRunIndex": 1,
+      "seed": 777,
+      "config": { "formation": "4-3-3", "difficulty": "classic", "pool": "modern" },
+      "expected": {
+        "opponentSequence": ["salzburg-bulls", "piraeus-reds", "prague-royals", "lisbon-eagles", "istanbul-eagles", "french-riviera", "andalusian-reds", "porto-dragons", "catalan-kings"],
+        "results": ["win", "win", "loss", "win", "win", "win", "win", "win", "pens-loss"],
+        "scorelines": ["1-0", "3-2", "0-2", "1-0", "1-0", "2-1", "1-0", "1-0", "0-0 (pens 5-4)"],
+        "qualification": "direct",
+        "leagueRecord": { "w": 7, "d": 0, "l": 1 },
+        "leaguePosition": 3,
+        "knockoutProgression": ["Round of 16"],
+        "exitStage": "Round of 16",
+        "champion": false,
+        "resolvedCount": 9,
+        "runCheckpoint": "9|direct|Round of 16|not-champion|Catalan Kings|0-0 (pens 5-4)",
+        "runSignature": "396cafa9"
+      }
+    },
+    {
+      "fixtureRunIndex": 7,
+      "seed": 777,
+      "config": { "formation": "4-2-3-1", "difficulty": "legendary", "pool": "modern" },
+      "expected": {
+        "opponentSequence": ["salzburg-bulls", "piraeus-reds", "prague-royals", "lisbon-eagles", "istanbul-eagles", "french-riviera", "north-london-spurs", "amsterdam-lancers", "mersey-reds"],
+        "results": ["win", "win", "loss", "win", "win", "win", "win", "draw", "loss"],
+        "scorelines": ["1-0", "3-2", "0-2", "1-0", "1-0", "2-1", "1-0", "0-0", "0-2"],
+        "qualification": "playoff",
+        "leagueRecord": { "w": 6, "d": 1, "l": 1 },
+        "leaguePosition": 11,
+        "knockoutProgression": ["Knockout Play-Off"],
+        "exitStage": "Knockout Play-Off",
+        "champion": false,
+        "resolvedCount": 9,
+        "runCheckpoint": "9|playoff|Knockout Play-Off|not-champion|Mersey Reds|0-2",
+        "runSignature": "831c9678"
+      }
+    },
+    {
+      "fixtureRunIndex": 15,
+      "seed": 2272774119,
+      "config": { "formation": "4-3-3", "difficulty": "classic", "pool": "modern" },
+      "expected": {
+        "opponentSequence": ["prague-royals", "manchester-sky", "lisbon-eagles", "eindhoven-lights", "istanbul-lions", "amsterdam-lancers", "chamartin", "istanbul-eagles", "andalusian-reds", "istanbul-lions"],
+        "results": ["win", "win", "win", "win", "win", "win", "draw", "draw", "win", "loss"],
+        "scorelines": ["3-0", "1-0", "1-0", "3-2", "1-0", "1-0", "0-0", "1-1", "3-1", "1-2"],
+        "qualification": "direct",
+        "leagueRecord": { "w": 6, "d": 2, "l": 0 },
+        "leaguePosition": 5,
+        "knockoutProgression": ["Round of 16", "Quarter-final"],
+        "exitStage": "Quarter-final",
+        "champion": false,
+        "resolvedCount": 10,
+        "runCheckpoint": "10|direct|Quarter-final|not-champion|Istanbul Lions|1-2",
+        "runSignature": "0eb74576"
+      }
+    }
+  ]
+}

@@ -1,0 +1,122 @@
+{
+  "fixtureVersion": 1,
+  "engineVersion": "legacy_v1",
+  "sampleRunsPerCell": 128,
+  "seedDomain": "m0-calibration|<cell>|<1-based-index>",
+  "definitions": {
+    "qualificationRate": "share of runs finishing 24th or better",
+    "penaltiesRunRate": "share of runs containing at least one shootout",
+    "penaltiesMatchRate": "shootouts divided by all resolved matches",
+    "scorelessMatchRate": "share of league matches ending 0-0",
+    "failedToScoreRate": "share of league matches where Final XI scored zero",
+    "oneGoalMarginRate": "share of league matches with absolute goal margin exactly one",
+    "twoPlusGoalMarginRate": "share of league matches with absolute goal margin at least two",
+    "opponentBands": "weak <=77, mid 78-87, strong >=88"
+  },
+  "classification": {
+    "preserve": [
+      "same-seed canonical equality within legacy_v1",
+      "difficulty ordering",
+      "opponent-strength ordering",
+      "role-balance weakness ordering",
+      "run progression viability and champion calibration band",
+      "penalties remain possible and deterministic",
+      "Daily and Resume canonical equality",
+      "catalogue boundaries and formation completion"
+    ],
+    "intentionallyChangeInM1": [
+      "the structural 11-scoreline limit",
+      "the inability for either side to score four or more",
+      "the inability to draw 2-2 or higher",
+      "flat uniform goal timing",
+      "post-hoc statistics",
+      "Signatures being absent from simulation",
+      "weak visible Match Plan effect",
+      "non-causal match events"
+    ],
+    "monitorOnly": [
+      "exact commentary wording",
+      "exact sequence frequency",
+      "exact individual scorer frequency",
+      "exact current Match Plan W/D/L delta"
+    ]
+  },
+  "tolerances": {
+    "runLevel": { "averageLeagueMatches": 0.15, "rates": 0.04, "averageResolvedCount": 0.25 },
+    "matchLevel": { "rates": 0.05, "goalMeans": 0.15 },
+    "formations": { "averageLeagueMatches": 0.25, "rates": 0.07, "averageResolvedCount": 0.4 },
+    "roleBalance": { "averageLeagueMatches": 0.25, "rates": 0.07, "averageResolvedCount": 0.4 },
+    "difficulty": { "averageLeagueMatches": 0.25, "rates": 0.07, "averageResolvedCount": 0.4 }
+  },
+  "baseline": {
+    "runLevel": {
+      "avgLeagueWins": 6.2578,
+      "avgLeagueDraws": 1.6406,
+      "avgLeagueLosses": 0.1016,
+      "qualificationRate": 1,
+      "progressionDistribution": {
+        "League Phase": 0,
+        "Knockout Play-Off": 0.0078,
+        "Round of 16": 0.1172,
+        "Quarter-final": 0.1328,
+        "Semi-final": 0.2031,
+        "Final": 0.5391
+      },
+      "penaltiesRunRate": 0.4375,
+      "penaltiesMatchRate": 0.0404,
+      "championRate": 0.3672,
+      "avgResolvedCount": 11.2188
+    },
+    "matchLevel": {
+      "low": {
+        "rating": 196,
+        "opponentBands": {
+          "weak": { "winRate": 0.6957, "drawRate": 0.2174, "lossRate": 0.087, "goalsFor": 1.4658, "goalsAgainst": 0.528, "cleanSheetRate": 0.5807, "scorelessMatchRate": 0.1304, "failedToScoreRate": 0.1925, "oneGoalMarginRate": 0.4938, "twoPlusGoalMarginRate": 0.2888 },
+          "mid": { "winRate": 0.6917, "drawRate": 0.2134, "lossRate": 0.0949, "goalsFor": 1.5791, "goalsAgainst": 0.6462, "cleanSheetRate": 0.496, "scorelessMatchRate": 0.1028, "failedToScoreRate": 0.1798, "oneGoalMarginRate": 0.4783, "twoPlusGoalMarginRate": 0.3083 },
+          "strong": { "winRate": 0.6276, "drawRate": 0.25, "lossRate": 0.1224, "goalsFor": 1.4286, "goalsAgainst": 0.6327, "cleanSheetRate": 0.5102, "scorelessMatchRate": 0.148, "failedToScoreRate": 0.25, "oneGoalMarginRate": 0.4643, "twoPlusGoalMarginRate": 0.2857 }
+        }
+      },
+      "medium": {
+        "rating": 210,
+        "opponentBands": {
+          "weak": { "winRate": 0.7618, "drawRate": 0.2133, "lossRate": 0.0249, "goalsFor": 1.687, "goalsAgainst": 0.5734, "cleanSheetRate": 0.5263, "scorelessMatchRate": 0.1053, "failedToScoreRate": 0.1247, "oneGoalMarginRate": 0.4903, "twoPlusGoalMarginRate": 0.2964 },
+          "mid": { "winRate": 0.7269, "drawRate": 0.2059, "lossRate": 0.0672, "goalsFor": 1.6008, "goalsAgainst": 0.5546, "cleanSheetRate": 0.5714, "scorelessMatchRate": 0.1155, "failedToScoreRate": 0.1618, "oneGoalMarginRate": 0.4769, "twoPlusGoalMarginRate": 0.3172 },
+          "strong": { "winRate": 0.6898, "drawRate": 0.2567, "lossRate": 0.0535, "goalsFor": 1.5348, "goalsAgainst": 0.631, "cleanSheetRate": 0.492, "scorelessMatchRate": 0.1337, "failedToScoreRate": 0.1604, "oneGoalMarginRate": 0.4866, "twoPlusGoalMarginRate": 0.2567 }
+        }
+      },
+      "high": {
+        "rating": 228,
+        "opponentBands": {
+          "weak": { "winRate": 0.8309, "drawRate": 0.1691, "lossRate": 0, "goalsFor": 1.727, "goalsAgainst": 0.5312, "cleanSheetRate": 0.5816, "scorelessMatchRate": 0.0712, "failedToScoreRate": 0.0712, "oneGoalMarginRate": 0.5549, "twoPlusGoalMarginRate": 0.276 },
+          "mid": { "winRate": 0.7653, "drawRate": 0.2286, "lossRate": 0.0061, "goalsFor": 1.6694, "goalsAgainst": 0.5122, "cleanSheetRate": 0.5816, "scorelessMatchRate": 0.1184, "failedToScoreRate": 0.1245, "oneGoalMarginRate": 0.4653, "twoPlusGoalMarginRate": 0.3061 },
+          "strong": { "winRate": 0.7157, "drawRate": 0.2741, "lossRate": 0.0102, "goalsFor": 1.5431, "goalsAgainst": 0.5584, "cleanSheetRate": 0.5635, "scorelessMatchRate": 0.1574, "failedToScoreRate": 0.1675, "oneGoalMarginRate": 0.4822, "twoPlusGoalMarginRate": 0.2437 }
+        }
+      }
+    },
+    "formations": {
+      "4-3-3": { "fixtureRunIndex": 0, "rating": 228, "difficulty": "classic", "metrics": { "avgLeagueWins": 6.2578, "avgLeagueDraws": 1.7031, "avgLeagueLosses": 0.0391, "qualificationRate": 1, "penaltiesRunRate": 0.3672, "championRate": 0.3906, "avgResolvedCount": 11.1797 } },
+      "4-4-2": { "fixtureRunIndex": 3, "rating": 235, "difficulty": "casual", "metrics": { "avgLeagueWins": 6.5547, "avgLeagueDraws": 1.4453, "avgLeagueLosses": 0, "qualificationRate": 1, "penaltiesRunRate": 0.3594, "championRate": 0.5313, "avgResolvedCount": 11.5703 } },
+      "4-2-3-1": { "fixtureRunIndex": 6, "rating": 234, "difficulty": "legendary", "metrics": { "avgLeagueWins": 5.6016, "avgLeagueDraws": 1.6875, "avgLeagueLosses": 0.7109, "qualificationRate": 1, "penaltiesRunRate": 0.3516, "championRate": 0.1484, "avgResolvedCount": 10.8828 } },
+      "3-5-2": { "fixtureRunIndex": 9, "rating": 220, "difficulty": "classic", "metrics": { "avgLeagueWins": 6.1641, "avgLeagueDraws": 1.7188, "avgLeagueLosses": 0.1172, "qualificationRate": 1, "penaltiesRunRate": 0.4219, "championRate": 0.2969, "avgResolvedCount": 11.2422 } },
+      "5-3-2": { "fixtureRunIndex": 12, "rating": 220, "difficulty": "casual", "metrics": { "avgLeagueWins": 6.8906, "avgLeagueDraws": 1.1094, "avgLeagueLosses": 0, "qualificationRate": 1, "penaltiesRunRate": 0.4922, "championRate": 0.4688, "avgResolvedCount": 11.3516 } }
+    },
+    "roleBalance": {
+      "balanced": { "rating": 228, "baseWinProbability": 0.7853, "weaknesses": [], "metrics": { "avgLeagueWins": 6.1484, "avgLeagueLosses": 0.0313, "qualificationRate": 1, "championRate": 0.3438, "avgResolvedCount": 11.2656 } },
+      "no_midfield_holder": { "rating": 196, "baseWinProbability": 0.6484, "weaknesses": ["No Defensive Shield", "No Ball Winner"], "metrics": { "avgLeagueWins": 5.2344, "avgLeagueLosses": 0.9063, "qualificationRate": 1, "championRate": 0.1328, "avgResolvedCount": 10.6641 } },
+      "over_creative_midfield": { "rating": 237, "baseWinProbability": 0.686, "weaknesses": ["No Defensive Shield", "No Ball Winner", "Too Many Creators"], "metrics": { "avgLeagueWins": 5.4063, "avgLeagueLosses": 0.8516, "qualificationRate": 0.9922, "championRate": 0.2188, "avgResolvedCount": 10.6953 } },
+      "no_natural_width": { "rating": 215, "baseWinProbability": 0.7318, "weaknesses": ["No Natural Width"], "metrics": { "avgLeagueWins": 5.7578, "avgLeagueLosses": 0.4766, "qualificationRate": 1, "championRate": 0.25, "avgResolvedCount": 11.0234 } },
+      "weak_defensive_structure": { "rating": 132, "baseWinProbability": 0.4265, "weaknesses": ["No Defensive Shield", "Weak Defense", "No Ball Winner", "No Big-Game Threat"], "metrics": { "avgLeagueWins": 3.25, "avgLeagueLosses": 3.0078, "qualificationRate": 0.5078, "championRate": 0, "avgResolvedCount": 8.9219 } }
+    },
+    "difficulty": {
+      "casual": { "avgLeagueWins": 6.5781, "avgLeagueLosses": 0, "qualificationRate": 1, "championRate": 0.3672, "avgResolvedCount": 11.1094 },
+      "classic": { "avgLeagueWins": 6.5234, "avgLeagueLosses": 0.0234, "qualificationRate": 1, "championRate": 0.3516, "avgResolvedCount": 11.125 },
+      "legendary": { "avgLeagueWins": 5.3203, "avgLeagueLosses": 0.8125, "qualificationRate": 1, "championRate": 0.1406, "avgResolvedCount": 10.5234 }
+    },
+    "matchPlansMonitorOnly": {
+      "balanced": { "avgLeagueWins": 5.9375, "avgLeagueDraws": 1.6797, "avgLeagueLosses": 0.3828, "championRate": 0.2422, "avgResolvedCount": 11.0078 },
+      "control": { "avgLeagueWins": 6.0469, "avgLeagueDraws": 1.6406, "avgLeagueLosses": 0.3125, "championRate": 0.2344, "avgResolvedCount": 10.8125 },
+      "wide": { "avgLeagueWins": 5.9141, "avgLeagueDraws": 1.6641, "avgLeagueLosses": 0.4219, "championRate": 0.2734, "avgResolvedCount": 11.2734 },
+      "counter": { "avgLeagueWins": 5.9063, "avgLeagueDraws": 1.6719, "avgLeagueLosses": 0.4219, "championRate": 0.2266, "avgResolvedCount": 10.8594 }
+    }
+  }
+}
