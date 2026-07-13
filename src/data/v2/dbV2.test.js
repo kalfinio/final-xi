@@ -1,7 +1,7 @@
 // Phase A — Player Database V2 tests: schema/validation, GOAT invariant,
 // legacy + V2 determinism, adapter→engine parity, save versioning, transfer
 // safety. None of this touches the live game's V1 draft/determinism.
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import {
   PLAYERS as V1_PLAYERS, getEligiblePlayers, computeRating, makeRng, shuffle, FORMATIONS, dateSeed, combineSeed, slotOptions,
@@ -332,19 +332,25 @@ describe('Modern Mix activation wiring (Phase A V2)', () => {
     }
   })
   it('curated seeded offers are deterministic, reroll-stable, and never escape the catalogue', () => {
-    const curatedIds = new Set(getCatalogue(CUR).orderedIds)
-    // pinned golden (moves only if curation changes)
-    expect(seededOffer(CUR, 'ST', 9, 1)).toEqual(['inzaghi', 'icardi', 'endrick'])
-    for (const slot of ['GK', 'RB', 'CB', 'LB', 'CDM', 'CM', 'CAM', 'RW', 'LW', 'ST', 'RWB', 'LWB']) {
-      for (const rc of [0, 1, 2, 3]) {
-        const o1 = seededOffer(CUR, slot, 4, rc)
-        const o2 = seededOffer(CUR, slot, 4, rc)
-        expect(o1).toEqual(o2) // deterministic
-        for (const id of o1) {
-          expect(curatedIds.has(id)).toBe(true) // never escapes the run catalogue
-          expect(resolvePlayer(id, CUR)).toBeTruthy() // resolves for save/restore
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 6, 10, 12, 0, 0))
+    try {
+      const curatedIds = new Set(getCatalogue(CUR).orderedIds)
+      // Pinned to the catalogue-activation date; moves only if curation changes.
+      expect(seededOffer(CUR, 'ST', 9, 1)).toEqual(['inzaghi', 'icardi', 'endrick'])
+      for (const slot of ['GK', 'RB', 'CB', 'LB', 'CDM', 'CM', 'CAM', 'RW', 'LW', 'ST', 'RWB', 'LWB']) {
+        for (const rc of [0, 1, 2, 3]) {
+          const o1 = seededOffer(CUR, slot, 4, rc)
+          const o2 = seededOffer(CUR, slot, 4, rc)
+          expect(o1).toEqual(o2) // deterministic
+          for (const id of o1) {
+            expect(curatedIds.has(id)).toBe(true) // never escapes the run catalogue
+            expect(resolvePlayer(id, CUR)).toBeTruthy() // resolves for save/restore
+          }
         }
       }
+    } finally {
+      vi.useRealTimers()
     }
   })
   it('a rerolled offer excludes already-used players (no duplicate corruption)', () => {

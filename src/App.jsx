@@ -58,7 +58,7 @@ import {
   createRunSnapshot, saveRunSnapshot, loadRunSnapshot, clearRunSnapshot,
   snapshotSummary, reconstructRun,
 } from './runPersistence'
-import { ACTIVE_ENGINE_VERSION } from './matchEngineVersions'
+import { ACTIVE_ENGINE_VERSION, M1_ENGINE_VERSION } from './matchEngineVersions'
 import { catalogueSlotOptions, activationCatalogVersion, getCatalogue } from './data/v2/catalogues'
 import {
   CLUB_IDENTITIES,
@@ -77,6 +77,17 @@ import {
 } from './draftClarity'
 
 const TOTAL_REROLLS = 3
+
+// Development-only M1 browser harness. Production builds compile DEV to
+// false, Daily explicitly ignores the override, and the chosen controller
+// version is persisted normally so refresh/Resume exercises the real path.
+export function developmentMatchEngineVersion(config, search = null, isDevelopment = import.meta.env.DEV) {
+  if (!isDevelopment || config?.mode === 'daily') return ACTIVE_ENGINE_VERSION
+  const query = search ?? (typeof window !== 'undefined' ? window.location.search : '')
+  return new URLSearchParams(query).get('engine') === M1_ENGINE_VERSION
+    ? M1_ENGINE_VERSION
+    : ACTIVE_ENGINE_VERSION
+}
 
 // ---------------------------------------------------------------------------
 // Small UI helpers
@@ -1271,7 +1282,7 @@ export default function App() {
     selectedApproachRef.current = 'balanced'
     runRef.current = createRunSimulation({
       rating: total, difficulty: config.difficulty, squad, rng, runSeed,
-      engineVersion: ACTIVE_ENGINE_VERSION,
+      engineVersion: developmentMatchEngineVersion(config),
       upgradeContextFor: (mc, profile) => buildUpgradeContext(upgradeStateRef.current.owned, mc, profile),
     })
     // Tactical read of the XI — flavours the Match Center, report and result.

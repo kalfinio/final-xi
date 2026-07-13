@@ -1,0 +1,120 @@
+{
+  "fixtureVersion": "m1-causal-v1",
+  "squadFixtureRunIndex": 0,
+  "fixtures": [
+    {
+      "name": "controlled-1-0-win",
+      "seed": 2,
+      "approach": "balanced",
+      "opponentId": "chamartin",
+      "kind": "league",
+      "round": null,
+      "score": "1-0",
+      "result": "win",
+      "signature": "4fe17d61"
+    },
+    {
+      "name": "open-3-3-draw",
+      "seed": 2,
+      "approach": "wide",
+      "opponentId": "paris-tower",
+      "kind": "league",
+      "round": null,
+      "score": "3-3",
+      "result": "draw",
+      "signature": "68c737ce"
+    },
+    {
+      "name": "four-goal-wide-win",
+      "seed": 3,
+      "approach": "wide",
+      "opponentId": "paris-tower",
+      "kind": "league",
+      "round": null,
+      "score": "4-0",
+      "result": "win",
+      "signature": "c90c71d5"
+    },
+    {
+      "name": "counter-comeback",
+      "seed": 4,
+      "approach": "counter",
+      "opponentId": "paris-tower",
+      "kind": "league",
+      "round": null,
+      "score": "5-1",
+      "result": "win",
+      "signature": "03ce492e"
+    },
+    {
+      "name": "controlled-1-3-loss",
+      "seed": 1,
+      "approach": "balanced",
+      "opponentId": "chamartin",
+      "kind": "league",
+      "round": null,
+      "score": "1-3",
+      "result": "loss",
+      "signature": "5bdadc1d"
+    },
+    {
+      "name": "quarter-final-penalties",
+      "seed": 4,
+      "approach": "balanced",
+      "opponentId": "chamartin",
+      "kind": "ko",
+      "round": "Quarter-final",
+      "score": "3-3 (pens 5-3)",
+      "result": "pens-win",
+      "signature": "4cacdddf"
+    },
+    {
+      "name": "control-route-example",
+      "seed": 20260713,
+      "approach": "control",
+      "opponentId": "paris-tower",
+      "kind": "league",
+      "round": null,
+      "score": "0-1",
+      "result": "loss",
+      "signature": "c0c95cb1",
+      "expectedRoute": "central_buildup"
+    },
+    {
+      "name": "wide-route-example",
+      "seed": 20260713,
+      "approach": "wide",
+      "opponentId": "paris-tower",
+      "kind": "league",
+      "round": null,
+      "score": "2-1",
+      "result": "win",
+      "signature": "351b47b4",
+      "expectedRoute": "wide_overlap"
+    },
+    {
+      "name": "counter-route-example",
+      "seed": 20260713,
+      "approach": "counter",
+      "opponentId": "paris-tower",
+      "kind": "league",
+      "round": null,
+      "score": "1-1",
+      "result": "draw",
+      "signature": "4bbb8979",
+      "expectedRoute": "counterattack"
+    },
+    {
+      "name": "signature-driven-goal",
+      "seed": 2,
+      "approach": "control",
+      "opponentId": "mersey-reds",
+      "kind": "league",
+      "round": null,
+      "score": "2-0",
+      "result": "win",
+      "signature": "13bc6f1f",
+      "expectedSignature": "Final Ball:pirlo"
+    }
+  ]
+}

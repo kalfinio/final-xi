@@ -72,40 +72,47 @@ function historicalRunSnapshot(result) {
   }
 }
 
-describe('M0.1 engine registry and legacy dispatch', () => {
-  it('keeps legacy_v1 active while registering m1 as unavailable infrastructure', () => {
+describe('version registry and frozen legacy dispatch', () => {
+  it('keeps legacy_v1 active while registering m1 as explicitly runnable', () => {
     expect(ACTIVE_ENGINE_VERSION).toBe(LEGACY_ENGINE_VERSION)
     expect(Object.keys(ENGINE_VERSIONS).sort()).toEqual([LEGACY_ENGINE_VERSION, M1_ENGINE_VERSION].sort())
     expect(isKnownEngineVersion(LEGACY_ENGINE_VERSION)).toBe(true)
     expect(isRunnableEngineVersion(LEGACY_ENGINE_VERSION)).toBe(true)
     expect(isKnownEngineVersion(M1_ENGINE_VERSION)).toBe(true)
-    expect(isRunnableEngineVersion(M1_ENGINE_VERSION)).toBe(false)
+    expect(isRunnableEngineVersion(M1_ENGINE_VERSION)).toBe(true)
   })
 
-  it('dispatches legacy_v1 to the current resolver and never fabricates m1 behavior', () => {
+  it('dispatches each version only to its explicit resolver', () => {
     const sentinel = { current: 'legacy-result' }
+    const m1Sentinel = { current: 'm1-result' }
     let calls = 0
+    let m1Calls = 0
     expect(resolveMatchByEngineVersion({
       engineVersion: LEGACY_ENGINE_VERSION,
       legacyResolver: () => { calls++; return sentinel },
     })).toBe(sentinel)
     expect(calls).toBe(1)
-    expect(() => resolveMatchByEngineVersion({
+    expect(resolveMatchByEngineVersion({
       engineVersion: M1_ENGINE_VERSION,
       legacyResolver: () => sentinel,
-    })).toThrow(/not implemented/i)
+      m1Resolver: () => { m1Calls++; return m1Sentinel },
+    })).toBe(m1Sentinel)
     expect(calls).toBe(1)
+    expect(m1Calls).toBe(1)
     expect(() => resolveMatchByEngineVersion({
       engineVersion: 'unknown_future',
       legacyResolver: () => sentinel,
     })).toThrow(/unknown/i)
   })
 
-  it('rejects m1 and unknown versions before a run can resolve or mix engines', () => {
+  it('runs explicit m1, rejects unknown versions, and never mixes engines', () => {
     const run = phase3Fixture.runs[0]
     const squad = squadFromPhase3Fixture(0)
     const args = { rating: computeRating(squad).total, difficulty: run.config.difficulty, squad, rng: makeRng(run.seed), runSeed: run.seed }
-    expect(() => createRunSimulation({ ...args, engineVersion: M1_ENGINE_VERSION })).toThrow(/not implemented/i)
+    const m1 = createRunSimulation({ ...args, engineVersion: M1_ENGINE_VERSION })
+    expect(m1.engineVersion).toBe(M1_ENGINE_VERSION)
+    m1.prepareNext()
+    expect(m1.resolveNext('balanced').engineVersion).toBe(M1_ENGINE_VERSION)
     expect(() => createRunSimulation({ ...args, engineVersion: 'future_v99' })).toThrow(/unknown/i)
     const ctrl = createRunSimulation({ ...args, engineVersion: LEGACY_ENGINE_VERSION })
     expect(ctrl.engineVersion).toBe(LEGACY_ENGINE_VERSION)

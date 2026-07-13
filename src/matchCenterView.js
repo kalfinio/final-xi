@@ -22,6 +22,7 @@ export const PATTERN_LABELS = {
   pressing_recovery: 'Pressing recovery',
   direct_attack: 'Direct attack',
   set_piece: 'Set piece',
+  long_range: 'Long-range effort',
   gk_miracle: 'Keeper up for it!',
   press: 'High press',
 }

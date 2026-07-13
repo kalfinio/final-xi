@@ -2,9 +2,9 @@
 // Match-engine version registry.
 //
 // The run-level version is authoritative for every match in that run.  M1 is
-// registered so persistence and dispatch have a stable future insertion point,
-// but it is deliberately not runnable until the causal resolver exists and has
-// passed its own activation audit.
+// registered so persistence and dispatch have a stable insertion point. M1 is
+// explicitly runnable for tests/development, but the active public version
+// remains the frozen legacy resolver until a separate activation audit.
 // ---------------------------------------------------------------------------
 
 export const LEGACY_ENGINE_VERSION = 'legacy_v1'
@@ -23,8 +23,8 @@ export const ENGINE_VERSIONS = Object.freeze({
   }),
   [M1_ENGINE_VERSION]: Object.freeze({
     id: M1_ENGINE_VERSION,
-    implemented: false,
-    runnable: false,
+    implemented: true,
+    runnable: true,
   }),
 })
 
@@ -50,16 +50,17 @@ export function assertRunnableEngineVersion(engineVersion) {
   return engineVersion
 }
 
-// Small resolver boundary used by createRunSimulation().  The callback keeps
-// the legacy implementation in data.js with its RNG call order untouched.
-// No fake/fallback M1 behavior is permitted.
-export function resolveMatchByEngineVersion({ engineVersion, legacyResolver }) {
+// Small resolver boundary used by createRunSimulation(). The callbacks keep
+// both implementations isolated. No implicit fallback between engines is
+// permitted: a run's immutable version selects exactly one resolver.
+export function resolveMatchByEngineVersion({ engineVersion, legacyResolver, m1Resolver }) {
   if (engineVersion === LEGACY_ENGINE_VERSION) {
     if (typeof legacyResolver !== 'function') throw new TypeError('legacyResolver must be a function')
     return legacyResolver()
   }
   if (engineVersion === M1_ENGINE_VERSION) {
-    throw new Error('Match engine m1 is registered but not implemented')
+    if (typeof m1Resolver !== 'function') throw new TypeError('m1Resolver must be a function')
+    return m1Resolver()
   }
   throw new RangeError(`Unknown match engine version: ${String(engineVersion)}`)
 }
