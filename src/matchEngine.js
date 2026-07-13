@@ -57,6 +57,63 @@ export function matchVerdict(tl) {
   return 'Honours even'
 }
 
+// M1 adapter: every value is a direct reduction of the canonical causal log.
+// No RNG is consumed and no statistic is synthesized from the final score.
+function buildM1MatchDetail({ match, matchNumber }) {
+  const gf = match.gf ?? 0
+  const ga = match.ga ?? 0
+  const stage = match.type === 'league' ? 'League Phase' : (match.round || 'Knockout')
+  const opponent = match.opponent || 'Opponent'
+  const metrics = match.eventMetrics || {}
+  const sourceHome = metrics.home || {}
+  const sourceAway = metrics.away || {}
+  const home = {
+    possession: clamp(sourceHome.possession ?? 50, 0, 100),
+    shots: Math.max(gf, sourceHome.shots ?? 0),
+    shotsOnTarget: Math.max(gf, sourceHome.shotsOnTarget ?? 0),
+    saves: Math.max(0, (sourceAway.shotsOnTarget ?? ga) - ga),
+    bigChances: Math.min(sourceHome.bigChances ?? 0, sourceHome.shots ?? 0),
+    xg: round1(sourceHome.xg ?? 0),
+    fouls: sourceHome.fouls ?? 0,
+  }
+  home.shotsOnTarget = clamp(home.shotsOnTarget, gf, home.shots)
+  const away = {
+    possession: 100 - home.possession,
+    shots: Math.max(ga, sourceAway.shots ?? 0),
+    shotsOnTarget: Math.max(ga, sourceAway.shotsOnTarget ?? 0),
+    saves: Math.max(0, home.shotsOnTarget - gf),
+    bigChances: Math.min(sourceAway.bigChances ?? 0, sourceAway.shots ?? 0),
+    xg: round1(sourceAway.xg ?? 0),
+    fouls: sourceAway.fouls ?? 0,
+  }
+  away.shotsOnTarget = clamp(away.shotsOnTarget, ga, away.shots)
+  const usEvents = (match.events || []).filter((event) => event.side === 'us')
+  return {
+    round: stage,
+    opponent,
+    homeGoals: gf,
+    awayGoals: ga,
+    pens: match.pens || null,
+    result: match.result,
+    scorers: usEvents.map((event) => event.scorer),
+    assists: usEvents.filter((event) => event.assist).map((event) => event.assist),
+    finalStats: { home, away },
+    presentationSeed: match.presentationSeed,
+    keyPlayer: match.stats?.potm || null,
+    verdict: matchVerdict({ gf, ga, result: match.result, pens: match.pens || null }),
+    metadata: {
+      stage,
+      matchNumber,
+      opponent,
+      opponentStyle: match.opponentMeta?.style || null,
+      engineVersion: 'm1',
+      simulationSeed: match.simulationSeed,
+      rngContract: match.rngContract,
+      causalSummary: match.causalSummary || null,
+    },
+  }
+}
+
 // Build the canonical MatchDetail for a completed match object produced by
 // simulate(). Called strictly AFTER the match result is final; consumes only
 // its own seeded RNG. Home headline numbers (possession / shots / SOT) are
@@ -64,6 +121,9 @@ export function matchVerdict(tl) {
 // player-visible numbers stay familiar; away stats, saves, big chances, xG and
 // fouls are generated/derived here — canonically, once, for all views.
 export function buildMatchDetail({ match, runSeed = 1, matchNumber = 0 }) {
+  if (match?.engineVersion === 'm1' && Array.isArray(match.causalEvents)) {
+    return buildM1MatchDetail({ match, matchNumber })
+  }
   const gf = match.gf ?? 0
   const ga = match.ga ?? 0
   const stage = match.type === 'league' ? 'League Phase' : (match.round || 'Knockout')

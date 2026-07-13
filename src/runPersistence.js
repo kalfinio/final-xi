@@ -86,6 +86,16 @@ export function canonicalMatchSignature(m, i) {
     detail: m.detail || null,
     activeUpgrades: m.activeUpgrades || null,
   }
+  // Add M1 authority only for M1 matches. The conditional is deliberate: the
+  // serialized legacy object remains byte-for-byte identical to the M0 freeze.
+  if (m.engineVersion === M1_ENGINE_VERSION) {
+    canonical.engineVersion = m.engineVersion
+    canonical.simulationSeed = m.simulationSeed
+    canonical.rngContract = m.rngContract
+    canonical.causalEvents = m.causalEvents || []
+    canonical.causalSummary = m.causalSummary || null
+    canonical.eventMetrics = m.eventMetrics || null
+  }
   return hashString(JSON.stringify(canonical)).toString(16).padStart(8, '0')
 }
 
@@ -159,8 +169,8 @@ export function validateRunSnapshot(snap) {
   if (!snap || typeof snap !== 'object') return false
   if (snap.schemaVersion !== SCHEMA_VERSION) return false
   const engineVersion = snapshotEngineVersion(snap)
-  // Known-but-unimplemented versions (currently m1) cannot be reconstructed
-  // safely. Unknown future values are rejected rather than silently downgraded.
+  // Only implemented/runnable versions can be reconstructed. Unknown future
+  // values are rejected rather than silently downgraded.
   if (!engineVersion || !isRunnableEngineVersion(engineVersion)) return false
   const r = snap.run
   if (!r || typeof r !== 'object') return false

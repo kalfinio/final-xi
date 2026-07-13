@@ -530,13 +530,107 @@ describe('F. M0.1 run-level engine version compatibility and lock', () => {
     }
   })
 
-  it('unknown, malformed, and known-but-unimplemented m1 versions fail safely', () => {
-    for (const invalid of ['future_v99', M1_ENGINE_VERSION, '', null, 7]) {
+  it('unknown and malformed versions fail safely', () => {
+    for (const invalid of ['future_v99', '', null, 7]) {
       const { snap } = good()
       snap.engineVersion = invalid
       expect(validateRunSnapshot(snap)).toBe(false)
       expect(reconstructRun(snap)).toEqual({ ok: false, reason: 'invalid' })
     }
+  })
+
+  it('explicit m1 snapshots validate, replay exactly, and remain m1 on re-save', () => {
+    const run = baseline.runs[0]
+    const squad = squadFromFixture(run)
+    const upgradeState = { owned: [], offers: [] }
+    const makeController = () => createRunSimulation({
+      rating: computeRating(squad).total,
+      difficulty: run.config.difficulty,
+      squad,
+      rng: makeRng(run.seed),
+      runSeed: run.seed,
+      engineVersion: M1_ENGINE_VERSION,
+      upgradeContextFor: (mc, profile) => buildUpgradeContext(upgradeState.owned, mc, profile),
+    })
+    const approaches = ['balanced', 'control', 'wide', 'counter', 'control', 'wide', 'balanced', 'counter']
+    const ctrl = makeController()
+    for (let index = 0; index < 4; index++) {
+      ctrl.prepareNext()
+      ctrl.resolveNext(approaches[index])
+    }
+    const uninterrupted = makeController()
+    for (let index = 0; index < approaches.length; index++) {
+      uninterrupted.prepareNext()
+      uninterrupted.resolveNext(approaches[index])
+    }
+    const snap = createRunSnapshot({
+      engineVersion: ctrl.engineVersion,
+      config: cfgOf(run), runSeed: run.seed, teamName: 'M1 XI', squad, rerollsUsed: 0,
+      matches: ctrl.matches, upgradeState,
+      checkpoint: { screen: 'watch', resolvedMatchCount: ctrl.resolvedCount, selectedApproach: 'balanced', stageLabel: 'League Phase' },
+    })
+    expect(snap.engineVersion).toBe(M1_ENGINE_VERSION)
+    expect(validateRunSnapshot(snap)).toBe(true)
+    const rec = reconstructRun(snap)
+    expect(rec.ok).toBe(true)
+    expect(rec.engineVersion).toBe(M1_ENGINE_VERSION)
+    expect(rec.ctrl.engineVersion).toBe(M1_ENGINE_VERSION)
+    expect(JSON.stringify(rec.ctrl.matches)).toBe(JSON.stringify(ctrl.matches))
+    expect(rec.ctrl.matches.every((match) => match.engineVersion === M1_ENGINE_VERSION)).toBe(true)
+    const originalTimeline = buildMatchTimeline(ctrl.matches[3], squad.map(({ player }) => player), 'League Phase', 'M1 XI', null, squad)
+    const resumedTimeline = buildMatchTimeline(rec.currentMatch, rec.squad.map(({ player }) => player), 'League Phase', 'M1 XI', null, rec.squad)
+    expect(JSON.stringify(rec.currentMatch.causalEvents)).toBe(JSON.stringify(ctrl.matches[3].causalEvents))
+    expect(JSON.stringify(rec.currentMatch.stats)).toBe(JSON.stringify(ctrl.matches[3].stats))
+    expect(JSON.stringify(rec.currentMatch.detail)).toBe(JSON.stringify(ctrl.matches[3].detail))
+    expect(JSON.stringify(resumedTimeline)).toBe(JSON.stringify(originalTimeline))
+    const reSaved = createRunSnapshot({
+      engineVersion: rec.ctrl.engineVersion,
+      config: rec.config,
+      catalogVersion: rec.catalogVersion,
+      dbVersion: rec.dbVersion,
+      runSeed: rec.runSeed,
+      teamName: rec.teamName,
+      squad: rec.squad,
+      rerollsUsed: rec.rerollsUsed,
+      matches: rec.ctrl.matches,
+      upgradeState: rec.upgradeState,
+      checkpoint: { screen: 'hub', resolvedMatchCount: rec.ctrl.resolvedCount, selectedApproach: 'balanced', stageLabel: 'League Phase' },
+    })
+    expect(reSaved.engineVersion).toBe(M1_ENGINE_VERSION)
+    expect(reSaved.run.signatures.canonicalMatches).toEqual(snap.run.signatures.canonicalMatches)
+    for (let index = 4; index < approaches.length; index++) {
+      rec.ctrl.prepareNext()
+      rec.ctrl.resolveNext(approaches[index])
+    }
+    expect(JSON.stringify(rec.ctrl.matches)).toBe(JSON.stringify(uninterrupted.matches))
+  })
+
+  it('rejects mixed-engine replay instead of falling back across resolvers', () => {
+    const { snap: legacySnap } = good()
+    legacySnap.engineVersion = M1_ENGINE_VERSION
+    expect(validateRunSnapshot(legacySnap)).toBe(true)
+    expect(reconstructRun(legacySnap).ok).toBe(false)
+
+    const run = baseline.runs[0]
+    const squad = squadFromFixture(run)
+    const ctrl = createRunSimulation({
+      rating: computeRating(squad).total,
+      difficulty: run.config.difficulty,
+      squad,
+      rng: makeRng(run.seed),
+      runSeed: run.seed,
+      engineVersion: M1_ENGINE_VERSION,
+    })
+    ctrl.prepareNext(); ctrl.resolveNext('balanced')
+    const m1Snap = createRunSnapshot({
+      engineVersion: M1_ENGINE_VERSION,
+      config: cfgOf(run), runSeed: run.seed, teamName: 'M1 XI', squad, rerollsUsed: 0,
+      matches: ctrl.matches, upgradeState: { owned: [], offers: [] },
+      checkpoint: { screen: 'hub', resolvedMatchCount: 1, selectedApproach: 'balanced', stageLabel: 'League Phase' },
+    })
+    m1Snap.engineVersion = LEGACY_ENGINE_VERSION
+    expect(validateRunSnapshot(m1Snap)).toBe(true)
+    expect(reconstructRun(m1Snap).ok).toBe(false)
   })
 
   it('an old missing-version snapshot re-saves with canonical legacy_v1 without a schema bump', () => {

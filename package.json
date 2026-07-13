@@ -13,7 +13,8 @@
     "db:audit:transfers": "node scripts/audit-transfer-intel.mjs",
     "db:sim": "node scripts/sim-catalogues.mjs",
     "draft:fit-audit": "node scripts/audit-draft-clarity.mjs",
-    "match:calibration": "node scripts/match-calibration.mjs"
+    "match:calibration": "node scripts/match-calibration.mjs",
+    "match:m1-calibration": "node scripts/match-m1-calibration.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

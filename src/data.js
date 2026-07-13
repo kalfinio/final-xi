@@ -23,6 +23,7 @@ import { makeRng, hashString, combineSeed, randomSeed } from './seedUtils'
 import { buildMatchDetail } from './matchEngine'
 import { buildSquadTacticalProfile, buildOpponentTacticalProfile, resolveTacticalMatchup } from './tacticalMatchup'
 import { applyTacticalApproach, approachMatchupPreviews } from './tacticalApproach'
+import { resolveM1Match } from './matchEngineM1'
 import {
   ACTIVE_ENGINE_VERSION,
   assertRunnableEngineVersion,
@@ -1001,6 +1002,15 @@ function oppProbDelta(opp) {
   return clamp((SIM.OPP_BASELINE - opp.strength) * SIM.OPP_SCALE, -SIM.OPP_DELTA_CAP, SIM.OPP_DELTA_CAP)
 }
 
+// M1 exposes opponent strength through several causal stages instead of a
+// single result roll, so its centred strength signal needs enough separation
+// to survive route/archetype variance. This is intentionally M1-only; the
+// frozen legacy probability and RNG contract continue to use oppProbDelta.
+function m1OppProbDelta(opp) {
+  if (!opp || typeof opp.strength !== 'number') return 0
+  return clamp((SIM.OPP_BASELINE - opp.strength) * 0.006, -0.08, 0.08)
+}
+
 // Knockout opponent-selection bias: later rounds favour stronger clubs, so the
 // run feels like it builds toward facing the giants. League phase uses a flat
 // weight (full mix of tiers). Pure ranking only — does not change match odds
@@ -1531,7 +1541,7 @@ export function createRunSimulation({
   engineVersion = ACTIVE_ENGINE_VERSION,
 }) {
   // Immutable for the controller lifetime: a run can never switch engines
-  // between matches. M1 is known to the registry but remains non-runnable.
+  // between matches. Public activation is independent of explicit runnability.
   const lockedEngineVersion = assertRunnableEngineVersion(engineVersion)
   const p = squadBaseProb(squad, difficulty)
   const players = squad.map((s) => s.player).filter(Boolean)
@@ -1724,6 +1734,87 @@ export function createRunSimulation({
     return match
   }
 
+  // Causal M1 sibling resolver. It consumes exactly one outer RNG draw for a
+  // match nonce; every football mechanic is then driven by named/indexed M1
+  // substreams. The legacy resolver above remains physically untouched.
+  function resolveNextM1(approachKey = 'balanced') {
+    if (done) return null
+    if (!pending) prepareNext()
+    if (!pending) return null
+    const opp = pending.opponentMeta
+    const uctx = upgradeContextFor ? upgradeContextFor({ ...pending.context, approachKey }, squadProfile) : null
+    const adjusted = applyTacticalApproach(squadProfile, approachKey, uctx)
+    const matchup = resolveTacticalMatchup(adjusted, buildOpponentTacticalProfile(opp))
+    const matchNonce = Math.floor(rng() * 4294967296) >>> 0
+    const round = pending.kind === 'ko' ? pending.round : null
+    const qualityProbability = pending.kind === 'league'
+      ? clamp(p + m1OppProbDelta(opp), SIM.KO_PR_FLOOR, SIM.KO_PR_CEIL)
+      : clamp(
+        p - (SIM.ROUND_PRESSURE[round] ?? 0) + leagueSeedBonus(leaguePhase.position, round) + m1OppProbDelta(opp),
+        SIM.KO_PR_FLOOR, SIM.KO_PR_CEIL,
+      )
+    const match = resolveM1Match({
+      runSeed,
+      matchNumber: allMatches.length + 1,
+      matchNonce,
+      kind: pending.kind,
+      round,
+      opponent: opp,
+      home: pending.home ?? null,
+      approach: approachKey,
+      squad,
+      adjustedProfile: adjusted,
+      matchup,
+      qualityProbability,
+      playerQualityById: Object.fromEntries(players.map((player) => [player.id, playerPoints(player)])),
+    })
+
+    if (uctx && Array.isArray(uctx.activeIds)) match.activeUpgrades = uctx.activeIds
+    match.detail = buildMatchDetail({ match, runSeed, matchNumber: allMatches.length + 1 })
+
+    // Run-wide scorer/creator tables remain the existing outer architecture;
+    // their inputs now come only from causal scoring events.
+    for (const event of match.events) {
+      if (event.side !== 'us') continue
+      const scorer = players.find((player) => player.name === event.scorer)
+      const assister = event.assist ? players.find((player) => player.name === event.assist) : null
+      if (scorer) {
+        tally.goals[scorer.id] = (tally.goals[scorer.id] || 0) + 1
+        if (pending.kind === 'league') leagueTally.goals[scorer.id] = (leagueTally.goals[scorer.id] || 0) + 1
+      }
+      if (assister) {
+        tally.assists[assister.id] = (tally.assists[assister.id] || 0) + 1
+        if (pending.kind === 'league') leagueTally.assists[assister.id] = (leagueTally.assists[assister.id] || 0) + 1
+      }
+    }
+
+    allMatches.push(match)
+    pending = null
+
+    if (match.type === 'league') {
+      if (match.result === 'win') lw++
+      else if (match.result === 'draw') ld++
+      else ll++
+      lgf += match.gf
+      lga += match.ga
+      if (stage.matchNo < 8) stage = { kind: 'league', matchNo: stage.matchNo + 1 }
+      else computeStandings()
+    } else if (match.round === 'Knockout Play-Off') {
+      playoff = match
+      if (match.eliminated) { eliminated = true; exitStage = 'Knockout Play-Off'; done = true }
+      else stage = { kind: 'ko', round: 'Round of 16' }
+    } else {
+      knockouts.push(match)
+      if (match.eliminated) { eliminated = true; exitStage = match.round; done = true }
+      else if (match.round === 'Final') { champion = true; exitStage = 'Final'; done = true }
+      else {
+        const order = ['Round of 16', 'Quarter-final', 'Semi-final', 'Final']
+        stage = { kind: 'ko', round: order[order.indexOf(match.round) + 1] }
+      }
+    }
+    return match
+  }
+
   // Public contract preserved. Dispatch happens before the legacy resolver
   // consumes RNG or mutates pending state, so an unavailable engine fails
   // without partially resolving a match.
@@ -1731,6 +1822,7 @@ export function createRunSimulation({
     return resolveMatchByEngineVersion({
       engineVersion: lockedEngineVersion,
       legacyResolver: () => resolveNextLegacy(approachKey),
+      m1Resolver: () => resolveNextM1(approachKey),
     })
   }
 
