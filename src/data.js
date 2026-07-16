@@ -23,9 +23,10 @@ import { makeRng, hashString, combineSeed, randomSeed } from './seedUtils'
 import { buildMatchDetail } from './matchEngine'
 import { buildSquadTacticalProfile, buildOpponentTacticalProfile, resolveTacticalMatchup } from './tacticalMatchup'
 import { applyTacticalApproach, approachMatchupPreviews } from './tacticalApproach'
-import { resolveM1Match } from './matchEngineM1'
+import { buildM1ApproachPreviews, resolveM1Match } from './matchEngineM1'
 import {
   ACTIVE_ENGINE_VERSION,
+  M1_ENGINE_VERSION,
   assertRunnableEngineVersion,
   resolveMatchByEngineVersion,
 } from './matchEngineVersions'
@@ -1639,7 +1640,10 @@ export function createRunSimulation({
       prevResult: allMatches.length ? allMatches[allMatches.length - 1].result : null,
     }
     const ctxOf = (key) => (upgradeContextFor ? upgradeContextFor({ ...pending.context, approachKey: key }, squadProfile) : null)
-    pending.previews = approachMatchupPreviews(squadProfile, pending.opponentMeta, upgradeContextFor ? ctxOf : null) // pure, no rng
+    const legacyPreviews = approachMatchupPreviews(squadProfile, pending.opponentMeta, upgradeContextFor ? ctxOf : null) // pure, no rng
+    pending.previews = lockedEngineVersion === M1_ENGINE_VERSION
+      ? buildM1ApproachPreviews({ baseProfile: squadProfile, opponent: pending.opponentMeta, legacyPreviews })
+      : legacyPreviews
     return pending
   }
 
@@ -1744,7 +1748,7 @@ export function createRunSimulation({
     const opp = pending.opponentMeta
     const uctx = upgradeContextFor ? upgradeContextFor({ ...pending.context, approachKey }, squadProfile) : null
     const adjusted = applyTacticalApproach(squadProfile, approachKey, uctx)
-    const matchup = resolveTacticalMatchup(adjusted, buildOpponentTacticalProfile(opp))
+    const matchup = pending.previews?.[approachKey] || resolveTacticalMatchup(adjusted, buildOpponentTacticalProfile(opp))
     const matchNonce = Math.floor(rng() * 4294967296) >>> 0
     const round = pending.kind === 'ko' ? pending.round : null
     const qualityProbability = pending.kind === 'league'

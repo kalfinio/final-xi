@@ -5,7 +5,7 @@ import { loadViteModule } from './vite-ssr-loader.mjs'
 const { runM1Calibration } = await loadViteModule('src/matchEngineM1Calibration.js')
 const report = runM1Calibration()
 
-console.log(`Match Engine calibration — ${report.engineVersion} (explicit, inactive)`)
+console.log(`Match Engine calibration — ${report.engineVersion} (Random active; Daily legacy)`)
 console.log('Samples:', JSON.stringify(report.samples))
 console.log('Signature:', report.signature)
 console.log('Outcomes:', JSON.stringify(report.outcomes))

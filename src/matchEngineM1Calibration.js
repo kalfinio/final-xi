@@ -192,16 +192,29 @@ function aggregateTacticalMatches(matches) {
   const shape = aggregateShape(matches)
   const ownOpps = mean(matches.map((match) => match.eventMetrics.home.opportunities))
   const oppOpps = mean(matches.map((match) => match.eventMetrics.away.opportunities))
+  const ownChances = mean(matches.map((match) => match.eventMetrics.home.chances))
+  const oppChances = mean(matches.map((match) => match.eventMetrics.away.chances))
   const ownXg = mean(matches.map((match) => match.eventMetrics.home.xg))
   const oppXg = mean(matches.map((match) => match.eventMetrics.away.xg))
+  const possession = mean(matches.map((match) => match.eventMetrics.home.possession))
+  const dangerousTransitions = mean(matches.map((match) => match.eventMetrics.home.dangerousTransitions))
+  const highTurnovers = mean(matches.map((match) => match.eventMetrics.home.highTurnovers))
+  const concessionExposure = mean(matches.map((match) => match.eventMetrics.away.dangerousTransitions))
   const downsides = mean(matches.map((match) => match.causalSummary.plan.downsideMetric))
   const homeFailures = mean(matches.map((match) => match.causalEvents.filter((event) => event.side === 'us' && event.progression !== 'success').length))
   return {
     ...outcomes,
+    pointsPerMatch: round4(mean(matches.map((match) => match.result === 'win' ? 3 : match.result === 'draw' ? 1 : 0))),
     ownOpportunities: round4(ownOpps),
     opponentOpportunities: round4(oppOpps),
+    ownChances: round4(ownChances),
+    opponentChances: round4(oppChances),
     ownXg: round4(ownXg),
     opponentXg: round4(oppXg),
+    possession: round4(possession),
+    dangerousTransitions: round4(dangerousTransitions),
+    highTurnovers: round4(highTurnovers),
+    concessionExposure: round4(concessionExposure),
     routes: shape.routes.home,
     opponentRoutes: shape.routes.away,
     chanceQuality: shape.chanceQuality,
@@ -231,6 +244,119 @@ export function planMetrics({ squad, samplesPerCell }) {
   raw.wide.explicitDownside = round4(raw.wide.opponentOpportunities - balanced.opponentOpportunities)
   raw.counter.explicitDownside = round4(balanced.ownOpportunities - raw.counter.ownOpportunities)
   return raw
+}
+
+export const M1_PLAN_AUDIT_NOISE_PPM = 0.04
+
+function routeFamilyShare(metrics, routes) {
+  return round4(routes.reduce((sum, route) => sum + (metrics.routes[route] || 0), 0))
+}
+
+function planAuditCell({ strength, squad, archetype, samplesPerCell }) {
+  const metrics = {}
+  for (const approach of M1_PLAN_KEYS) {
+    const matches = Array.from({ length: samplesPerCell }, (_, index) => controlledM1Match({
+      seed: hashString(`m1-plan-audit|${strength}|${archetype}|${index + 1}`),
+      squad,
+      opponent: REPRESENTATIVE_OPPONENTS[archetype],
+      approach,
+    }))
+    metrics[approach] = aggregateTacticalMatches(matches)
+  }
+  const ranking = [...M1_PLAN_KEYS]
+    .sort((left, right) => metrics[right].pointsPerMatch - metrics[left].pointsPerMatch || left.localeCompare(right))
+  const bestPoints = metrics[ranking[0]].pointsPerMatch
+  const viable = ranking.filter((approach) => bestPoints - metrics[approach].pointsPerMatch <= M1_PLAN_AUDIT_NOISE_PPM)
+  return { metrics, ranking, best: ranking[0], viable, bestPoints }
+}
+
+export function evaluateM1PlanAudit(report) {
+  const failures = []
+  const cells = Object.values(report.cells).flatMap((byArchetype) => Object.values(byArchetype))
+  const viableCount = Object.fromEntries(M1_PLAN_KEYS.map((approach) => [approach, cells.filter((cell) => cell.viable.includes(approach)).length]))
+  const bestCount = Object.fromEntries(M1_PLAN_KEYS.map((approach) => [approach, cells.filter((cell) => cell.best === approach).length]))
+  for (const approach of M1_PLAN_KEYS) {
+    if (viableCount[approach] === 0) failures.push(`${approach} is never best or within ${M1_PLAN_AUDIT_NOISE_PPM.toFixed(2)} PPM of best`)
+    if (bestCount[approach] === cells.length) failures.push(`${approach} is universally optimal`)
+  }
+  const favorableCounter = Object.values(report.cells).some((byArchetype) =>
+    ['pressing', 'attacking', 'elite'].some((archetype) => byArchetype[archetype].viable.includes('counter')),
+  )
+  if (!favorableCounter) failures.push('Counter is not viable against any exposed opponent context')
+  const weakCounter = Object.values(report.cells).some((byArchetype) =>
+    ['defensive', 'underdog'].some((archetype) => !byArchetype[archetype].viable.includes('counter')),
+  )
+  if (!weakCounter) failures.push('Counter retains no low-block downside')
+  const viableWideBlock = Object.values(report.cells).some((byArchetype) =>
+    ['defensive', 'underdog'].some((archetype) => byArchetype[archetype].viable.includes('wide')),
+  )
+  if (!viableWideBlock) failures.push('Wide is not viable against a compact opponent')
+  if (bestCount.control >= Math.ceil(cells.length / 2)) failures.push(`Control dominates ${bestCount.control}/${cells.length} cells`)
+
+  const aggregate = report.aggregate
+  const transitionRoutes = ['counterattack', 'direct_attack', 'pressing_recovery']
+  const controlledRoutes = ['central_buildup', 'one_two', 'switch_of_play']
+  const wideRoutes = ['wide_overlap', 'cross', 'cutback']
+  if (!(aggregate.counter.possession < aggregate.control.possession - 8)) failures.push('Counter possession identity collapsed')
+  if (!(routeFamilyShare(aggregate.counter, transitionRoutes) > routeFamilyShare(aggregate.balanced, transitionRoutes) + 0.12)) failures.push('Counter transition/direct identity collapsed')
+  if (!(routeFamilyShare(aggregate.wide, wideRoutes) > routeFamilyShare(aggregate.balanced, wideRoutes) + 0.12)) failures.push('Wide route identity collapsed')
+  if (!(routeFamilyShare(aggregate.control, controlledRoutes) > routeFamilyShare(aggregate.balanced, controlledRoutes) + 0.12)) failures.push('Control settled-route identity collapsed')
+  if (!(aggregate.control.volatility < aggregate.counter.volatility)) failures.push('Control is not less volatile than Counter')
+  if (!(aggregate.counter.ownOpportunities < aggregate.balanced.ownOpportunities)) failures.push('Counter lost its lower-volume downside')
+  if (!(aggregate.wide.opponentOpportunities > aggregate.balanced.opponentOpportunities)) failures.push('Wide lost its concession downside')
+
+  const lowBlockCells = Object.values(report.cells).flatMap((byArchetype) => [byArchetype.defensive, byArchetype.underdog])
+  if (!lowBlockCells.some((cell) => cell.metrics.control.ownXg < cell.metrics.balanced.ownXg)) failures.push('Control has no sterile-possession evidence against low blocks')
+  return failures
+}
+
+export function runM1PlanAudit({ samplesPerCell = 1000 } = {}) {
+  const squads = {
+    low: squadFromPhase3Fixture(11),
+    medium: squadFromPhase3Fixture(1),
+    high: squadFromPhase3Fixture(0),
+  }
+  const cells = {}
+  for (const [strength, squad] of Object.entries(squads)) {
+    cells[strength] = {}
+    for (const archetype of M1_ARCHETYPE_KEYS) {
+      const cell = planAuditCell({ strength, squad, archetype, samplesPerCell })
+      cells[strength][archetype] = cell
+    }
+  }
+  const allCells = Object.values(cells).flatMap((byArchetype) => Object.values(byArchetype))
+  const aggregate = Object.fromEntries(M1_PLAN_KEYS.map((approach) => {
+    const metrics = allCells.map((cell) => cell.metrics[approach])
+    const numericKeys = [
+      'winRate', 'drawRate', 'lossRate', 'pointsPerMatch', 'goalsFor', 'goalsAgainst',
+      'ownOpportunities', 'opponentOpportunities', 'ownChances', 'opponentChances',
+      'ownXg', 'opponentXg', 'possession', 'volatility', 'dangerousTransitions',
+      'highTurnovers', 'concessionExposure', 'rawDownsideMetric', 'homeProgressionFailures',
+    ]
+    const averaged = Object.fromEntries(numericKeys.map((key) => [key, round4(mean(metrics.map((value) => value[key])))]))
+    const nestedAverage = (key) => {
+      const names = new Set(metrics.flatMap((value) => Object.keys(value[key] || {})))
+      return Object.fromEntries([...names].map((name) => [name, round4(mean(metrics.map((value) => value[key]?.[name] || 0)))]))
+    }
+    return [approach, { ...averaged, routes: nestedAverage('routes'), chanceQuality: nestedAverage('chanceQuality') }]
+  }))
+  const report = {
+    engineVersion: M1_ENGINE_VERSION,
+    samplesPerCell,
+    pairedMatches: samplesPerCell * Object.keys(squads).length * M1_ARCHETYPE_KEYS.length * M1_PLAN_KEYS.length,
+    noiseTolerancePpm: M1_PLAN_AUDIT_NOISE_PPM,
+    cells,
+    aggregate,
+  }
+  report.bestCounts = Object.fromEntries(M1_PLAN_KEYS.map((approach) => [approach,
+    Object.values(cells).flatMap((byArchetype) => Object.values(byArchetype)).filter((cell) => cell.best === approach).length,
+  ]))
+  report.viableCounts = Object.fromEntries(M1_PLAN_KEYS.map((approach) => [approach,
+    Object.values(cells).flatMap((byArchetype) => Object.values(byArchetype)).filter((cell) => cell.viable.includes(approach)).length,
+  ]))
+  report.failures = evaluateM1PlanAudit(report)
+  report.signature = stableCalibrationSignature({ ...report, failures: undefined, signature: undefined })
+  return report
 }
 
 export function opponentMetrics({ squad, samplesPerCell }) {

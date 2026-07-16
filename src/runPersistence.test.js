@@ -36,6 +36,7 @@ function drive(run, { approachFor = () => 'balanced', chooseFn = () => null, sto
   const ctrl = createRunSimulation({
     rating: total, difficulty: run.config.difficulty, squad,
     rng: makeRng(run.seed), runSeed: run.seed,
+    engineVersion: LEGACY_ENGINE_VERSION,
     upgradeContextFor: (mc, p) => buildUpgradeContext(state.owned, mc, p),
   })
   let i = 0
@@ -63,6 +64,7 @@ function drive(run, { approachFor = () => 'balanced', chooseFn = () => null, sto
 
 function snapFor(run, drv, screen) {
   return createRunSnapshot({
+    engineVersion: drv.ctrl.engineVersion,
     config: cfgOf(run), runSeed: run.seed, teamName: 'Test XI', squad: drv.squad, rerollsUsed: 1,
     matches: drv.ctrl.matches, upgradeState: drv.state,
     checkpoint: { screen, resolvedMatchCount: drv.ctrl.resolvedCount, selectedApproach: 'balanced', stageLabel: 'League Phase' },
@@ -86,6 +88,7 @@ function v2Snap({ screen = 'hub', resolved = 0, catalogVersion = 'modern_mix_v2_
   const ctrl = createRunSimulation({
     rating: total, difficulty: 'classic', squad,
     rng: makeRng(24680), runSeed: 24680,
+    engineVersion: LEGACY_ENGINE_VERSION,
     upgradeContextFor: (mc, p) => buildUpgradeContext(state.owned, mc, p),
   })
   for (let i = 0; i < resolved; i++) {
@@ -93,6 +96,7 @@ function v2Snap({ screen = 'hub', resolved = 0, catalogVersion = 'modern_mix_v2_
     ctrl.resolveNext('balanced')
   }
   return createRunSnapshot({
+    engineVersion: ctrl.engineVersion,
     config: { mode: 'random', formation: '4-3-3', pool: 'modern', difficulty: 'classic' },
     dbVersion: 'v2',
     catalogVersion,
@@ -113,7 +117,7 @@ describe('A. snapshot round trip', () => {
     const drv = drive(run, { stopAfter: 5, approachFor: (_, i) => ['balanced', 'control', 'wide', 'counter'][i % 4], chooseFn: (ids) => ids[0] })
     const snap = snapFor(run, drv, 'hub')
     expect(snap.schemaVersion).toBe(SCHEMA_VERSION)
-    expect(snap.engineVersion).toBe(ENGINE_VERSION)
+    expect(snap.engineVersion).toBe(LEGACY_ENGINE_VERSION)
     const round = parseRunSnapshot(serializeRunSnapshot(snap))
     expect(validateRunSnapshot(round)).toBe(true)
     expect(round.run.squadSelections).toHaveLength(11)
@@ -149,6 +153,7 @@ describe('A5. Club Identity persistence', () => {
       const run = baseline.runs[0]
       const drv = drive(run, { stopAfter: 2 })
       const snap = createRunSnapshot({
+        engineVersion: drv.ctrl.engineVersion,
         config: { ...cfgOf(run), clubIdentity }, runSeed: run.seed, teamName: 'Identity XI', squad: drv.squad, rerollsUsed: 1,
         matches: drv.ctrl.matches, upgradeState: drv.state,
         checkpoint: { screen: 'hub', resolvedMatchCount: drv.ctrl.resolvedCount, selectedApproach: 'balanced', stageLabel: 'League Phase' },
@@ -247,6 +252,7 @@ describe('B2. catalogue-aware player resolution', () => {
     expect(rec.catalogVersion).toBe('legacy_v1')
 
     const reSaved = createRunSnapshot({
+      engineVersion: rec.ctrl.engineVersion,
       config: rec.config,
       catalogVersion: rec.catalogVersion,
       dbVersion: rec.dbVersion,
@@ -272,6 +278,7 @@ describe('B2. catalogue-aware player resolution', () => {
     expect(rec.ok).toBe(true)
     expect(rec.catalogVersion).toBe('legacy_v1')
     const reSaved = createRunSnapshot({
+      engineVersion: rec.ctrl.engineVersion,
       config: rec.config,
       catalogVersion: rec.catalogVersion,
       dbVersion: rec.dbVersion,
@@ -303,6 +310,7 @@ describe('B2. catalogue-aware player resolution', () => {
     expect(matchSignature(rec.currentMatch, 0)).toBe(snap.run.signatures.resolvedMatches[0])
 
     const reSaved = createRunSnapshot({
+      engineVersion: rec.ctrl.engineVersion,
       config: rec.config,
       catalogVersion: rec.catalogVersion,
       dbVersion: rec.dbVersion,
@@ -460,7 +468,7 @@ describe('E. Sim All + Daily persistence', () => {
     const squad = squadFromFixture(run)
     const { total } = computeRating(squad)
     const state = { owned: [], offers: [] }
-    const ctrl = createRunSimulation({ rating: total, difficulty: run.config.difficulty, squad, rng: makeRng(run.seed), runSeed: run.seed, upgradeContextFor: (mc, p) => buildUpgradeContext(state.owned, mc, p) })
+    const ctrl = createRunSimulation({ rating: total, difficulty: run.config.difficulty, squad, rng: makeRng(run.seed), runSeed: run.seed, engineVersion: LEGACY_ENGINE_VERSION, upgradeContextFor: (mc, p) => buildUpgradeContext(state.owned, mc, p) })
     ctrl.prepareNext(); ctrl.resolveNext('wide'); ctrl.finishRemaining('balanced')
     const snap = snapFor(run, { ctrl, state, squad }, 'result')
     const rec = reconstructRun(snap)
@@ -656,7 +664,7 @@ describe('F. M0.1 run-level engine version compatibility and lock', () => {
     expect(reSaved.run.signatures.canonicalMatches).toHaveLength(rec.ctrl.resolvedCount)
   })
 
-  it('new controllers and snapshots receive the active legacy version explicitly', () => {
+  it('new default controllers and snapshots receive the active m1 version', () => {
     const run = baseline.runs[0]
     const squad = squadFromFixture(run)
     const ctrl = createRunSimulation({
@@ -667,8 +675,8 @@ describe('F. M0.1 run-level engine version compatibility and lock', () => {
       runSeed: run.seed,
       engineVersion: ACTIVE_ENGINE_VERSION,
     })
-    expect(ACTIVE_ENGINE_VERSION).toBe(LEGACY_ENGINE_VERSION)
-    expect(ctrl.engineVersion).toBe(LEGACY_ENGINE_VERSION)
+    expect(ACTIVE_ENGINE_VERSION).toBe(M1_ENGINE_VERSION)
+    expect(ctrl.engineVersion).toBe(M1_ENGINE_VERSION)
     const state = { owned: [], offers: [] }
     const snap = createRunSnapshot({
       engineVersion: ctrl.engineVersion,
@@ -676,7 +684,7 @@ describe('F. M0.1 run-level engine version compatibility and lock', () => {
       matches: ctrl.matches, upgradeState: state,
       checkpoint: { screen: 'hub', resolvedMatchCount: 0, selectedApproach: 'balanced', stageLabel: 'League Phase' },
     })
-    expect(snap.engineVersion).toBe(LEGACY_ENGINE_VERSION)
+    expect(snap.engineVersion).toBe(M1_ENGINE_VERSION)
   })
 
   it('hub, Watch, post-match, knockout, and completed checkpoints retain one engine version', () => {

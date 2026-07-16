@@ -76,9 +76,9 @@ function firstM1(seed = 1, approach = 'balanced', squad = squadFromPhase3Fixture
 }
 
 describe('M1 causal core invariants', () => {
-  it('is explicitly runnable without public activation', () => {
+  it('is runnable as the active Random engine', () => {
     const { ctrl, match } = firstM1(0x10101010)
-    expect(ACTIVE_ENGINE_VERSION).toBe(LEGACY_ENGINE_VERSION)
+    expect(ACTIVE_ENGINE_VERSION).toBe(M1_ENGINE_VERSION)
     expect(ctrl.engineVersion).toBe(M1_ENGINE_VERSION)
     expect(match.engineVersion).toBe(M1_ENGINE_VERSION)
     expect(match.rngContract).toBe(M1_RNG_CONTRACT)
@@ -163,8 +163,9 @@ describe('M1 causal core invariants', () => {
   it('keeps the development override isolated from production and Daily', () => {
     expect(developmentMatchEngineVersion({ mode: 'random' }, '?engine=m1', true)).toBe(M1_ENGINE_VERSION)
     expect(developmentMatchEngineVersion({ mode: 'daily' }, '?engine=m1', true)).toBe(LEGACY_ENGINE_VERSION)
-    expect(developmentMatchEngineVersion({ mode: 'random' }, '?engine=m1', false)).toBe(LEGACY_ENGINE_VERSION)
-    expect(developmentMatchEngineVersion({ mode: 'random' }, '', true)).toBe(LEGACY_ENGINE_VERSION)
+    expect(developmentMatchEngineVersion({ mode: 'random' }, '?engine=legacy_v1', true)).toBe(LEGACY_ENGINE_VERSION)
+    expect(developmentMatchEngineVersion({ mode: 'random' }, '?engine=legacy_v1', false)).toBe(M1_ENGINE_VERSION)
+    expect(developmentMatchEngineVersion({ mode: 'random' }, '', true)).toBe(M1_ENGINE_VERSION)
   })
 })
 

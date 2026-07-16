@@ -10,6 +10,7 @@ import {
   APPROACH_PROFILE_CAP, INTENT_MIN, INTENT_MAX,
 } from './tacticalApproach'
 import { buildMatchTimeline } from './matchTimeline'
+import { LEGACY_ENGINE_VERSION } from './matchEngineVersions'
 
 const byId = Object.fromEntries(PLAYERS.map((p) => [p.id, p]))
 const squadFromFixture = (run) => run.squad.map(({ slot, id }) => ({ slot, player: byId[id] }))
@@ -35,6 +36,7 @@ function runController(run, approachFor = () => 'balanced') {
   const ctrl = createRunSimulation({
     rating: total, difficulty: run.config.difficulty, squad,
     rng: makeRng(run.seed), runSeed: run.seed,
+    engineVersion: LEGACY_ENGINE_VERSION,
   })
   let i = 0
   while (!ctrl.isDone) {
@@ -216,7 +218,7 @@ describe('staged run controller', () => {
     const run = baseline.runs[2]
     const squad = squadFromFixture(run)
     const { total } = computeRating(squad)
-    const ctrl = createRunSimulation({ rating: total, difficulty: run.config.difficulty, squad, rng: makeRng(run.seed), runSeed: run.seed })
+    const ctrl = createRunSimulation({ rating: total, difficulty: run.config.difficulty, squad, rng: makeRng(run.seed), runSeed: run.seed, engineVersion: LEGACY_ENGINE_VERSION })
     const pending = ctrl.prepareNext()
     expect(Object.keys(pending.previews).sort()).toEqual([...APPROACH_KEYS].sort())
     expect(pending.result).toBeUndefined()
@@ -235,7 +237,7 @@ describe('staged run controller', () => {
     const run = baseline.runs[1]
     const squad = squadFromFixture(run)
     const { total } = computeRating(squad)
-    const mk = () => createRunSimulation({ rating: total, difficulty: run.config.difficulty, squad, rng: makeRng(run.seed), runSeed: run.seed })
+    const mk = () => createRunSimulation({ rating: total, difficulty: run.config.difficulty, squad, rng: makeRng(run.seed), runSeed: run.seed, engineVersion: LEGACY_ENGINE_VERSION })
     const a = mk()
     a.prepareNext(); a.resolveNext('counter')
     a.finishRemaining('balanced')

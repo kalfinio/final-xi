@@ -155,6 +155,7 @@ export function approachFit(approachKey, previews, baseProfile) {
   const sel = previews[approachKey]
   const base = previews.balanced
   if (!sel || !base) return ''
+  if (sel.m1Preview) return sel.m1Preview.fit
   if (approachKey === 'balanced') {
     return base.keyAdvantage
       ? `Natural fit: ${base.keyAdvantage.text.charAt(0).toLowerCase()}${base.keyAdvantage.text.slice(1)}`
@@ -204,8 +205,11 @@ export function approachFeedback({ approach = 'balanced', matchup = null, detail
     const influenced = causal.plan?.influencedEvents || 0
     if (approach === 'control') {
       const settled = (shares.central_buildup || 0) + (shares.one_two || 0) + (shares.switch_of_play || 0)
-      if (influenced > 0 && settled >= 0.45 && poss >= 52) return 'Control Tempo produced the settled central spells shown in the event log.'
-      return 'Control Tempo was selected, but the match never settled into sustained control.'
+      if (influenced > 0 && settled >= 0.45 && poss >= 52) {
+        if ((causal.plan?.downsideMetric || 0) > 0) return 'Control Tempo produced settled buildup, but the event log also shows sterile possession against their compact shape.'
+        return 'Control Tempo produced the settled central spells shown in the event log.'
+      }
+      return 'Control Tempo was selected, but the match never turned its possession into sustained penetration.'
     }
     if (approach === 'wide') {
       const wideShare = (shares.wide_overlap || 0) + (shares.cross || 0) + (shares.cutback || 0)
@@ -215,7 +219,7 @@ export function approachFeedback({ approach = 'balanced', matchup = null, detail
     if (approach === 'counter') {
       const counterShare = (shares.counterattack || 0) + (shares.direct_attack || 0) + (shares.pressing_recovery || 0)
       if (influenced > 0 && counterShare >= 0.35) return 'The event log shows the counter plan creating fast, direct attacks.'
-      return 'The counter plan was selected, but the recorded match offered little usable transition space.'
+      return 'The counter plan found little usable transition space and produced too few settled attacks.'
     }
     return 'Balanced kept the route mix tied to the XI’s natural structure.'
   }
