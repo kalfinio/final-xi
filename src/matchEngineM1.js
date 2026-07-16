@@ -381,10 +381,93 @@ export function m1ScoreStateOpportunityMultiplier({ us = 0, opp = 0, side = 'us'
 const ARCHETYPE_TEMPO = Object.freeze({ pressing: 1.1, technical: 0.96, defensive: 0.84, attacking: 1.14, physical: 1.04, elite: 1, underdog: 0.86 })
 const PLAN_VOLUME = Object.freeze({
   balanced: { us: 1, opp: 1 },
-  control: { us: 0.96, opp: 0.88 },
+  control: { us: 0.94, opp: 0.94 },
   wide: { us: 1.08, opp: 1.11 },
-  counter: { us: 0.84, opp: 1.05 },
+  counter: { us: 0.91, opp: 1.06 },
 })
+
+const M1_PREVIEW_ARCHETYPE_FIT = Object.freeze({
+  balanced: Object.freeze({ pressing: 0, technical: 0.2, defensive: 0.15, attacking: 0, physical: 0.1, elite: 0.35, underdog: 0.1 }),
+  control: Object.freeze({ pressing: 0.2, technical: 0.85, defensive: -1.15, attacking: 0.05, physical: 0.65, elite: 0.25, underdog: -1.15 }),
+  wide: Object.freeze({ pressing: -0.1, technical: 0.1, defensive: 1.2, attacking: -0.15, physical: 0.45, elite: 0.1, underdog: 1.2 }),
+  counter: Object.freeze({ pressing: 1.25, technical: -0.15, defensive: -1.25, attacking: 1.25, physical: -0.35, elite: 0.15, underdog: -1.25 }),
+})
+
+function m1PlanProfileSupport(approach, profile) {
+  if (approach === 'control') return clamp((((profile?.buildupSecurity ?? 65) + (profile?.midfieldControl ?? 69)) / 2 - 67) / 12, -0.7, 0.7)
+  if (approach === 'wide') return clamp(((profile?.width ?? 68) - 68) / 12, -0.7, 0.7)
+  if (approach === 'counter') return clamp(((profile?.transitionThreat ?? 63) - 63) / 12, -0.7, 0.7)
+  const dimensions = ['buildupSecurity', 'midfieldControl', 'width', 'transitionThreat', 'defensiveStability']
+  const weakest = Math.min(...dimensions.map((dimension) => profile?.[dimension] ?? 65))
+  return weakest >= 60 ? 0.2 : 0
+}
+
+function m1PlanPreviewCopy(approach, archetype) {
+  const compact = archetype === 'defensive' || archetype === 'underdog'
+  const aggressive = archetype === 'pressing' || archetype === 'attacking'
+  if (approach === 'control') return {
+    benefit: 'Settled central buildup can improve control and reduce open transitions.',
+    risk: compact
+      ? 'Their compact block can turn extra possession sterile and lower the chance ceiling.'
+      : 'Reduced directness can leave fewer quick, high-quality attacks.',
+  }
+  if (approach === 'wide') return {
+    benefit: compact
+      ? 'Width, crosses and cutbacks can stretch their compact defensive shape.'
+      : 'Overlaps and deliveries create a distinct route around central pressure.',
+    risk: 'Failed wide attacks can expose central transitions.',
+  }
+  if (approach === 'counter') return {
+    benefit: aggressive
+      ? 'Their aggressive shape leaves space for counter and direct attacks.'
+      : 'Fast transition routes can turn recoveries into higher-variance chances.',
+    risk: compact
+      ? 'Their deep block removes transition space and leaves fewer settled chances.'
+      : 'Lower possession and fewer settled attacks reduce control when breaks fail.',
+  }
+  return {
+    benefit: 'A stable route mix lets the XI use its natural all-round structure.',
+    risk: 'No specialist plan means no targeted matchup edge.',
+  }
+}
+
+function m1PreviewLabel(score) {
+  if (score >= 1) return 'Strong Edge'
+  if (score >= 0.35) return 'Slight Edge'
+  if (score > -0.35) return 'Even'
+  if (score > -1) return 'Slight Concern'
+  return 'Difficult Matchup'
+}
+
+// Engine-aware Match Hub adapter. It preserves the legacy matchup mechanics
+// object used by route resolution, while replacing only player-facing advice
+// with deterministic evidence from M1's actual plan/archetype tradeoffs and
+// this XI's tactical profile. No result probability or RNG enters the preview.
+export function buildM1ApproachPreviews({ baseProfile, opponent, legacyPreviews }) {
+  const archetype = opponent?.archetype || 'elite'
+  const evidence = Object.fromEntries(Object.keys(PLAN_ROUTE_MULTIPLIERS).map((approach) => {
+    const score = (M1_PREVIEW_ARCHETYPE_FIT[approach]?.[archetype] || 0) + m1PlanProfileSupport(approach, baseProfile)
+    return [approach, { score, ...m1PlanPreviewCopy(approach, archetype) }]
+  }))
+  const bestScore = Math.max(...Object.values(evidence).map((value) => value.score))
+  return Object.fromEntries(Object.entries(legacyPreviews).map(([approach, legacy]) => {
+    const current = evidence[approach]
+    const recommended = current.score >= bestScore - 0.2
+    const fit = recommended
+      ? `Recommended fit: ${current.benefit.charAt(0).toLowerCase()}${current.benefit.slice(1)}`
+      : current.score <= -0.55
+        ? `Poor fit: ${current.risk.charAt(0).toLowerCase()}${current.risk.slice(1)}`
+        : `Tradeoff: ${current.benefit.charAt(0).toLowerCase()}${current.benefit.slice(1)} ${current.risk}`
+    return [approach, {
+      ...legacy,
+      engineVersion: 'm1',
+      overallLabel: m1PreviewLabel(current.score),
+      keyAdvantage: { dim: 'causalPlan', text: current.benefit, past: current.benefit },
+      keyRisk: { dim: 'causalPlan', text: current.risk, past: current.risk },
+      m1Preview: { archetype, score: round2(current.score), recommended, benefit: current.benefit, risk: current.risk, fit },
+    }]
+  }))
+}
 
 function opportunityPressure({ side, qualityProbability, approach, archetype, window, score, tempo, exposure, home }) {
   const state = scoreStateFor(score.us, score.opp, side, window.phase)
@@ -393,7 +476,17 @@ function opportunityPressure({ side, qualityProbability, approach, archetype, wi
   const quality = side === 'us'
     ? 0.2 + qualityProbability * 1.35
     : 1.725 - qualityProbability * 1.25
-  const plan = PLAN_VOLUME[approach]?.[side] || 1
+  let plan = PLAN_VOLUME[approach]?.[side] || 1
+  // Context prices the two specialist plans through opportunity creation,
+  // never through a result bonus. Counter recovers volume only when an
+  // aggressive opponent leaves space, while a low block preserves its
+  // settled-attack tax. Control becomes sterile against the same compact
+  // shapes instead of receiving cheap safety everywhere.
+  if (side === 'us' && approach === 'counter') {
+    if (archetype === 'pressing' || archetype === 'attacking') plan *= 1.05
+    else if (archetype === 'defensive' || archetype === 'underdog') plan *= 0.91
+  }
+  if (side === 'us' && approach === 'control' && (archetype === 'defensive' || archetype === 'underdog')) plan *= 0.9
   const archetypeTempo = ARCHETYPE_TEMPO[archetype] || 1
   const venue = side === 'us' ? (home === false ? 0.985 : 1.015) : (home === false ? 1.015 : 0.985)
   return clamp(quality * plan * archetypeTempo * window.tempo * statePressure(state) * tempo * venue * (exposure ? 1.16 : 1), 0.48, 1.62)
@@ -502,6 +595,9 @@ function progressionProbability({ side, route, qualityProbability, approach, arc
   probability += stateDelta
 
   if (archetype === 'pressing') probability += side === 'us' ? (['central_buildup', 'one_two'].includes(route) ? -0.075 : ['counterattack', 'direct_attack'].includes(route) ? 0.065 : 0) : (route === 'pressing_recovery' ? 0.065 : 0)
+  if (side === 'us' && approach === 'counter' && archetype === 'attacking' && ['counterattack', 'direct_attack', 'pressing_recovery'].includes(route)) probability += 0.045
+  if (side === 'us' && approach === 'counter' && archetype === 'elite' && ['counterattack', 'direct_attack'].includes(route)) probability += 0.025
+  if (side === 'us' && approach === 'control' && (archetype === 'defensive' || archetype === 'underdog') && ['central_buildup', 'one_two', 'through_ball'].includes(route)) probability -= 0.03
   if (archetype === 'defensive' || archetype === 'underdog') probability += side === 'us' ? (['central_buildup', 'through_ball'].includes(route) ? -0.09 : ['wide_overlap', 'switch_of_play'].includes(route) ? 0.025 : 0) : 0.025
   if (archetype === 'physical') probability += side === 'us' ? (['wide_overlap', 'switch_of_play'].includes(route) ? 0.04 : ['direct_attack', 'set_piece'].includes(route) ? -0.035 : 0) : (['direct_attack', 'cross', 'set_piece'].includes(route) ? 0.045 : 0)
   if (archetype === 'technical' && side === 'opp' && ['central_buildup', 'one_two', 'through_ball'].includes(route)) probability += 0.045
@@ -556,24 +652,39 @@ function chanceQuality({ side, route, qualityProbability, approach, archetype, p
 
   const planCauses = []
   if (side === 'us' && approach === 'control') {
-    if (['central_buildup', 'one_two', 'switch_of_play'].includes(route)) { xg += 0.012; planCauses.push('control:settled-quality') }
+    if (['central_buildup', 'one_two', 'switch_of_play'].includes(route)) { xg += 0.004; planCauses.push('control:settled-quality') }
     if (['counterattack', 'direct_attack'].includes(route)) { xg -= 0.025; planCauses.push('control:lower-directness') }
+    if ((archetype === 'defensive' || archetype === 'underdog') && ['central_buildup', 'one_two', 'through_ball'].includes(route)) {
+      xg -= 0.025
+      planCauses.push('control:sterile-possession')
+    }
   }
   if (side === 'us' && approach === 'wide') {
     if (route === 'cutback') { xg += 0.035; planCauses.push('wide:cutback-quality') }
     if (route === 'cross') { xg -= 0.006; planCauses.push('wide:cross-volume-tradeoff') }
   }
   if (side === 'us' && approach === 'counter') {
-    if (route === 'counterattack') { xg += 0.045; planCauses.push('counter:space-quality') }
+    if (route === 'counterattack') { xg += 0.06; planCauses.push('counter:space-quality') }
     if (['central_buildup', 'one_two'].includes(route)) { xg -= 0.02; planCauses.push('counter:lower-settled-quality') }
   }
 
   const opponentCauses = []
   if (side === 'us') {
-    if (archetype === 'pressing' && ['counterattack', 'direct_attack'].includes(route)) { xg += 0.045; opponentCauses.push('pressing:space-behind') }
+    if (archetype === 'pressing' && ['counterattack', 'direct_attack'].includes(route)) {
+      xg += 0.045 + (approach === 'counter' ? 0.02 : 0)
+      opponentCauses.push('pressing:space-behind')
+    }
     if ((archetype === 'defensive' || archetype === 'underdog') && ['central_buildup', 'through_ball'].includes(route)) { xg -= 0.035; opponentCauses.push(`${archetype}:central-protection`) }
     if ((archetype === 'defensive' || archetype === 'underdog') && route === 'cutback') { xg += 0.018; opponentCauses.push(`${archetype}:wide-concession`) }
-    if (archetype === 'attacking' && route === 'counterattack') { xg += 0.045; opponentCauses.push('attacking:transition-space') }
+    if (archetype === 'attacking' && route === 'counterattack') {
+      xg += 0.045 + (approach === 'counter' ? 0.035 : 0)
+      opponentCauses.push('attacking:transition-space')
+    }
+    if (archetype === 'attacking' && approach === 'counter' && ['direct_attack', 'pressing_recovery'].includes(route)) {
+      xg += route === 'direct_attack' ? 0.035 : 0.025
+      opponentCauses.push('attacking:transition-space')
+    }
+    if (archetype === 'elite' && approach === 'counter' && route === 'counterattack') { xg += 0.02; opponentCauses.push('elite:space-behind') }
     if (archetype === 'physical' && ['cross', 'set_piece'].includes(route)) { xg -= 0.018; opponentCauses.push('physical:aerial-pressure') }
   } else {
     if (archetype === 'attacking' && ['counterattack', 'through_ball'].includes(route)) xg += 0.025
@@ -791,7 +902,7 @@ function causalSummaryFor({ metrics, causalEvents, approach, archetype }) {
   const ownFailures = causalEvents.filter((event) => event.side === 'us' && event.progression !== 'success').length
   const concessionTransitions = causalEvents.filter((event) => event.side === 'opp' && event.dangerousTransition).length
   let downsideMetric
-  if (approach === 'control') downsideMetric = causalEvents.filter((event) => event.side === 'us' && ['counterattack', 'direct_attack'].includes(event.route)).length
+  if (approach === 'control') downsideMetric = causalEvents.filter((event) => event.side === 'us' && event.causes.plan.includes('control:sterile-possession')).length
   else if (approach === 'wide') downsideMetric = concessionTransitions
   else if (approach === 'counter') downsideMetric = causalEvents.filter((event) => event.side === 'us' && ['central_buildup', 'one_two'].includes(event.route) && event.progression !== 'success').length + Math.max(0, metrics.away.opportunities - metrics.home.opportunities)
   else downsideMetric = 0

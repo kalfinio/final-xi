@@ -3,8 +3,8 @@
 //
 // The run-level version is authoritative for every match in that run.  M1 is
 // registered so persistence and dispatch have a stable insertion point. M1 is
-// explicitly runnable for tests/development, but the active public version
-// remains the frozen legacy resolver until a separate activation audit.
+// explicitly runnable and is the active engine for newly-created Random runs.
+// Daily is held on legacy_v1 by selectEngineVersionForNewRun().
 // ---------------------------------------------------------------------------
 
 export const LEGACY_ENGINE_VERSION = 'legacy_v1'
@@ -28,9 +28,25 @@ export const ENGINE_VERSIONS = Object.freeze({
   }),
 })
 
-// M0/M0.1 must not activate M1.  A future activation change must be explicit,
-// audited, and (for Daily) made at a declared date/ruleset boundary.
-export const ACTIVE_ENGINE_VERSION = LEGACY_ENGINE_VERSION
+export const ACTIVE_ENGINE_VERSION = M1_ENGINE_VERSION
+
+// Central new-run policy. Resume never calls this function: persisted
+// engineVersion remains authoritative in reconstructRun(). Daily is frozen on
+// legacy_v1 regardless of pool, environment, query string, or active default.
+export function selectEngineVersionForNewRun({
+  mode = null,
+  pool = null,
+  requestedEngineVersion = null,
+  isDevelopment = false,
+} = {}) {
+  void pool // both supported Random pools activate together
+  if (mode === 'daily') return LEGACY_ENGINE_VERSION
+  if (mode !== 'random') return LEGACY_ENGINE_VERSION
+  if (isDevelopment && requestedEngineVersion && isRunnableEngineVersion(requestedEngineVersion)) {
+    return requestedEngineVersion
+  }
+  return ACTIVE_ENGINE_VERSION
+}
 
 export function isKnownEngineVersion(engineVersion) {
   return typeof engineVersion === 'string' && Object.hasOwn(ENGINE_VERSIONS, engineVersion)

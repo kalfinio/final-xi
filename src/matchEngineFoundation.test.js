@@ -15,6 +15,7 @@ import {
   isKnownEngineVersion,
   isRunnableEngineVersion,
   resolveMatchByEngineVersion,
+  selectEngineVersionForNewRun,
 } from './matchEngineVersions'
 import {
   calibrationFixture,
@@ -72,14 +73,19 @@ function historicalRunSnapshot(result) {
   }
 }
 
-describe('version registry and frozen legacy dispatch', () => {
-  it('keeps legacy_v1 active while registering m1 as explicitly runnable', () => {
-    expect(ACTIVE_ENGINE_VERSION).toBe(LEGACY_ENGINE_VERSION)
+describe('version registry, activation policy, and frozen legacy dispatch', () => {
+  it('activates m1 for new Random runs while centrally isolating Daily', () => {
+    expect(ACTIVE_ENGINE_VERSION).toBe(M1_ENGINE_VERSION)
     expect(Object.keys(ENGINE_VERSIONS).sort()).toEqual([LEGACY_ENGINE_VERSION, M1_ENGINE_VERSION].sort())
     expect(isKnownEngineVersion(LEGACY_ENGINE_VERSION)).toBe(true)
     expect(isRunnableEngineVersion(LEGACY_ENGINE_VERSION)).toBe(true)
     expect(isKnownEngineVersion(M1_ENGINE_VERSION)).toBe(true)
     expect(isRunnableEngineVersion(M1_ENGINE_VERSION)).toBe(true)
+    expect(selectEngineVersionForNewRun({ mode: 'random', pool: 'modern' })).toBe(M1_ENGINE_VERSION)
+    expect(selectEngineVersionForNewRun({ mode: 'random', pool: 'legends' })).toBe(M1_ENGINE_VERSION)
+    expect(selectEngineVersionForNewRun({ mode: 'daily', pool: 'modern' })).toBe(LEGACY_ENGINE_VERSION)
+    expect(selectEngineVersionForNewRun({ mode: 'daily', pool: 'legends' })).toBe(LEGACY_ENGINE_VERSION)
+    expect(selectEngineVersionForNewRun({ mode: 'daily', requestedEngineVersion: M1_ENGINE_VERSION, isDevelopment: true })).toBe(LEGACY_ENGINE_VERSION)
   })
 
   it('dispatches each version only to its explicit resolver', () => {

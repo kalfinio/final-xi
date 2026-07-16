@@ -11,6 +11,7 @@ import {
   MAX_UPGRADES_PER_RUN, UPGRADE_DIM_CAP, UPGRADE_INTENT_MIN, UPGRADE_INTENT_MAX,
 } from './runUpgrades'
 import { buildMatchTimeline } from './matchTimeline'
+import { LEGACY_ENGINE_VERSION } from './matchEngineVersions'
 
 const byId = Object.fromEntries(PLAYERS.map((p) => [p.id, p]))
 const squadFromFixture = (run) => run.squad.map(({ slot, id }) => ({ slot, player: byId[id] }))
@@ -34,6 +35,7 @@ function runWithUpgrades(run, { pickAt = () => null, approachFor = () => 'balanc
   const ctrl = createRunSimulation({
     rating: total, difficulty: run.config.difficulty, squad,
     rng: makeRng(run.seed), runSeed: run.seed,
+    engineVersion: LEGACY_ENGINE_VERSION,
     upgradeContextFor: (mc, profile) => buildUpgradeContext(state.owned, mc, profile),
   })
   let i = 0
@@ -281,6 +283,7 @@ describe('full-run integration', () => {
       const ctrl = createRunSimulation({
         rating: total, difficulty: run.config.difficulty, squad,
         rng: makeRng(run.seed), runSeed: run.seed,
+        engineVersion: LEGACY_ENGINE_VERSION,
         upgradeContextFor: (mc, p) => buildUpgradeContext(state.owned, mc, p),
       })
       return { state, ctrl }

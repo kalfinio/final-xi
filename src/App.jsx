@@ -58,7 +58,7 @@ import {
   createRunSnapshot, saveRunSnapshot, loadRunSnapshot, clearRunSnapshot,
   snapshotSummary, reconstructRun,
 } from './runPersistence'
-import { ACTIVE_ENGINE_VERSION, M1_ENGINE_VERSION } from './matchEngineVersions'
+import { LEGACY_ENGINE_VERSION, M1_ENGINE_VERSION, selectEngineVersionForNewRun } from './matchEngineVersions'
 import { catalogueSlotOptions, activationCatalogVersion, getCatalogue } from './data/v2/catalogues'
 import {
   CLUB_IDENTITIES,
@@ -82,11 +82,14 @@ const TOTAL_REROLLS = 3
 // false, Daily explicitly ignores the override, and the chosen controller
 // version is persisted normally so refresh/Resume exercises the real path.
 export function developmentMatchEngineVersion(config, search = null, isDevelopment = import.meta.env.DEV) {
-  if (!isDevelopment || config?.mode === 'daily') return ACTIVE_ENGINE_VERSION
   const query = search ?? (typeof window !== 'undefined' ? window.location.search : '')
-  return new URLSearchParams(query).get('engine') === M1_ENGINE_VERSION
-    ? M1_ENGINE_VERSION
-    : ACTIVE_ENGINE_VERSION
+  const requested = new URLSearchParams(query).get('engine')
+  return selectEngineVersionForNewRun({
+    mode: config?.mode,
+    pool: config?.pool,
+    requestedEngineVersion: requested === M1_ENGINE_VERSION || requested === LEGACY_ENGINE_VERSION ? requested : null,
+    isDevelopment,
+  })
 }
 
 // ---------------------------------------------------------------------------
