@@ -13,6 +13,7 @@
 
 import {
   makeRng, shuffle, combineSeed, FORMATIONS, computeRating, playerPoints, getEligiblePlayers,
+  squadStrengthBreakdown,
 } from '../../data'
 import { catalogueEligiblePlayers, catalogueMembers } from './catalogues'
 import { v2PlayerById } from './index'
@@ -33,7 +34,10 @@ export function membersResolver(members, pool = 'modern') {
   )
 }
 
-const tierOf = (p) => v2PlayerById[p.id]?.tier || (p.era === 'legend' ? 'elite' : 'unknown')
+// Tier resolves from the CATALOGUE-RESOLVED record when present (an R1 view
+// must report R1 tiers); the current-master lookup remains only for V1
+// objects, which carry no versioned record.
+const tierOf = (p) => p.v2Source?.tier || v2PlayerById[p.id]?.tier || (p.era === 'legend' ? 'elite' : 'unknown')
 const isPremium = (t) => t === 'elite' || t === 'goat_candidate' || t === 'goat'
 
 // One deterministic draft under a first-choice policy, given an eligible resolver.
@@ -50,7 +54,15 @@ export function simulateDraftWith(eligible, { seed, formation }) {
     used.push(offer[0].id)
     squad.push({ slot: slots[i], player: offer[0] })
   }
-  return { completed, rating: completed ? computeRating(squad).total : null, offered, squad }
+  const strength = completed ? squadStrengthBreakdown(squad) : null
+  return {
+    completed,
+    rating: completed ? computeRating(squad).total : null,
+    rawStrength: strength?.rawStrength ?? null,
+    effectiveStrength: strength?.effectiveStrength ?? null,
+    offered,
+    squad,
+  }
 }
 
 export function simulateDraft(catalogVersion, { seed, formation, pool = 'modern' }) {
@@ -70,6 +82,8 @@ export function slotDepth(catalogVersion, pool = 'modern') {
 // Core sweep over an eligible resolver → aggregate activation-health metrics.
 export function sweep(eligible, { seeds = 500, formations = SIM_FORMATIONS, label = 'pool' } = {}) {
   const ratings = []
+  const rawStrengths = []
+  const effectiveStrengths = []
   let drafts = 0
   let completedDrafts = 0
   let offeredCount = 0
@@ -83,7 +97,12 @@ export function sweep(eligible, { seeds = 500, formations = SIM_FORMATIONS, labe
     for (const formation of formations) {
       drafts++
       const r = simulateDraftWith(eligible, { seed, formation })
-      if (r.completed) { completedDrafts++; ratings.push(r.rating) }
+      if (r.completed) {
+        completedDrafts++
+        ratings.push(r.rating)
+        rawStrengths.push(r.rawStrength)
+        effectiveStrengths.push(r.effectiveStrength)
+      }
       for (const p of r.offered) {
         offeredCount++
         offerPtsSum += playerPoints(p)
@@ -99,6 +118,8 @@ export function sweep(eligible, { seeds = 500, formations = SIM_FORMATIONS, labe
   const n = ratings.length
   const sorted = [...ratings].sort((a, b) => a - b)
   const mean = n ? ratings.reduce((a, b) => a + b, 0) / n : 0
+  const rawMean = n ? rawStrengths.reduce((a, b) => a + b, 0) / n : 0
+  const effectiveMean = n ? effectiveStrengths.reduce((a, b) => a + b, 0) / n : 0
   const tierPct = {}
   for (const [t, c] of Object.entries(tierOffers)) tierPct[t] = +(100 * c / offeredCount).toFixed(2)
   // Repeated-player concentration: how much of all offers the busiest players soak up.
@@ -113,6 +134,8 @@ export function sweep(eligible, { seeds = 500, formations = SIM_FORMATIONS, labe
     formationCompletion: +(100 * completedDrafts / drafts).toFixed(2),
     avgOfferPoints: offeredCount ? +(offerPtsSum / offeredCount).toFixed(2) : 0,
     avgXIRating: +mean.toFixed(2),
+    avgRawStrength: +rawMean.toFixed(2),
+    avgEffectiveStrength: +effectiveMean.toFixed(2),
     minXIRating: sorted[0] ?? null,
     maxXIRating: sorted[n - 1] ?? null,
     medianXIRating: n ? sorted[Math.floor(n / 2)] : null,

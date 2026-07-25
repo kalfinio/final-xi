@@ -8,6 +8,7 @@ import {
   playerBreakdown,
   canPlay,
   computeRating,
+  squadStrengthBreakdown,
   squadMVP,
   smartestPick,
   topBonus,
@@ -176,7 +177,7 @@ function HowToStep({ n, title, children }) {
   )
 }
 
-function HowToPlay() {
+export function HowToPlay() {
   return (
     <div className="mt-2 p-4 rounded-lg bg-card border border-border space-y-3">
       <HowToStep n={1} title="Choose your run">Random Run gives a fresh draft each time. Daily Challenge gives everyone the same draft for the day.</HowToStep>
@@ -184,11 +185,11 @@ function HowToPlay() {
       <HowToStep n={3} title="Choose your player pool">Legends Only is classic icons. Modern Mix adds modern stars.</HowToStep>
       <HowToStep n={4} title="Choose a Club Identity">Decide what kind of team you want to build. Identity guides recruitment; it does not lock your match plan.</HowToStep>
       <HowToStep n={5} title="Pick a formation">The formation decides which positions you need to fill.</HowToStep>
-      <HowToStep n={6} title="Draft your XI">Compare Player Quality, Identity Fit, and Squad Need. The biggest name is not always the best pick.</HowToStep>
+      <HowToStep n={6} title="Draft your XI">Compare Player Quality, Identity Alignment, and Squad Need. Alignment shows how naturally a player matches your squad style — it does not directly increase match probability.</HowToStep>
       <HowToStep n={7} title="Set Your XI">Rearrange players into their real eligible positions. Illegal moves are blocked.</HowToStep>
-      <HowToStep n={8} title="Build your squad rating">Player value + traits + chemistry + role synergies − weaknesses. A higher Final Rating improves your European Run odds.</HowToStep>
-      <HowToStep n={9} title="Play the European Run">Finish in the top 24 to reach the knockouts, then survive each tie to Conquer Europe.</HowToStep>
-      <div className="pt-1 border-t border-border text-xs text-gold/80">A strong XI combines individual quality, tactical fit, and squad balance.</div>
+      <HowToStep n={8} title="Build your squad strength">Player value, current-ability traits, squad bonuses, and weaknesses shape your European Run odds. R2 shows both raw and effective strength.</HowToStep>
+      <HowToStep n={9} title="Play the European Run">Pick a Match Plan for each opponent, then finish in the top 24 to reach the knockouts and survive each tie to Conquer Europe.</HowToStep>
+      <div className="pt-1 border-t border-border text-xs text-gold/80">A strong XI combines individual quality, tactical alignment, and squad balance.</div>
     </div>
   )
 }
@@ -227,7 +228,7 @@ function HowToPlayModal({ onClose }) {
         <p className="text-xs text-secondary mb-4">The whole game in four steps.</p>
         <div className="space-y-3 mb-5">
           <HowToStep n={1} title="Choose your style">Pick a Club Identity, then a formation for the team you want to build.</HowToStep>
-          <HowToStep n={2} title="Draft with a reason">Compare Player Quality, Identity Fit, and Squad Need. Star power alone is not enough.</HowToStep>
+          <HowToStep n={2} title="Draft with a reason">Compare Player Quality, Identity Alignment, and Squad Need. Star power alone is not enough.</HowToStep>
           <HowToStep n={3} title="Name & plan">Name your team, then open Tactical Breakdown to see your in / out-of-possession shape.</HowToStep>
           <HowToStep n={4} title="Play the European Run">Go match by match — Watch Match, Quick Sim, or Sim All to the final result.</HowToStep>
         </div>
@@ -361,7 +362,7 @@ function IntroScreen({ onStart, stats, savedRun, onResume, resumeError }) {
         {firstTime && <p className="fx-in fx-d3 text-[11px] text-secondary -mt-3 mb-5">New? Casual is recommended for your first run.</p>}
 
         <h2 className="fx-in fx-d4 text-xs uppercase tracking-widest text-secondary mb-2">Club Identity</h2>
-        <p className="fx-in fx-d4 text-xs text-secondary mb-3">What kind of team are you trying to build? This guides recruitment, not your match-by-match plan.</p>
+        <p className="fx-in fx-d4 text-xs text-secondary mb-3">Your Club Identity shapes recruitment and squad alignment. You can still choose a different Match Plan before every match.</p>
         <div className="fx-in fx-d4 grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
           {CLUB_IDENTITIES.map((option) => {
             const active = identity === option.key
@@ -467,7 +468,7 @@ function FormationMini({ slots }) {
 // ---------------------------------------------------------------------------
 // Draft card: plain-language decision layer first, expert detail on demand.
 // ---------------------------------------------------------------------------
-function PlayerDetails({ player, slot, fit, tradeoff }) {
+export function PlayerDetails({ player, slot, fit, tradeoff }) {
   const b = playerBreakdown(player)
   const suitability = playerRoleSuitability(player)
   const signatures = playerSignatures(player)
@@ -496,7 +497,7 @@ function PlayerDetails({ player, slot, fit, tradeoff }) {
         </div>
       )}
       <div>
-        <div className="text-[10px] uppercase tracking-widest text-gold/80 mb-1">{fit.identityName} fit: {fit.label}</div>
+        <div className="text-[10px] uppercase tracking-widest text-gold/80 mb-1">{fit.identityName} alignment: {fit.label}</div>
         <div className="space-y-1 text-secondary">
           {fit.why.map((reason) => <div key={reason}><span className="text-success">+</span> {reason}</div>)}
           {tradeoff && <div><span className="text-gold">Tradeoff:</span> {tradeoff}</div>}
@@ -525,13 +526,13 @@ function PlayerDetails({ player, slot, fit, tradeoff }) {
 }
 
 function fitStyle(label) {
-  if (label === 'EXCELLENT') return 'text-success border-success/40 bg-success/5'
+  if (label === 'STRONG') return 'text-success border-success/40 bg-success/5'
   if (label === 'GOOD') return 'text-gold border-gold/40 bg-gold/5'
   if (label === 'WEAK') return 'text-danger border-danger/40 bg-danger/5'
   return 'text-primary border-border bg-surface'
 }
 
-function PlayerCard({ player, onPick, slot, identityKey, squadNeed }) {
+export function PlayerCard({ player, onPick, slot, identityKey, squadNeed }) {
   const [open, setOpen] = useState(false)
   const fit = calculateIdentityFit(player, identityKey)
   const quality = playerQualityTier(player)
@@ -561,7 +562,7 @@ function PlayerCard({ player, onPick, slot, identityKey, squadNeed }) {
 
       <div className={`rounded border p-2.5 mb-2 text-xs ${fitStyle(fit.label)}`}>
         <div className="flex justify-between gap-2 font-bold">
-          <span>{fit.identityName} FIT</span>
+          <span>{fit.identityName} ALIGNMENT</span>
           <span>{fit.label}</span>
         </div>
         {squadNeed && <div className="mt-2 pt-2 border-t border-current/20"><span className="font-bold">{squadNeed.label}</span><span className="block mt-0.5 opacity-80">{squadNeed.detail}</span></div>}
@@ -597,17 +598,17 @@ function SquadPreview({ squad, activeIndex }) {
 // ---------------------------------------------------------------------------
 // Draft
 // ---------------------------------------------------------------------------
-function DraftGuidance({ identityKey, onClose }) {
+export function DraftGuidance({ identityKey, onClose }) {
   const [exampleOpen, setExampleOpen] = useState(false)
   const identity = clubIdentity(identityKey)
   return (
     <div className="mb-5 p-4 rounded-lg border border-gold/40 bg-gold/5">
       <div className="text-[10px] uppercase tracking-widest text-gold/80 mb-1">A strong team is more than star power</div>
       <div className="font-bold text-primary mb-1">The highest-rated player is not always the best pick.</div>
-      <p className="text-xs text-secondary leading-snug">Player Quality shows broad individual level. Look at Quality, {identity.name} Fit, and Squad Need together.</p>
+      <p className="text-xs text-secondary leading-snug">Player Quality shows broad individual level. Look at Quality, {identity.name} Alignment, and Squad Need together. Alignment shows how naturally the player matches your squad style — it does not directly increase match probability.</p>
       {exampleOpen && (
         <div className="mt-3 p-3 rounded bg-bg border border-border text-xs text-secondary leading-snug">
-          A creative star may have the stronger individual profile, while a midfielder who protects the defence can be the better choice when that profile is missing. Fit and Need explain that opportunity cost.
+          A creative star may have the stronger individual profile, while a midfielder who protects the defence can be the better choice when that profile is missing. Alignment and Need explain that opportunity cost.
         </div>
       )}
       <div className="flex flex-wrap gap-2 mt-3">
@@ -685,7 +686,7 @@ function DraftScreen({ config, onComplete }) {
       <div className="text-center mb-6">
         <p className="text-secondary text-xs sm:text-sm uppercase tracking-widest">Pick your</p>
         <h2 className="text-2xl sm:text-3xl font-black text-gold">{SLOT_NAMES[slot]}</h2>
-        <p className="text-[11px] text-secondary mt-2">Compare broad quality with tactical fit and what your squad still needs.</p>
+        <p className="text-[11px] text-secondary mt-2">Compare broad quality with Identity Alignment and what your squad still needs.</p>
       </div>
 
       <PickFeedback feedback={feedback} onClose={() => setFeedback(null)} />
@@ -840,8 +841,12 @@ function StatBox({ label, value, accent }) {
   )
 }
 
-function BonusesScreen({ squad, config, rerollsUsed, onSimulate, initialTeamName }) {
+export function BonusesScreen({ squad, config, rerollsUsed, onSimulate, initialTeamName }) {
   const { base, bonusTotal, total, bonuses, weaknesses } = computeRating(squad)
+  const strength = squadStrengthBreakdown(squad)
+  const usesR2Strength = strength.policy === 'ability'
+  const positiveBonusTotal = bonuses.reduce((sum, bonus) => sum + bonus.pts, 0)
+  const displayStrength = (value) => Number.isInteger(value) ? value : Number(value.toFixed(1))
   const squadProfile = tacticalIdentity(squad)
   const [howOpen, setHowOpen] = useState(false)
   const [tacticsOpen, setTacticsOpen] = useState(false)
@@ -854,18 +859,33 @@ function BonusesScreen({ squad, config, rerollsUsed, onSimulate, initialTeamName
       <h2 className="text-2xl sm:text-3xl font-black text-gold text-center mb-1">Squad Rating</h2>
       <p className="text-center text-secondary text-sm mb-6">Club Identity: <span className="text-primary font-semibold">{clubIdentity(config.clubIdentity)?.name || 'UNSET'}</span><span className="mx-2">·</span>Squad profile: <span className="text-primary font-semibold">{squadProfile}</span><span className="mx-2">·</span>Rerolls: <span className="text-primary font-semibold">{rerollsUsed}</span></p>
 
-      <div className="flex gap-2 sm:gap-3 mb-4">
-        <StatBox label="Player Value" value={base} />
-        <StatBox label="Bonus" value={`${bonusTotal >= 0 ? '+' : ''}${bonusTotal}`} accent={bonusTotal >= 0 ? 'text-success' : 'text-danger'} />
-        <StatBox label="Total" value={total} accent="text-gold" />
-      </div>
+      {usesR2Strength ? (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4">
+          <StatBox label="Player Value" value={base} />
+          <StatBox label="Squad Bonuses" value={`+${positiveBonusTotal}`} accent="text-success" />
+          <StatBox label="Raw Strength" value={displayStrength(strength.rawStrength)} />
+          <StatBox label="Effective Strength" value={displayStrength(strength.effectiveStrength)} accent="text-gold" />
+        </div>
+      ) : (
+        <div className="flex gap-2 sm:gap-3 mb-4">
+          <StatBox label="Player Value" value={base} />
+          <StatBox label="Bonus" value={`${bonusTotal >= 0 ? '+' : ''}${bonusTotal}`} accent={bonusTotal >= 0 ? 'text-success' : 'text-danger'} />
+          <StatBox label="Total" value={total} accent="text-gold" />
+        </div>
+      )}
 
       {/* Plain-English meaning of this screen — quick clarity for new players. */}
       <div className="mb-6 p-3 rounded-lg bg-card border border-border text-xs text-secondary space-y-1">
         <div className="text-[10px] uppercase tracking-widest text-gold/80 mb-1">What this means</div>
-        <div><span className="text-primary font-semibold">Rating</span> = squad quality + chemistry bonuses.</div>
+        {usesR2Strength ? (
+          <>
+            <div><span className="text-primary font-semibold">Raw Strength</span> = player value + active squad bonuses.</div>
+            <div><span className="text-primary font-semibold">Effective Strength</span> = the R2-compressed value used by the engine's win-probability curve.</div>
+            <div><span className="text-primary font-semibold">Weaknesses</span> apply separately as a capped probability penalty.</div>
+          </>
+        ) : <div><span className="text-primary font-semibold">Rating</span> = squad quality + chemistry bonuses.</div>}
         <div><span className="text-primary font-semibold">Strengths</span> help your European Run.</div>
-        <div><span className="text-primary font-semibold">Weaknesses</span> can show up in match commentary.</div>
+        {!usesR2Strength && <div><span className="text-primary font-semibold">Weaknesses</span> can show up in match commentary.</div>}
         <div><span className="text-primary font-semibold">Tactics</span> shape match events and your tactical notes.</div>
       </div>
 
@@ -879,8 +899,18 @@ function BonusesScreen({ squad, config, rerollsUsed, onSimulate, initialTeamName
           <div><span className="text-primary font-semibold">Chemistry Bonuses</span> = squad links and achievements</div>
           <div><span className="text-primary font-semibold">Role Synergies</span> = tactical role combinations</div>
           <div><span className="text-primary font-semibold">Weakness Penalties</span> = squad balance problems</div>
-          <div><span className="text-primary font-semibold">Final Rating</span> = player value + bonuses + role synergies − weaknesses</div>
-          <div className="text-gold/80">A higher Final Rating lifts your odds — but pressure rises every round and the Final is the hardest match.</div>
+          {usesR2Strength ? (
+            <>
+              <div><span className="text-primary font-semibold">Raw Strength</span> = player value + bonuses + role synergies</div>
+              <div><span className="text-primary font-semibold">Effective Strength</span> = compressed Raw Strength; the engine then applies weakness penalties and match context</div>
+              <div className="text-gold/80">Both values are shown above so the number used by the probability curve is never hidden.</div>
+            </>
+          ) : (
+            <>
+              <div><span className="text-primary font-semibold">Final Rating</span> = player value + bonuses + role synergies − weaknesses</div>
+              <div className="text-gold/80">A higher Final Rating lifts your odds — but pressure rises every round and the Final is the hardest match.</div>
+            </>
+          )}
         </div>
       )}
 
@@ -1448,6 +1478,7 @@ export default function App() {
           matchNumber={matchNo}
           firstTime={!stats?.gamesPlayed}
           squadProfile={runRef.current.squadProfile}
+          clubIdentityKey={config?.clubIdentity || null}
           upgrades={upgradeStateRef.current.owned}
           initialApproach={selectedApproachRef.current}
           onApproachChange={(a) => { selectedApproachRef.current = a; persistRun('hub') }}

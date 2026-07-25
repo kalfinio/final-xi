@@ -14,7 +14,8 @@ import {
   ROLE_SUITABILITY_SET,
 } from './schema'
 import { NATIONS, LEAGUES, CLUBS, V2_PLAYERS, nationById, leagueById, clubById, leagueOfClub, v2PlayerById } from './index'
-import { CATALOGUES } from './catalogues'
+import { CATALOGUES, resolvePlayer } from './catalogues'
+import { MODERN_CURATED_R1_ORDERED_IDS } from './curatedManifest'
 import { PLAYERS as V1_PLAYERS } from '../../data'
 
 const POS_SET = new Set(POSITIONS)
@@ -138,12 +139,30 @@ export function validateV2(transferIntel = null) {
     if (!Array.isArray(cat.orderedIds)) { P(`Catalogue ${cat.id} has no orderedIds`); continue }
     if (dupes(cat.orderedIds).length) P(`Catalogue ${cat.id} duplicate ids: ${dupes(cat.orderedIds)}`)
     if (cat.id === 'legacy_v1') for (const msg of validateLegacyV1Order(cat.orderedIds)) P(msg)
-    if (cat.source === 'v2') {
+    if (cat.source === 'v2' || cat.source === 'v2r1' || cat.source === 'v2r2') {
       for (const id of cat.orderedIds) if (!v2PlayerById[id]) P(`Catalogue ${cat.id} references missing V2 player ${id}`)
+      // Every member of a versioned catalogue must actually RESOLVE in that
+      // catalogue's own view (id lists and data views can never drift apart),
+      // with a well-formed positional record.
+      for (const id of cat.orderedIds) {
+        const resolved = resolvePlayer(id, cat.id)
+        if (!resolved) { P(`Catalogue ${cat.id} member ${id} does not resolve in its own view`); continue }
+        if (!Array.isArray(resolved.eligibleSlots) || resolved.eligibleSlots.length === 0) P(`Catalogue ${cat.id} member ${id} has no eligibleSlots`)
+      }
       // modern player accidentally in legends_v2 / legend in modern set anomalies
       if (cat.id === 'legends_v2') {
         for (const id of cat.orderedIds) if (v2PlayerById[id]?.era !== 'legend') W(`Anomaly: non-legend ${id} in legends_v2`)
       }
+    }
+  }
+  // The curated manifest is the single literal membership authority for both
+  // curated revisions: exactly 341 unique ids, used verbatim by R1 and R2.
+  if (MODERN_CURATED_R1_ORDERED_IDS.length !== 341) P(`Curated manifest has ${MODERN_CURATED_R1_ORDERED_IDS.length} ids (expected 341)`)
+  if (dupes([...MODERN_CURATED_R1_ORDERED_IDS]).length) P('Curated manifest contains duplicate ids')
+  for (const catId of ['modern_mix_v2_curated', 'modern_mix_v2_curated_r2']) {
+    const ids = CATALOGUES[catId]?.orderedIds || []
+    if (ids.length !== MODERN_CURATED_R1_ORDERED_IDS.length || ids.some((id, i) => id !== MODERN_CURATED_R1_ORDERED_IDS[i])) {
+      P(`Catalogue ${catId} ordered ids diverge from the literal manifest`)
     }
   }
 

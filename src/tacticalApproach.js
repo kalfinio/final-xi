@@ -148,40 +148,130 @@ export function approachEmphasis(approachKey) {
     .map((d) => `${SHORT_DIM[d]} ${def.modifiers[d] > 0 ? '↑' : '↓'}`)
 }
 
-// Grounded one-line fit sentence: compares this approach's canonical preview
-// against Balanced for the SAME squad and opponent. No probabilities shown,
-// no spoilers, no random flavor.
-export function approachFit(approachKey, previews, baseProfile) {
-  const sel = previews[approachKey]
-  const base = previews.balanced
-  if (!sel || !base) return ''
-  if (sel.m1Preview) return sel.m1Preview.fit
-  if (approachKey === 'balanced') {
-    return base.keyAdvantage
-      ? `Natural fit: ${base.keyAdvantage.text.charAt(0).toLowerCase()}${base.keyAdvantage.text.slice(1)}`
-      : 'Trusts your natural shape against this opponent.'
+// (The old `approachFit` one-liner was removed in the alignment-wording
+// remediation: the redesigned Match Hub renders the Selected Plan Analysis
+// panel — advantage/risk/identity/read — instead, and the function's legacy
+// "…fit:" copy is prohibited user-facing wording. Deliberately deleted, not
+// renamed, so no dead identity-fit strings survive in the bundle.)
+
+// ---------------------------------------------------------------------------
+// Opponent Scout (UX clarity phase). PLAN-INDEPENDENT read of the opponent —
+// archetype, likely style, primary threat, exploitable weakness. Pure data
+// derived from the opponent's archetype only: no result, no probability, no
+// RNG, valid for both engines because it describes the opponent, not a plan.
+// ---------------------------------------------------------------------------
+const OPPONENT_SCOUT_BY_ARCHETYPE = {
+  pressing: {
+    threat: 'They hunt the ball high and punish loose buildup with fast recoveries.',
+    weakness: 'Their aggressive shape leaves space behind once the first press is beaten.',
+  },
+  technical: {
+    threat: 'They can dominate settled midfield possession and pass through a passive block.',
+    weakness: 'They may be vulnerable when forced away from central combinations.',
+  },
+  defensive: {
+    threat: 'They defend deep and compact, protecting the central lanes for ninety minutes.',
+    weakness: 'They concede territory out wide and can be stretched by crosses and cutbacks.',
+  },
+  attacking: {
+    threat: 'They commit numbers forward and create sustained attacking pressure.',
+    weakness: 'Their high commitment leaves transition space when attacks break down.',
+  },
+  physical: {
+    threat: 'They dominate duels, deliveries and set pieces with sheer physicality.',
+    weakness: 'They can be moved around by quick switches and width before the block sets.',
+  },
+  elite: {
+    threat: 'They are strong in every phase and punish any clear mistake.',
+    weakness: 'No structural gift — small edges must be built patiently or on the break.',
+  },
+  underdog: {
+    threat: 'They sit deep, stay disciplined and look for one moment on the counter.',
+    weakness: 'They offer little going forward and can be worn down out wide.',
+  },
+}
+export function opponentScout(opponentMeta) {
+  const archetype = opponentMeta?.archetype || 'elite'
+  const scout = OPPONENT_SCOUT_BY_ARCHETYPE[archetype] || OPPONENT_SCOUT_BY_ARCHETYPE.elite
+  return { archetype, style: opponentMeta?.style || null, threat: scout.threat, weakness: scout.weakness }
+}
+
+// ---------------------------------------------------------------------------
+// Club Identity ↔ Match Plan relationship (UX clarity phase). Presentation
+// only: identities shape squad building; this table just says how NATURAL a
+// per-match plan feels for that identity. It never enters the engine, never
+// changes probabilities, and is deliberately separate from opponent fit.
+// ---------------------------------------------------------------------------
+const IDENTITY_PLAN_FIT = {
+  control: { balanced: 'neutral', control: 'natural', wide: 'neutral', counter: 'stretch' },
+  press: { balanced: 'neutral', control: 'stretch', wide: 'neutral', counter: 'natural' },
+  transition: { balanced: 'neutral', control: 'stretch', wide: 'neutral', counter: 'natural' },
+  fortress: { balanced: 'neutral', control: 'stretch', wide: 'stretch', counter: 'natural' },
+}
+export function identityPlanFit(identityKey, approachKey) {
+  return IDENTITY_PLAN_FIT[identityKey]?.[approachKey] || 'neutral'
+}
+
+// One combined line for the selected plan: opponent read × identity read.
+// `opponentGood` comes from existing preview evidence (m1Preview.recommended
+// or a positive legacy label) — this helper adds no judgement of its own.
+export function identityRelationship({ identityKey, identityName, approachKey, opponentGood = null }) {
+  if (!identityKey || !identityName) return null
+  const fit = identityPlanFit(identityKey, approachKey)
+  if (fit === 'natural') {
+    if (opponentGood === false) return `Matches your ${identityName} identity but may struggle against this opponent.`
+    return `Naturally aligned with your ${identityName} identity.`
   }
-  const diff = sel.probabilityDelta - base.probabilityDelta
-  const def = TACTICAL_APPROACHES[approachKey]
-  // strongest helped/costed dimension for grounded wording
-  const helped = DIMENSIONS.filter((d) => (def.modifiers[d] || 0) > 0)
-    .sort((a, b) => (sel.dimensionResults[b] - base.dimensionResults[b]) - (sel.dimensionResults[a] - base.dimensionResults[a]))[0]
-  const costed = DIMENSIONS.filter((d) => (def.modifiers[d] || 0) < 0)
-    .sort((a, b) => (sel.dimensionResults[a] - base.dimensionResults[a]) - (sel.dimensionResults[b] - base.dimensionResults[b]))[0]
-  const structural = {
-    control: baseProfile.midfieldControl >= 74 ? 'your midfield structure supports this approach' : null,
-    wide: baseProfile.width >= 74 ? 'your wide structure supports this approach' : null,
-    counter: baseProfile.transitionThreat >= 70 ? 'your runners support this approach' : null,
-  }[approachKey]
-  if (diff >= 0.008) {
-    const why = sel.keyAdvantage ? `${sel.keyAdvantage.text.charAt(0).toLowerCase()}${sel.keyAdvantage.text.slice(1)}` : 'it targets what this opponent concedes.'
-    return structural ? `Natural fit: ${structural} — ${why}` : `Good fit: ${why}`
+  if (fit === 'stretch') {
+    if (opponentGood === true) return `Effective matchup, but less natural for your ${identityName} squad identity.`
+    return `A stretch for your ${identityName} identity — your squad is not built around this plan.`
   }
-  if (diff <= -0.008) {
-    const why = sel.keyRisk ? `${sel.keyRisk.text.charAt(0).toLowerCase()}${sel.keyRisk.text.slice(1)}` : 'this opponent punishes what it gives up.'
-    return `Risky fit: ${why}`
+  return `Compatible with your ${identityName} identity.`
+}
+
+// Concise selector badges. Engine badges come ONLY from existing M1 preview
+// evidence (never invented for legacy runs); the identity badge comes from
+// the identity table above. Tone is a style hint for the UI. The identity
+// badge is deliberately NOT gold and reads "Identity Alignment": it describes
+// squad-style alignment only and must never imply a hidden match-probability
+// modifier — it carries no performance bonus of any kind.
+export function matchPlanBadges({ preview = null, identityKey = null, approachKey }) {
+  const badges = []
+  const m1 = preview?.m1Preview
+  if (m1) {
+    if (m1.recommended) badges.push({ label: 'Recommended', tone: 'success' })
+    else if (m1.score >= 0.35) badges.push({ label: 'Strong Matchup', tone: 'success' })
+    else if (m1.score > -0.35) badges.push({ label: 'Viable', tone: 'neutral' })
+    else badges.push({ label: 'Risky', tone: 'danger' })
   }
-  if (helped && costed) return `Tradeoff: more ${SHORT_DIM[helped].toLowerCase()}, but less ${SHORT_DIM[costed].toLowerCase()} against this opponent.`
+  if (identityKey && identityPlanFit(identityKey, approachKey) === 'natural') {
+    badges.push({ label: 'Identity Alignment', tone: 'neutral' })
+  }
+  return badges
+}
+
+// Shown once near the Match Plan selector so the alignment badge can never be
+// read as a gameplay modifier.
+export const IDENTITY_ALIGNMENT_NOTE = 'Squad-style alignment only — no direct performance bonus.'
+
+// Short, non-duplicating recommendation line for the Selected Plan Analysis
+// panel. Uses only existing preview evidence (M1 recommendation score, or the
+// legacy probability-delta comparison vs Balanced) — never repeats the
+// advantage/risk prose shown alongside it.
+export function planRecommendationLine(approachKey, previews) {
+  const sel = previews?.[approachKey]
+  const base = previews?.balanced
+  if (!sel) return ''
+  const m1 = sel.m1Preview
+  if (m1) {
+    if (m1.recommended) return 'Recommended read for this opponent.'
+    if (m1.score > -0.35) return 'Viable option against this opponent.'
+    return 'Risky read against this opponent.'
+  }
+  if (approachKey === 'balanced' || !base) return 'Trusts your natural shape against this opponent.'
+  const diff = (sel.probabilityDelta ?? 0) - (base.probabilityDelta ?? 0)
+  if (diff >= 0.008) return 'Reads well against this opponent.'
+  if (diff <= -0.008) return 'Reads risky against this opponent.'
   return 'Roughly even with your natural approach here.'
 }
 

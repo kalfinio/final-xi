@@ -20,11 +20,50 @@
 import { PLAYERS as V1_PLAYERS, getEligiblePlayers as v1Eligible, dateSeed, combineSeed, makeRng, shuffle } from '../../data'
 import { V2_PLAYERS, v2PlayerById } from './index'
 import { adaptPlayerV2ToLegacyShape } from './adapter'
+import { MODERN_CURATED_R1_ORDERED_IDS } from './curatedManifest'
+import curatedR1Snapshot from './curatedR1Snapshot.json'
 
 export const DEFAULT_CATALOG_VERSION = 'legacy_v1'
 
 // V2 players adapted once into legacy shape, preserving V2_PLAYERS order.
 const V2_ADAPTED = V2_PLAYERS.map(adaptPlayerV2ToLegacyShape)
+
+const deepFreeze = (value) => {
+  if (value && typeof value === 'object' && !Object.isFrozen(value)) {
+    for (const key of Object.keys(value)) deepFreeze(value[key])
+    Object.freeze(value)
+  }
+  return value
+}
+
+// -----------------------------------------------------------------------
+// Frozen R1 view — resolved EXCLUSIVELY from the committed static snapshot
+// (curatedR1Snapshot.json, generated once from the pre-correction code at
+// commit 897efff). It is NOT rebuilt from the current master database: no
+// future edit to any master field (club, league, role, tier, signatures,
+// suitability, development, character, positions…) can enter historical R1.
+// Every wrapper and every nested array/object is deep-frozen, so R1 saves
+// keep byte-identical points, eligibility, labels and canonical replays.
+// -----------------------------------------------------------------------
+const V2_ADAPTED_R1 = MODERN_CURATED_R1_ORDERED_IDS.map((id) => {
+  const entry = curatedR1Snapshot.players[id]
+  if (!entry) throw new Error(`curatedR1Snapshot missing manifest id ${id}`)
+  const source = deepFreeze(JSON.parse(JSON.stringify(entry.source)))
+  return deepFreeze({
+    ...JSON.parse(JSON.stringify(entry.adapted)),
+    signatures: source.signatures.length ? [...source.signatures] : undefined,
+    // Explicit catalogue policy: R1 is the frozen historical revision.
+    scoringPolicy: 'legacy',
+    v2Source: source,
+  })
+})
+
+// Live R2 view: corrected master data adapted under the ABILITY tag policy —
+// club, league and development potential carry zero gameplay points for new
+// Random Modern runs; tier-based current-ability tags remain. EVERY member,
+// modern and legend alike, is stamped `scoringPolicy: 'ability'` by the
+// adapter and deep-frozen so live pool data can never be mutated at runtime.
+const V2_ADAPTED_R2 = V2_PLAYERS.map((p) => deepFreeze(adaptPlayerV2ToLegacyShape(p, { tagPolicy: 'ability' })))
 
 // ---------------------------------------------------------------------------
 // Curated activation membership (Phase A remediation).
@@ -47,6 +86,10 @@ const V2_ADAPTED = V2_PLAYERS.map(adaptPlayerV2ToLegacyShape)
 // formation 100% completable. The master DB is untouched; this only chooses
 // which explicitly-ordered members are eligible when the curated pool is drafted.
 // ---------------------------------------------------------------------------
+// HISTORICAL ADMISSION PREDICATE — documentation/audit only. This rule chose
+// the original 341 members; it NO LONGER controls live membership. Both the
+// R1 and R2 catalogues resolve their ordered membership exclusively from the
+// literal MODERN_CURATED_R1_ORDERED_IDS manifest.
 const CURATED_PREMIUM_TIERS = new Set(['goat', 'goat_candidate', 'elite', 'star'])
 export const CURATED_SPECIALIST_ROLES = new Set([
   'Defensive Shield', 'Ball Winner', 'Defensive Wingback', 'Balanced Wingback',
@@ -81,12 +124,27 @@ export const CATALOGUES = {
   modern_mix_v2_curated: {
     id: 'modern_mix_v2_curated',
     dbVersion: 'v2',
-    label: 'Modern Mix — Curated Activation (2026-07-07)',
-    source: 'v2',
+    label: 'Modern Mix — Curated Activation (2026-07-07, R1 freeze)',
+    source: 'v2r1',
+    eras: ['legend', 'modern'],
+    // FROZEN: pre-correction data revision. Only referenced by runs saved
+    // before the R2 boundary; new runs are created on the R2 catalogue below.
+    // Membership = the literal manifest, resolved through the static snapshot.
+    orderedIds: [...MODERN_CURATED_R1_ORDERED_IDS],
+  },
+  modern_mix_v2_curated_r2: {
+    id: 'modern_mix_v2_curated_r2',
+    dbVersion: 'v2',
+    label: 'Modern Mix — Curated Activation R2 (quality/eligibility corrections)',
+    source: 'v2r2',
     eras: ['legend', 'modern'],
     activation: true,
-    // Curated subset of the master, kept in explicit master order via filter.
-    orderedIds: V2_ADAPTED.filter(isCuratedActivationMember).map((p) => p.id),
+    // MEMBERSHIP IS THE LITERAL MANIFEST, NOT TIER-DERIVED: R2 uses the exact
+    // 341 ordered ids of the original curated pool while resolving corrected
+    // R2 player records. A quality correction is a rating decision, never a
+    // silent removal decision. Any future membership change must be an
+    // explicit per-player id decision in a new catalogue revision.
+    orderedIds: [...MODERN_CURATED_R1_ORDERED_IDS],
   },
   legends_v2: {
     id: 'legends_v2',
@@ -98,26 +156,40 @@ export const CATALOGUES = {
   },
 }
 
+// The catalogue registry itself is immutable: ids, ordered lists and metadata
+// can only change through an explicit source-code revision.
+for (const cat of Object.values(CATALOGUES)) {
+  Object.freeze(cat.orderedIds)
+  Object.freeze(cat.eras)
+  Object.freeze(cat)
+}
+Object.freeze(CATALOGUES)
+
 export const getCatalogue = (id) => CATALOGUES[id] || null
 
 const V2_ADAPTED_BY_ID = Object.fromEntries(V2_ADAPTED.map((p) => [p.id, p]))
+const V2_ADAPTED_R1_BY_ID = Object.fromEntries(V2_ADAPTED_R1.map((p) => [p.id, p]))
+const V2_ADAPTED_R2_BY_ID = Object.fromEntries(V2_ADAPTED_R2.map((p) => [p.id, p]))
 const V1_BY_ID = Object.fromEntries(V1_PLAYERS.map((p) => [p.id, p]))
 const CATALOGUE_ID_SETS = Object.fromEntries(Object.values(CATALOGUES).map((c) => [c.id, new Set(c.orderedIds)]))
+
+const SOURCE_BY_ID = { v1: V1_BY_ID, v2: V2_ADAPTED_BY_ID, v2r1: V2_ADAPTED_R1_BY_ID, v2r2: V2_ADAPTED_R2_BY_ID }
 
 export function catalogueMembers(catalogVersion = DEFAULT_CATALOG_VERSION) {
   const cat = CATALOGUES[catalogVersion]
   if (!cat) return []
-  const byId = cat.source === 'v1' ? V1_BY_ID : V2_ADAPTED_BY_ID
+  const byId = SOURCE_BY_ID[cat.source] || V2_ADAPTED_BY_ID
   return cat.orderedIds.map((id) => byId[id]).filter(Boolean)
 }
 
 // Resolve a player id within a given catalogue version to a legacy-shaped
 // object. Old snapshots (no catalogVersion) resolve through legacy_v1 → the
-// frozen V1 object, so saves stay byte-identical.
+// frozen V1 object; snapshots on the original modern activation catalogue
+// resolve through the frozen R1 view — saves stay byte-identical either way.
 export function resolvePlayer(id, catalogVersion = DEFAULT_CATALOG_VERSION) {
   const cat = CATALOGUES[catalogVersion]
   if (!cat || !CATALOGUE_ID_SETS[catalogVersion]?.has(id)) return null
-  return (cat.source === 'v1' ? V1_BY_ID[id] : V2_ADAPTED_BY_ID[id]) || null
+  return (SOURCE_BY_ID[cat.source] || V2_ADAPTED_BY_ID)[id] || null
 }
 
 // Deterministic eligible-player list for a slot, in the catalogue's explicit
@@ -126,7 +198,7 @@ export function resolvePlayer(id, catalogVersion = DEFAULT_CATALOG_VERSION) {
 export function catalogueEligiblePlayers(catalogVersion, slotLabel, usedIds, pool = 'modern') {
   if (catalogVersion === 'legacy_v1') return v1Eligible(slotLabel, usedIds, pool)
   const cat = CATALOGUES[catalogVersion]
-  if (!cat || cat.source !== 'v2') return []
+  if (!cat || !cat.source.startsWith('v2')) return []
   return catalogueMembers(catalogVersion).filter(
     (p) =>
       p.eligibleSlots.includes(slotLabel) &&
@@ -143,7 +215,7 @@ export function catalogueEligiblePlayers(catalogVersion, slotLabel, usedIds, poo
 // deliberately NOT a live default — it remains a database/audit view only.
 // ---------------------------------------------------------------------------
 export const ACTIVATION_CATALOG_BY_POOL = {
-  modern: 'modern_mix_v2_curated',
+  modern: 'modern_mix_v2_curated_r2',
   legends: 'legacy_v1',
 }
 export const ACTIVATION_CATALOG_BY_MODE = {

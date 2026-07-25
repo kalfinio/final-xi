@@ -735,7 +735,7 @@ export default function MatchCenter({ squad, feature, onContinue, isLast = false
             {ftTacticalNote && <div className="text-[11px] text-gold/70 mb-1 px-2">{ftTacticalNote}</div>}
             {keyPlayer && <div className="text-[11px] text-secondary">Key player: <span className="text-primary font-semibold">{keyPlayer}</span></div>}
             <div className="mt-2 pt-2 border-t border-border flex flex-col items-center gap-0.5">
-              <div className="text-[10px] text-secondary"><span className="uppercase tracking-wide text-secondary/80">Approach</span> <span className="text-primary font-semibold">{ftApproachName}</span></div>
+              <div className="text-[10px] text-secondary"><span className="uppercase tracking-wide text-secondary/80">Match plan</span> <span className="text-primary font-semibold">{ftApproachName}</span></div>
               {ftActiveUpgrades.length > 0 && (
                 <div className="text-[10px] text-secondary"><span className="uppercase tracking-wide text-secondary/80">Upgrades active</span> <span className="text-gold font-semibold">{ftActiveUpgrades.join(' · ')}</span></div>
               )}

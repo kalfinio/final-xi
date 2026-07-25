@@ -1,0 +1,135 @@
+{
+ "generatedFromCommit": "897efff",
+ "note": "Save + expected outputs produced by pre-correction committed code; current code must reconstruct byte-identically.",
+ "snapshot": {
+  "schemaVersion": 1,
+  "engineVersion": "m1",
+  "savedAt": 1784465133286,
+  "run": {
+   "mode": "random",
+   "runSeed": 5349495,
+   "dbVersion": "v1",
+   "catalogVersion": "modern_mix_v2_curated",
+   "dailyContext": null,
+   "config": {
+    "formation": "4-3-3",
+    "pool": "modern",
+    "difficulty": "classic",
+    "clubIdentity": "press"
+   },
+   "teamName": "Historical XI",
+   "squadSelections": [
+    {
+     "slot": "GK",
+     "playerId": "alisson"
+    },
+    {
+     "slot": "RB",
+     "playerId": "hakimi"
+    },
+    {
+     "slot": "CB",
+     "playerId": "cucurella"
+    },
+    {
+     "slot": "CB",
+     "playerId": "saliba"
+    },
+    {
+     "slot": "LB",
+     "playerId": "theo"
+    },
+    {
+     "slot": "CM",
+     "playerId": "rodri"
+    },
+    {
+     "slot": "CM",
+     "playerId": "bellingham"
+    },
+    {
+     "slot": "CM",
+     "playerId": "pedri"
+    },
+    {
+     "slot": "RW",
+     "playerId": "salah"
+    },
+    {
+     "slot": "ST",
+     "playerId": "haaland"
+    },
+    {
+     "slot": "LW",
+     "playerId": "vinicius"
+    }
+   ],
+   "rerollsUsed": 1,
+   "approachHistory": [
+    {
+     "matchIndex": 0,
+     "approachKey": "balanced"
+    },
+    {
+     "matchIndex": 1,
+     "approachKey": "counter"
+    },
+    {
+     "matchIndex": 2,
+     "approachKey": "control"
+    },
+    {
+     "matchIndex": 3,
+     "approachKey": "wide"
+    }
+   ],
+   "upgradeState": {
+    "owned": [],
+    "offers": []
+   },
+   "checkpoint": {
+    "screen": "hub",
+    "resolvedMatchCount": 4,
+    "currentMatchIndex": null,
+    "selectedApproach": "balanced",
+    "stageLabel": "League Phase"
+   },
+   "signatures": {
+    "resolvedMatches": [
+     "0|L1|Eindhoven Lights|1-0|win",
+     "1|L2|Milano Blue|0-1|loss",
+     "2|L3|Basque Lions|0-0|draw",
+     "3|L4|Glasgow Hoops|1-1|draw"
+    ],
+    "canonicalMatches": [
+     "6ff2b894",
+     "e11596b0",
+     "4680fe47",
+     "a379e7d7"
+    ]
+   }
+  }
+ },
+ "expected": {
+  "canonicalMatches": [
+   "6ff2b894",
+   "e11596b0",
+   "4680fe47",
+   "a379e7d7"
+  ],
+  "resolvedMatches": [
+   "0|L1|Eindhoven Lights|1-0|win",
+   "1|L2|Milano Blue|0-1|loss",
+   "2|L3|Basque Lions|0-0|draw",
+   "3|L4|Glasgow Hoops|1-1|draw"
+  ],
+  "scores": [
+   "1-0|win|balanced",
+   "0-1|loss|counter",
+   "0-0|draw|control",
+   "1-1|draw|wide"
+  ],
+  "engineVersion": "m1",
+  "matchesJsonLength": 68795
+ }
+}

@@ -530,20 +530,69 @@ export const TAG_LABELS = {
 
 const POS_TYPE_NAME = { GK: 'GK', DEF: 'DEF', MID: 'MID', ATT: 'ATT' }
 
+// ---------------------------------------------------------------------------
+// CANONICAL points components — the single source of truth for BOTH gameplay
+// (`playerPoints`) and the visible breakdown (`playerBreakdown`). There is no
+// duplicate arithmetic anywhere: the displayed components always sum exactly
+// to the value the engine uses.
+//
+// The policy boundary is EXPLICIT. Ability-policy (R2) players are scored only
+// from position base + their catalogue-stamped current-ability value + the
+// authored Big Stage character trait. Legacy and frozen-R1 players retain the
+// historical tag/aura/badge arithmetic byte-for-byte. In particular, this
+// function never guesses a policy from the presence of `abilityBonus`.
+// ---------------------------------------------------------------------------
+const R2_ABILITY_LABEL = {
+  goat: 'All-time-great level',
+  goat_candidate: 'World-class level',
+  elite: 'Elite level',
+  star: 'Star level',
+  quality: 'Proven level',
+  squad: 'Squad level',
+  prospect: 'Prospect level',
+}
+
+export function playerPointsComponents(player) {
+  const components = [
+    { key: 'base', label: `Base ability (${POS_TYPE_NAME[player.posType]})`, pts: BASE_POINTS[player.posType] },
+  ]
+
+  if (player.scoringPolicy === 'ability') {
+    const tier = player.v2Source?.tier || 'unknown'
+    components.push({
+      key: 'current-ability',
+      label: R2_ABILITY_LABEL[tier] || 'Current-ability calibration',
+      pts: Number.isFinite(player.abilityBonus) ? player.abilityBonus : 0,
+    })
+    if (player.v2Source?.character === 'Big Stage') {
+      components.push({ key: 'big-stage', label: 'Big-stage trait', pts: 3 })
+    }
+    return components
+  }
+
+  for (const tag of player.tags) {
+    components.push({ key: `tag:${tag}`, label: TAG_LABELS[tag] || tag, pts: TAG_POINTS[tag] || 0 })
+  }
+  if (isGoat(player)) components.push({ key: 'aura', label: 'GOAT Tier', pts: 6 })
+  else if (isGoatCandidate(player)) components.push({ key: 'aura', label: 'GOAT Candidate', pts: 4 })
+  if ((SPECIAL_BADGES[player.id] || []).includes('Football Icon')) components.push({ key: 'badge', label: 'Football Icon', pts: 2 })
+  return components
+}
+
 export function playerPoints(player) {
-  const base = BASE_POINTS[player.posType]
-  const tagSum = player.tags.reduce((acc, t) => acc + (TAG_POINTS[t] || 0), 0)
-  return base + tagSum + auraIndividual(player)
+  return playerPointsComponents(player).reduce((acc, component) => acc + component.pts, 0)
 }
 
 // Transparent breakdown for the "Why these points?" card.
 export function playerBreakdown(player) {
-  const base = BASE_POINTS[player.posType]
-  const traits = player.tags.map((t) => ({ label: TAG_LABELS[t] || t, pts: TAG_POINTS[t] || 0 }))
-  const extras = []
-  if (isGoat(player)) extras.push({ label: 'GOAT Tier', pts: 6 })
-  else if (isGoatCandidate(player)) extras.push({ label: 'GOAT Candidate', pts: 4 })
-  if ((SPECIAL_BADGES[player.id] || []).includes('Football Icon')) extras.push({ label: 'Football Icon', pts: 2 })
+  // Derived strictly from the canonical components, so the visible breakdown
+  // can never disagree with `playerPoints`. R2 objects therefore show their
+  // "Current-ability calibration" line; legacy/R1 objects show their
+  // historical prestige lines — each catalogue displays exactly what it uses.
+  const components = playerPointsComponents(player)
+  const base = components.find((c) => c.key === 'base')?.pts ?? 0
+  const traits = components.filter((c) => c.key.startsWith('tag:')).map(({ label, pts }) => ({ label, pts }))
+  const extras = components.filter((c) => !c.key.startsWith('tag:') && c.key !== 'base').map(({ label, pts }) => ({ label, pts }))
   return {
     basePos: POS_TYPE_NAME[player.posType],
     base,
@@ -551,7 +600,7 @@ export function playerBreakdown(player) {
     extras,
     role: player.role,
     secondaryRole: player.secondaryRole,
-    total: base + traits.reduce((a, x) => a + x.pts, 0) + extras.reduce((a, x) => a + x.pts, 0),
+    total: playerPoints(player),
   }
 }
 
@@ -628,33 +677,60 @@ function roleCounter(players) {
 }
 
 // ---------------------------------------------------------------------------
+// Squad scoring policy — EXPLICIT, catalogue-derived. Every player resolved
+// through an ability-policy catalogue (R2) is stamped `scoringPolicy:
+// 'ability'` by that catalogue (moderns AND legends); legacy_v1 objects and
+// frozen R1 wrappers are legacy (marked 'legacy' or unmarked frozen V1 data).
+// A squad is ability-policy only when EVERY member carries the explicit
+// marker — never inferred from abilityBonus presence, tags, or squad mix.
+// Catalogue locking guarantees a run can never mix policies.
+// ---------------------------------------------------------------------------
+export function squadScoringPolicy(players) {
+  return players.length > 0 && players.every((p) => p.scoringPolicy === 'ability') ? 'ability' : 'legacy'
+}
+
+// ---------------------------------------------------------------------------
 // Chemistry + role + era bonuses (positive). kind: 'chem' | 'role' | 'era'
 // ---------------------------------------------------------------------------
 export function computeBonuses(squad) {
   const players = squad.map((s) => s.player).filter(Boolean)
   const bonuses = []
+  const abilityPolicy = squadScoringPolicy(players) === 'ability'
   const countTag = (tag) => players.filter((p) => p.tags.includes(tag)).length
   const someRole = (list) => players.some((p) => inRoles(p, list))
-  const hasBigGame = players.some(isBigGameScorer)
+  const hasBigGame = abilityPolicy
+    ? players.some((player) => player.v2Source?.character === 'Big Stage')
+    : players.some(isBigGameScorer)
 
-  // chemistry (tag) bonuses
-  if (countTag('real_madrid_dna') >= 3) bonuses.push({ name: 'Madrid DNA', pts: 10, kind: 'chem' })
-  if (countTag('barca_dna') >= 3) bonuses.push({ name: 'Barça DNA', pts: 9, kind: 'chem' })
-  if (countTag('euro_final_scorer') >= 2) bonuses.push({ name: 'Final Scorers', pts: 8, kind: 'chem' })
-  if (countTag('world_cup_winner') >= 3) bonuses.push({ name: 'World Champions', pts: 6, kind: 'chem' })
-  if (countTag('played_with_messi') >= 2) bonuses.push({ name: 'Messi Connection', pts: 5, kind: 'chem' })
-  if (countTag('serial_winner') >= 4) bonuses.push({ name: 'Serial Winners', pts: 7, kind: 'chem' })
-  if (countTag('euro_legend') >= 5) bonuses.push({ name: 'European Legacy', pts: 5, kind: 'chem' })
+  // Historical achievement/reputation chemistry is legacy-only. Even if a
+  // stale or synthetic R2 wrapper is handed one of these tags, the explicit
+  // ability policy ignores it completely.
+  if (!abilityPolicy) {
+    if (countTag('real_madrid_dna') >= 3) bonuses.push({ name: 'Madrid DNA', pts: 10, kind: 'chem' })
+    if (countTag('barca_dna') >= 3) bonuses.push({ name: 'Barça DNA', pts: 9, kind: 'chem' })
+    if (countTag('euro_final_scorer') >= 2) bonuses.push({ name: 'Final Scorers', pts: 8, kind: 'chem' })
+    if (countTag('world_cup_winner') >= 3) bonuses.push({ name: 'World Champions', pts: 6, kind: 'chem' })
+    if (countTag('played_with_messi') >= 2) bonuses.push({ name: 'Messi Connection', pts: 5, kind: 'chem' })
+    if (countTag('serial_winner') >= 4) bonuses.push({ name: 'Serial Winners', pts: 7, kind: 'chem' })
+    if (countTag('euro_legend') >= 5) bonuses.push({ name: 'European Legacy', pts: 5, kind: 'chem' })
+  }
 
   const countryCounts = {}
   players.forEach((p) => { countryCounts[p.country] = (countryCounts[p.country] || 0) + 1 })
   const topCountry = Object.entries(countryCounts).find(([, n]) => n >= 3)
   if (topCountry) bonuses.push({ name: `National Core (${topCountry[0]})`, pts: 4, kind: 'chem' })
 
-  const clubCounts = {}
-  players.forEach((p) => { clubCounts[p.club] = (clubCounts[p.club] || 0) + 1 })
-  const topClub = Object.entries(clubCounts).find(([, n]) => n >= 4)
-  if (topClub) bonuses.push({ name: `Club Spine (${topClub[0]})`, pts: 6, kind: 'chem' })
+  // Club Spine is a club-clustering bonus — a club-prestige trigger. Squads
+  // built from an ability-policy catalogue (R2) must have club-invariant
+  // strength, so the bonus is version-gated on the EXPLICIT catalogue policy
+  // (every R2 member — modern and legend — is stamped by its catalogue; the
+  // policy is never inferred from abilityBonus presence or squad mix).
+  if (!abilityPolicy) {
+    const clubCounts = {}
+    players.forEach((p) => { clubCounts[p.club] = (clubCounts[p.club] || 0) + 1 })
+    const topClub = Object.entries(clubCounts).find(([, n]) => n >= 4)
+    if (topClub) bonuses.push({ name: `Club Spine (${topClub[0]})`, pts: 6, kind: 'chem' })
+  }
 
   // role synergies (Final XI language)
   if (someRole(BALLWINNER_ROLES)) bonuses.push({ name: 'Defensive Shield', pts: 4, kind: 'role' })
@@ -667,24 +743,34 @@ export function computeBonuses(squad) {
 
   // aura team synergies — tightly capped so icons cannot run away with the rating.
   // GOAT Aura: +3 for one GOAT, +4 for two or more (never above +4).
-  const goatCount = players.filter(isGoat).length
+  const goatCount = abilityPolicy
+    ? players.filter((player) => player.v2Source?.tier === 'goat').length
+    : players.filter(isGoat).length
   if (goatCount >= 2) bonuses.push({ name: 'GOAT Aura', pts: 4, kind: 'aura' })
   else if (goatCount === 1) bonuses.push({ name: 'GOAT Aura', pts: 3, kind: 'aura' })
   // Football Icon: +2 if at least one GOAT Candidate (never above +2). GOAT
   // Candidates do NOT trigger GOAT Aura.
-  if (players.some(isGoatCandidate)) bonuses.push({ name: 'Football Icon', pts: 2, kind: 'aura' })
+  const hasGoatCandidate = abilityPolicy
+    ? players.some((player) => player.v2Source?.tier === 'goat_candidate')
+    : players.some(isGoatCandidate)
+  if (hasGoatCandidate) bonuses.push({ name: abilityPolicy ? 'World-Class Core' : 'Football Icon', pts: 2, kind: 'aura' })
   // Infinity Aura (Zlatan) is cosmetic — no team bonus.
 
   // modern-era bonuses
   const modernCount = players.filter((p) => p.era === 'modern').length
   const legendCount = players.filter((p) => p.era === 'legend').length
   if (modernCount >= 4) bonuses.push({ name: 'Modern Era Core', pts: 6, kind: 'era' })
-  if (countTag('future_legend') >= 2) bonuses.push({ name: 'Future Legends', pts: 5, kind: 'era' })
-  if (countTag('city_core') >= 3) bonuses.push({ name: 'City Core', pts: 6, kind: 'era' })
-  if (countTag('liverpool_core') >= 3) bonuses.push({ name: 'Liverpool Core', pts: 6, kind: 'era' })
-  if (countTag('madrid_modern') >= 3) bonuses.push({ name: 'Madrid Modern', pts: 7, kind: 'era' })
-  if (countTag('bayern_core') >= 3) bonuses.push({ name: 'Bayern Core', pts: 6, kind: 'era' })
-  if (countTag('current_superstar') >= 3) bonuses.push({ name: 'Current Superstars', pts: 6, kind: 'era' })
+  if (!abilityPolicy) {
+    if (countTag('future_legend') >= 2) bonuses.push({ name: 'Future Legends', pts: 5, kind: 'era' })
+    if (countTag('city_core') >= 3) bonuses.push({ name: 'City Core', pts: 6, kind: 'era' })
+    if (countTag('liverpool_core') >= 3) bonuses.push({ name: 'Liverpool Core', pts: 6, kind: 'era' })
+    if (countTag('madrid_modern') >= 3) bonuses.push({ name: 'Madrid Modern', pts: 7, kind: 'era' })
+    if (countTag('bayern_core') >= 3) bonuses.push({ name: 'Bayern Core', pts: 6, kind: 'era' })
+    if (countTag('current_superstar') >= 3) bonuses.push({ name: 'Current Superstars', pts: 6, kind: 'era' })
+  } else {
+    const topAbilityCount = players.filter((player) => ['goat', 'goat_candidate', 'elite'].includes(player.v2Source?.tier)).length
+    if (topAbilityCount >= 3) bonuses.push({ name: 'Elite-Level Core', pts: 6, kind: 'era' })
+  }
   if (legendCount >= 5 && modernCount >= 4) bonuses.push({ name: 'Old Meets New', pts: 8, kind: 'era' })
 
   return bonuses
@@ -698,10 +784,13 @@ export function computeWeaknesses(squad) {
   const weaknesses = []
   if (players.length === 0) return weaknesses
 
+  const abilityPolicy = squadScoringPolicy(players) === 'ability'
   const someRole = (list) => players.some((p) => inRoles(p, list))
   const countRole = (list) => players.filter((p) => inRoles(p, list)).length
   const hasTrueST = players.some((p) => p.primaryPos === 'ST')
-  const hasBigGame = players.some(isBigGameScorer)
+  const hasBigGame = abilityPolicy
+    ? players.some((player) => player.v2Source?.character === 'Big Stage')
+    : players.some(isBigGameScorer)
 
   // squad-shape weaknesses
   if (!hasTrueST) weaknesses.push({ name: 'No True Striker', desc: 'No natural No.9 to lead the line.', pts: -8, kind: 'squad' })
@@ -712,13 +801,31 @@ export function computeWeaknesses(squad) {
   if (!hasShield) weaknesses.push({ name: 'No Defensive Shield', desc: 'No holding midfielder screening the defence.', pts: -8, kind: 'squad' })
 
   const gk = players.find((p) => p.posType === 'GK')
-  if (gk && !gk.tags.includes('euro_legend') && !gk.tags.includes('serial_winner') && !gk.tags.includes('big_game_player')) {
-    weaknesses.push({ name: 'Weak Goalkeeper', desc: 'Keeper lacks big-night pedigree.', pts: -10, kind: 'squad' })
+  const strongAbilityKeeper = gk && (
+    ['goat', 'goat_candidate', 'elite', 'star'].includes(gk.v2Source?.tier)
+    || gk.v2Source?.character === 'Big Stage'
+  )
+  if (gk && (abilityPolicy
+    ? !strongAbilityKeeper
+    : !gk.tags.includes('euro_legend') && !gk.tags.includes('serial_winner') && !gk.tags.includes('big_game_player'))) {
+    weaknesses.push({
+      name: 'Weak Goalkeeper',
+      desc: abilityPolicy ? 'Keeper falls below the required current-ability level.' : 'Keeper lacks big-night pedigree.',
+      pts: -10,
+      kind: 'squad',
+    })
   }
 
   const defenders = players.filter((p) => p.posType === 'DEF')
-  const eliteDef = defenders.filter((p) => p.tags.some((t) => ['world_cup_winner', 'serial_winner', 'real_madrid_dna', 'barca_dna', 'european_winner'].includes(t)))
-  if (defenders.length > 0 && eliteDef.length < 2) weaknesses.push({ name: 'Weak Defense', desc: 'Back line short on elite, proven defenders.', pts: -7, kind: 'squad' })
+  const eliteDef = abilityPolicy
+    ? defenders.filter((player) => ['goat', 'goat_candidate', 'elite', 'star'].includes(player.v2Source?.tier))
+    : defenders.filter((p) => p.tags.some((t) => ['world_cup_winner', 'serial_winner', 'real_madrid_dna', 'barca_dna', 'european_winner'].includes(t)))
+  if (defenders.length > 0 && eliteDef.length < 2) weaknesses.push({
+    name: 'Weak Defense',
+    desc: abilityPolicy ? 'Back line short on high current-ability defenders.' : 'Back line short on elite, proven defenders.',
+    pts: -7,
+    kind: 'squad',
+  })
 
   // role-based weaknesses
   if (!someRole(BALLWINNER_ROLES)) weaknesses.push({ name: 'No Ball Winner', desc: 'Nobody to break up play in midfield.', pts: -6, kind: 'role' })
@@ -738,7 +845,7 @@ export function computeWeaknesses(squad) {
   const modernCount = players.filter((p) => p.era === 'modern').length
   const provenTags = ['euro_legend', 'european_winner', 'final_scorer', 'big_game_player']
   const provenCount = players.filter((p) => p.tags.some((t) => provenTags.includes(t))).length
-  if (modernCount >= 7 && provenCount < 3) weaknesses.push({ name: 'Too Modern, Not Proven', desc: 'Young and shiny, but short on proven winners.', pts: -6, kind: 'era' })
+  if (!abilityPolicy && modernCount >= 7 && provenCount < 3) weaknesses.push({ name: 'Too Modern, Not Proven', desc: 'Young and shiny, but short on proven winners.', pts: -6, kind: 'era' })
 
   return weaknesses
 }
@@ -907,7 +1014,7 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
 // ---------------------------------------------------------------------------
 // Balance tuning (Phase 3). One place to retune the simulation.
 // ---------------------------------------------------------------------------
-const SIM = {
+export const SIM = {
   // strength rating → neutral win probability (before weaknesses / round pressure)
   RATING_MID: 131,        // rating mapping to ~0.50 strength (pre-difficulty)
   RATING_SPREAD: 340,     // larger = flatter curve; differentiates elite tiers
@@ -970,12 +1077,83 @@ export function winProbability(rating, difficulty = 'classic') {
 // Per-run base knockout win probability for a finalized squad: raw strength
 // minus a capped drag from squad weaknesses. This is the Play-Off / pre-pressure
 // probability; later rounds subtract ROUND_PRESSURE from it.
+// ---------------------------------------------------------------------------
+// R2 strength compression — version-gated, monotonic, transparent.
+//
+// Ability-only scoring made optimizing drafts (picking the strongest of every
+// offer) too rewarding at the top end while novice drafting stayed healthy.
+// Rather than weakening player cards or restoring prestige noise, R2 squad
+// strength is transformed around a documented pivot BEFORE the rating→
+// probability conversion: all squads are re-centred by the same offset,
+// above-pivot squads are additionally damped, and ordering is strictly
+// preserved (slope > 0). The
+// constants were derived from the three-policy full-run calibration
+// (scripts/r2-full-calibration.mjs) against the declared release bands. The
+// compression is independent of club, league, potential, fame, formation,
+// opponent, seed and player identity, and never applies to legacy_v1 or
+// frozen R1 squads (their arithmetic stays byte-identical).
+// ---------------------------------------------------------------------------
+export const R2_STRENGTH_PIVOT = 182
+export const R2_STRENGTH_TOP_PIVOT = 235
+export const R2_STRENGTH_MID_SLOPE = 0.08
+export const R2_STRENGTH_TOP_SLOPE = 0.55
+export const R2_STRENGTH_OFFSET = 33
+
+// Continuous piecewise-linear schedule with a constant re-centering offset.
+// Three segments, each with a strictly positive slope, joined continuously at
+// both breakpoints:
+//
+//   raw <= 182            : effective = raw − 33                       (slope 1)
+//   182 < raw <= 235      : effective = 182 + 0.08×(raw−182) − 33      (slope 0.08)
+//   raw >  235            : effective = 186.24 + 0.55×(raw−235) − 33   (slope 0.55)
+//
+// Why three segments rather than one knee: the declared release bands
+// constrain two DIFFERENT regions of the distribution independently. The
+// reasonable/power policies' median squad (raw ≈ 214) drives the classic
+// qualification ceiling, while the champion floor is driven only by the
+// extreme tail (raw > 235) that survives five knockout rounds. A single knee
+// moves both together, so no (pivot, slope, offset) triple clears both with
+// headroom. The middle segment is therefore the most compressed band — it
+// holds broad qualification down — while the tail keeps enough differentiation
+// that a genuinely stacked squad can still win the trophy. Every segment slope
+// is below 1, so the whole schedule remains a compression of raw strength.
+//
+// Strictly monotonic (all slopes > 0) — stronger squads always stay stronger.
+// Applied in strength space before any probability conversion, never as a flat
+// win modifier, and independent of club, league, potential, fame, formation,
+// opponent, seed and player identity.
+export function r2EffectiveStrength(strengthRating) {
+  let kneed
+  if (strengthRating <= R2_STRENGTH_PIVOT) {
+    kneed = strengthRating
+  } else if (strengthRating <= R2_STRENGTH_TOP_PIVOT) {
+    kneed = R2_STRENGTH_PIVOT + R2_STRENGTH_MID_SLOPE * (strengthRating - R2_STRENGTH_PIVOT)
+  } else {
+    const atTopPivot = R2_STRENGTH_PIVOT + R2_STRENGTH_MID_SLOPE * (R2_STRENGTH_TOP_PIVOT - R2_STRENGTH_PIVOT)
+    kneed = atTopPivot + R2_STRENGTH_TOP_SLOPE * (strengthRating - R2_STRENGTH_TOP_PIVOT)
+  }
+  return kneed - R2_STRENGTH_OFFSET
+}
+
+// Canonical engine-strength disclosure used by both gameplay and reporting.
+// `rawStrength` is player points plus positive squad bonuses, exactly the
+// value entering the strength transform. `effectiveStrength` is the
+// post-transform value passed to winProbability. Weaknesses remain a separate
+// probability drag, matching the historical engine path.
+export function squadStrengthBreakdown(squad) {
+  const rating = computeRating(squad)
+  const players = squad.map((s) => s.player).filter(Boolean)
+  const rawStrength = rating.base + rating.bonuses.reduce((sum, bonus) => sum + bonus.pts, 0)
+  const policy = squadScoringPolicy(players)
+  const effectiveStrength = policy === 'ability' ? r2EffectiveStrength(rawStrength) : rawStrength
+  const weaknessMagnitude = -rating.weaknesses.reduce((sum, weakness) => sum + weakness.pts, 0)
+  return { policy, rawStrength, effectiveStrength, weaknessMagnitude, rating }
+}
+
 export function squadBaseProb(squad, difficulty = 'classic') {
-  const { base, bonuses, weaknesses } = computeRating(squad)
-  const strengthRating = base + bonuses.reduce((a, b) => a + b.pts, 0)
-  const weaknessMag = -weaknesses.reduce((a, w) => a + w.pts, 0)
-  const strengthProb = winProbability(strengthRating, difficulty)
-  const drag = clamp(weaknessMag * SIM.WEAK_DRAG_SCALE, 0, SIM.WEAK_DRAG_MAX)
+  const { effectiveStrength, weaknessMagnitude } = squadStrengthBreakdown(squad)
+  const strengthProb = winProbability(effectiveStrength, difficulty)
+  const drag = clamp(weaknessMagnitude * SIM.WEAK_DRAG_SCALE, 0, SIM.WEAK_DRAG_MAX)
   return clamp(strengthProb - drag, SIM.KO_PR_FLOOR, SIM.KO_PR_CEIL)
 }
 
@@ -1007,7 +1185,7 @@ function oppProbDelta(opp) {
 // single result roll, so its centred strength signal needs enough separation
 // to survive route/archetype variance. This is intentionally M1-only; the
 // frozen legacy probability and RNG contract continue to use oppProbDelta.
-function m1OppProbDelta(opp) {
+export function m1OppProbDelta(opp) {
   if (!opp || typeof opp.strength !== 'number') return 0
   return clamp((SIM.OPP_BASELINE - opp.strength) * 0.006, -0.08, 0.08)
 }
@@ -1259,6 +1437,20 @@ function topEntry(map, byId, key) {
 // League Phase finish → per-round seeding bonus. A top finish earns an easier
 // early path; the advantage fades by the Quarter-final and is gone from the
 // Semi-final onward so the Final stays hard.
+// The EXACT M1 per-match quality-probability formula — one exported function
+// used by the live resolver AND by calibration tooling, so "clearly
+// unwinnable" measurements can never drift from the engine (knockout round
+// pressure and league-seed adjustment included; the base probability already
+// carries every squad-level modifier, including the R2 strength compression
+// inside squadBaseProb).
+export function m1QualityProbability({ baseProb, kind, round = null, leaguePosition = null, opponent }) {
+  if (kind === 'league') return clamp(baseProb + m1OppProbDelta(opponent), SIM.KO_PR_FLOOR, SIM.KO_PR_CEIL)
+  return clamp(
+    baseProb - (SIM.ROUND_PRESSURE[round] ?? 0) + leagueSeedBonus(leaguePosition, round) + m1OppProbDelta(opponent),
+    SIM.KO_PR_FLOOR, SIM.KO_PR_CEIL,
+  )
+}
+
 export function leagueSeedBonus(position, round) {
   if (round === 'Knockout Play-Off') return position <= 16 ? SIM.SEED_PLAYOFF.mid : SIM.SEED_PLAYOFF.low
   if (round === 'Round of 16') return position <= 4 ? SIM.SEED_R16.top4 : position <= 8 ? SIM.SEED_R16.top8 : 0
@@ -1751,12 +1943,9 @@ export function createRunSimulation({
     const matchup = pending.previews?.[approachKey] || resolveTacticalMatchup(adjusted, buildOpponentTacticalProfile(opp))
     const matchNonce = Math.floor(rng() * 4294967296) >>> 0
     const round = pending.kind === 'ko' ? pending.round : null
-    const qualityProbability = pending.kind === 'league'
-      ? clamp(p + m1OppProbDelta(opp), SIM.KO_PR_FLOOR, SIM.KO_PR_CEIL)
-      : clamp(
-        p - (SIM.ROUND_PRESSURE[round] ?? 0) + leagueSeedBonus(leaguePhase.position, round) + m1OppProbDelta(opp),
-        SIM.KO_PR_FLOOR, SIM.KO_PR_CEIL,
-      )
+    const qualityProbability = m1QualityProbability({
+      baseProb: p, kind: pending.kind, round, leaguePosition: leaguePhase?.position ?? null, opponent: opp,
+    })
     const match = resolveM1Match({
       runSeed,
       matchNumber: allMatches.length + 1,
@@ -1875,6 +2064,9 @@ export function createRunSimulation({
     get matches() { return allMatches },
     get isDone() { return done },
     get resolvedCount() { return allMatches.length },
+    // Read-only league standing (null until the league phase completes) —
+    // lets calibration tooling reproduce the exact knockout seed adjustment.
+    get leaguePosition() { return leaguePhase?.position ?? null },
   }
 }
 
