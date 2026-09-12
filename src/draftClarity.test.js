@@ -5,7 +5,7 @@ import { getV2PlayerById } from './data/v2'
 import { activationCatalogVersion, catalogueMembers, catalogueSlotOptions } from './data/v2/catalogues'
 import {
   CLUB_IDENTITY_KEYS,
-  IDENTITY_FIT_LABELS,
+  IDENTITY_ALIGNMENT_LABELS,
   acknowledgeDraftGuidance,
   analyzeSquadNeed,
   buildPickFeedback,
@@ -22,8 +22,14 @@ import {
 const activePlayers = [
   ...catalogueMembers('legacy_v1'),
   ...catalogueMembers('modern_mix_v2_curated'),
+  ...catalogueMembers('modern_mix_v2_curated_r2'),
 ]
-const curatedPlayers = catalogueMembers('modern_mix_v2_curated')
+const curatedPlayers = catalogueMembers('modern_mix_v2_curated_r2')
+
+// Live R2 ability-only Points distribution: no club/league/potential tags;
+// the tier-derived R2_ABILITY_POINTS model restores a healthy strength
+// envelope (calibrated via match:r2-calibration full-run bands).
+const R2_POINTS_QUARTILES = { min: 8, q25: 12, median: 14, q75: 16, max: 32 }
 const playerWithRole = (role) => activePlayers.find((player) => player.role === role)
 const selection = (player, slot = player.primaryPos) => ({ slot, player })
 
@@ -53,7 +59,10 @@ describe('draft clarity translation layer', () => {
     for (const player of activePlayers) {
       const quality = playerQualityTier(player)
       const aura = auraLabel(player)
-      const profile = getV2PlayerById(player.id)
+      // Version isolation: a catalogue-resolved player's label must come from
+      // ITS OWN frozen source record (R1 stays R1 even after master
+      // corrections); the master lookup applies only to V1 objects.
+      const profile = player.v2Source || getV2PlayerById(player.id)
       expect(quality.label, player.id).not.toBe('PROFILE UNAVAILABLE')
       if (aura === 'GOAT' || aura === 'GOAT Candidate') {
         expect(quality.source, player.id).toBe('aura')
@@ -65,6 +74,16 @@ describe('draft clarity translation layer', () => {
         if (quality.source === 'era') expect(player.era, player.id).toBe(quality.sourceValue)
       }
     }
+  })
+
+  it('runs the Points distribution against the LIVE R2 pool as well as R1', () => {
+    // R2 removes club/league/potential scoring, so its distribution is
+    // ability-only. Pinned so a scoring regression (prestige tags leaking
+    // back into R2) is caught immediately.
+    const values = catalogueMembers('modern_mix_v2_curated_r2').map(playerPoints).sort((a, b) => a - b)
+    const q = (fraction) => values[Math.floor((values.length - 1) * fraction)]
+    expect({ min: values[0], q25: q(0.25), median: q(0.5), q75: q(0.75), max: values[values.length - 1] })
+      .toEqual(R2_POINTS_QUARTILES)
   })
 
   it('does not present Points as a standalone football rating on draft cards', () => {
@@ -134,7 +153,7 @@ describe('Club Identity fit', () => {
         const first = calculateIdentityFit(player, identity)
         const second = calculateIdentityFit(player, identity)
         expect(first, `${identity}:${player.id}`).toEqual(second)
-        expect(IDENTITY_FIT_LABELS).toContain(first.label)
+        expect(IDENTITY_ALIGNMENT_LABELS).toContain(first.label)
         expect(Number.isFinite(first.score)).toBe(true)
       }
     }
@@ -164,13 +183,13 @@ describe('Club Identity fit', () => {
     }
   })
 
-  it('produces a meaningful curated-catalogue spread with selective EXCELLENT labels', () => {
+  it('produces a meaningful curated-catalogue spread with selective STRONG labels', () => {
     for (const identity of CLUB_IDENTITY_KEYS) {
-      const counts = Object.fromEntries(IDENTITY_FIT_LABELS.map((label) => [label, 0]))
+      const counts = Object.fromEntries(IDENTITY_ALIGNMENT_LABELS.map((label) => [label, 0]))
       for (const player of curatedPlayers) counts[calculateIdentityFit(player, identity).label]++
-      for (const label of IDENTITY_FIT_LABELS) expect(counts[label], `${identity}:${label}`).toBeGreaterThan(0)
-      expect(counts.EXCELLENT / curatedPlayers.length, identity).toBeLessThan(0.35)
-      expect((counts.EXCELLENT + counts.GOOD) / curatedPlayers.length, identity).toBeLessThan(0.7)
+      for (const label of IDENTITY_ALIGNMENT_LABELS) expect(counts[label], `${identity}:${label}`).toBeGreaterThan(0)
+      expect(counts.STRONG / curatedPlayers.length, identity).toBeLessThan(0.35)
+      expect((counts.STRONG + counts.GOOD) / curatedPlayers.length, identity).toBeLessThan(0.7)
       if (identity === 'press' || identity === 'transition') expect(counts.WEAK, identity).toBeGreaterThan(0)
     }
   })
@@ -183,7 +202,7 @@ describe('Club Identity fit', () => {
 
     const seedArgs = { dateKey: '2026-07-10', formation: '4-3-3', ids: ['a', 'b'], slots: ['GK', 'ST'], difficulty: 'classic', pool: 'modern', rerollsUsed: 1 }
     expect(buildSimSeed({ ...seedArgs, clubIdentity: 'control' })).toBe(buildSimSeed({ ...seedArgs, clubIdentity: 'transition' }))
-    expect(activationCatalogVersion({ mode: 'random', pool: 'modern', clubIdentity: 'fortress' })).toBe('modern_mix_v2_curated')
+    expect(activationCatalogVersion({ mode: 'random', pool: 'modern', clubIdentity: 'fortress' })).toBe('modern_mix_v2_curated_r2')
   })
 })
 

@@ -15,7 +15,8 @@
     "draft:fit-audit": "node scripts/audit-draft-clarity.mjs",
     "match:calibration": "node scripts/match-calibration.mjs",
     "match:m1-calibration": "node scripts/match-m1-calibration.mjs",
-    "match:m1-plan-audit": "node scripts/match-m1-plan-audit.mjs"
+    "match:m1-plan-audit": "node scripts/match-m1-plan-audit.mjs",
+    "match:r2-calibration": "node scripts/r2-full-calibration.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

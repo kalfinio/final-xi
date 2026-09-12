@@ -9,6 +9,7 @@ import {
 import { V2_PLAYERS, v2PlayerById, LEGEND_PLAYERS, NATIONS, LEAGUES, CLUBS, deriveRoleSuitability } from './index'
 import { adaptPlayerV2ToLegacyShape } from './adapter'
 import { CATALOGUES, catalogueEligiblePlayers, resolvePlayer, getCatalogue, isCuratedActivationMember, CURATED_SPECIALIST_ROLES, activationCatalogVersion, catalogueSlotOptions, ACTIVATION_CATALOG_BY_POOL, ACTIVATION_CATALOG_BY_MODE } from './catalogues'
+import { MODERN_CURATED_R1_ORDERED_IDS } from './curatedManifest'
 import { simulateCatalogue } from './draftSim'
 import { validateV2, validateTransferIntel, validateLegacyV1Order, roleSuitabilityProblems } from './validate'
 import { createRunSnapshot, snapshotCatalogVersion, validateRunSnapshot } from '../../runPersistence'
@@ -207,12 +208,16 @@ describe('deterministic golden draft fixtures', () => {
   })
 
   it('pins representative V2 Modern Mix and Legends Only exact offers', () => {
-    // Modern Mix pins move whenever the modern set is expanded (the eligible
-    // list feeds the shuffle); re-pinned for the Phase A.2 (544-player) DB.
+    // Modern Mix pins move whenever the modern set is expanded or corrected
+    // (the eligible list feeds the shuffle); re-pinned for the quality/
+    // eligibility correction phase — several wide forwards lost occasional ST
+    // eligibility and Merino's evidence-backed ST was restored, which
+    // reshuffles the master ST pool. GK and Legends pins must NOT move (no GK
+    // or legend data changed).
     expect(offerIds('modern_mix_v2_2026_07_07', 'ST', [], 777, 'modern'))
-      .toEqual(['lautaro', 'williamsjr', 'jackson'])
+      .toEqual(['williamsjr', 'woltemade', 'gakpo_x'])
     expect(offerIds('modern_mix_v2_2026_07_07', 'ST', ['ronaldo', 'haaland', 'mbappe'], 777, 'modern'))
-      .toEqual(['joaofelix', 'mikautadze', 'ferran'])
+      .toEqual(['eusebio', 'lewandowski', 'mane'])
     expect(offerIds('modern_mix_v2_2026_07_07', 'GK', [], 42, 'modern'))
       .toEqual(['pickford', 'oblak', 'leno'])
     // Legends Only is derived from the frozen legend order and must NOT move.
@@ -229,13 +234,20 @@ describe('deterministic golden draft fixtures', () => {
 describe('curated Modern Mix activation catalogue (Phase A remediation)', () => {
   const CUR = 'modern_mix_v2_curated'
   it('is registered, explicitly ordered, deduped, and mid-sized (280–380)', () => {
-    const cat = getCatalogue(CUR)
-    expect(cat).toBeTruthy()
-    expect(cat.activation).toBe(true)
-    expect(Array.isArray(cat.orderedIds)).toBe(true)
-    expect(new Set(cat.orderedIds).size).toBe(cat.orderedIds.length)
-    expect(cat.orderedIds.length).toBeGreaterThanOrEqual(280)
-    expect(cat.orderedIds.length).toBeLessThanOrEqual(380)
+    // CUR is now the FROZEN R1 view (kept for old saves); the live activation
+    // pool is the R2 catalogue. Both must stay well-formed and mid-sized.
+    for (const id of [CUR, 'modern_mix_v2_curated_r2']) {
+      const cat = getCatalogue(id)
+      expect(cat).toBeTruthy()
+      expect(Array.isArray(cat.orderedIds)).toBe(true)
+      expect(new Set(cat.orderedIds).size).toBe(cat.orderedIds.length)
+      expect(cat.orderedIds.length).toBeGreaterThanOrEqual(280)
+      expect(cat.orderedIds.length).toBeLessThanOrEqual(380)
+    }
+    expect(getCatalogue(CUR).activation).toBeUndefined()
+    expect(getCatalogue('modern_mix_v2_curated_r2').activation).toBe(true)
+    // The R1 freeze keeps its original membership exactly (341 members).
+    expect(getCatalogue(CUR).orderedIds.length).toBe(341)
   })
   it('is a strict subset of the full master and keeps every legend + all GOATs', () => {
     const master = new Set(getCatalogue('modern_mix_v2_2026_07_07').orderedIds)
@@ -244,15 +256,20 @@ describe('curated Modern Mix activation catalogue (Phase A remediation)', () => 
     for (const p of V2_PLAYERS.filter((x) => x.era === 'legend')) expect(cur.has(p.id)).toBe(true)
     for (const id of GOAT_REQUIRED) expect(cur.has(id)).toBe(true)
   })
-  it('admits only premium tiers, plus quality ONLY where it fills a scarce specialist role', () => {
+  it('was admitted by the premium/specialist rule at R1, and membership is now the literal manifest', () => {
+    // The premium/specialist rule was the ORIGINAL (R1) admission decision —
+    // documented here against the frozen snapshot's own tiers. It no longer
+    // controls membership: both catalogues resolve the literal manifest.
     for (const id of getCatalogue(CUR).orderedIds) {
-      const p = v2PlayerById[id]
-      if (p.era === 'legend') continue
-      const premium = ['goat', 'goat_candidate', 'elite', 'star'].includes(p.tier)
-      const specialistQuality = p.tier === 'quality' && CURATED_SPECIALIST_ROLES.has(p.primaryRole)
-      expect(premium || specialistQuality).toBe(true)
-      expect(p.tier).not.toBe('squad') // lowest tier never enters the activation pool
+      const r1 = resolvePlayer(id, CUR)
+      const source = r1.v2Source
+      if (source.era === 'legend') continue
+      const premium = ['goat', 'goat_candidate', 'elite', 'star'].includes(source.tier)
+      const specialistQuality = source.tier === 'quality' && CURATED_SPECIALIST_ROLES.has(source.primaryRole)
+      expect(premium || specialistQuality, id).toBe(true)
     }
+    expect(getCatalogue(CUR).orderedIds).toEqual([...MODERN_CURATED_R1_ORDERED_IDS])
+    expect(getCatalogue('modern_mix_v2_curated_r2').orderedIds).toEqual([...MODERN_CURATED_R1_ORDERED_IDS])
     expect(isCuratedActivationMember({ id: 'messi' })).toBe(true)
   })
   it('pins representative curated offers (deterministic; move only when curation changes)', () => {
@@ -293,6 +310,36 @@ describe('activation-catalogue simulation guardrails', () => {
     expect(sim.concentrationTop10Pct).toBeLessThan(15)
     expect(sim.distinctOffered).toBeGreaterThan(200)
   })
+
+  // LIVE R2 pool — ability-only scoring (no club/league/potential points).
+  // Ratings sit lower than R1 by design: that is the measured consequence of
+  // removing prestige scoring, not pool dilution. Any future rebalance is a
+  // separate approved phase; these gates hold the new ability-only reality.
+  describe('live R2 activation pool', () => {
+    const simR2 = simulateCatalogue('modern_mix_v2_curated_r2', { seeds: 60 })
+    it('completes every formation and keeps slot depth healthy', () => {
+      expect(simR2.formationCompletion).toBe(100)
+      for (const [slot, depth] of Object.entries(simR2.slotDepth)) {
+        expect(depth, `slot ${slot}`).toBeGreaterThanOrEqual(5)
+      }
+    })
+    it('holds the ability-only strength band', () => {
+      // Calibrated by full-run viability (match:r2-calibration): the tier
+      // model lands drafted XIs near the R1 envelope without prestige points.
+      expect(simR2.avgOfferPoints).toBeGreaterThan(12.5)
+      // The old `avgXIRating` mixed weakness presentation with engine input.
+      // R2 now reports the actual pre-compression and post-compression values.
+      expect(simR2.avgRawStrength).toBeGreaterThan(170)
+      expect(simR2.avgRawStrength).toBeLessThan(195)
+      expect(simR2.avgEffectiveStrength).toBeGreaterThan(135)
+      expect(simR2.avgEffectiveStrength).toBeLessThan(160)
+    })
+    it('preserves premium excitement and rare GOAT exposure', () => {
+      expect(simR2.premiumOfferPct).toBeGreaterThan(30)
+      expect(simR2.goatOfferPct).toBeGreaterThan(0.2)
+      expect(simR2.goatOfferPct).toBeLessThan(3)
+    })
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -301,9 +348,13 @@ describe('Modern Mix activation wiring (Phase A V2)', () => {
   const seededOffer = (catalogVersion, slot, slotIndex, rerollCount, usedIds = [], pool = 'modern') =>
     catalogueSlotOptions({ catalogVersion, mode: 'daily', slotLabel: slot, slotIndex, rerollCount, usedIds, pool }).map((p) => p.id)
 
-  it('a new normal Modern Mix run selects the curated V2 catalogue', () => {
-    expect(activationCatalogVersion({ mode: 'random', pool: 'modern' })).toBe(CUR)
-    expect(ACTIVATION_CATALOG_BY_POOL.modern).toBe(CUR)
+  it('a new normal Modern Mix run selects the corrected R2 curated catalogue', () => {
+    // Quality/eligibility correction phase: new runs draft from the R2
+    // catalogue; the original curated id stays registered as the R1 freeze
+    // that old saves resolve through.
+    expect(activationCatalogVersion({ mode: 'random', pool: 'modern' })).toBe('modern_mix_v2_curated_r2')
+    expect(ACTIVATION_CATALOG_BY_POOL.modern).toBe('modern_mix_v2_curated_r2')
+    expect(getCatalogue(CUR)).toBeTruthy()
   })
   it('the full-master V2 catalogue is NOT a live activation default', () => {
     expect(Object.values(ACTIVATION_CATALOG_BY_POOL)).not.toContain('modern_mix_v2_2026_07_07')

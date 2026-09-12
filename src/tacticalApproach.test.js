@@ -6,9 +6,11 @@ import { PLAYERS, OPPONENTS, computeRating, simulate, createRunSimulation, makeR
 import { buildSquadTacticalProfile, buildOpponentTacticalProfile, resolveTacticalMatchup, DIMENSIONS, TUNING } from './tacticalMatchup'
 import {
   TACTICAL_APPROACHES, APPROACH_KEYS, applyTacticalApproach, approachIntents,
-  approachMatchupPreviews, approachTradeoffs, approachFit, approachFeedback,
+  approachMatchupPreviews, approachTradeoffs, approachFeedback,
   APPROACH_PROFILE_CAP, INTENT_MIN, INTENT_MAX,
 } from './tacticalApproach'
+import * as tacticalApproachModule from './tacticalApproach'
+const approachFit = tacticalApproachModule.approachFit
 import { buildMatchTimeline } from './matchTimeline'
 import { LEGACY_ENGINE_VERSION } from './matchEngineVersions'
 
@@ -163,13 +165,11 @@ describe('D+F. fit examples and probability safety', () => {
     }
   })
 
-  it('fit sentences are deterministic, grounded, and spoiler-free', () => {
-    const previews = approachMatchupPreviews(profile, oppOf('defensive'))
-    for (const key of APPROACH_KEYS) {
-      const s1 = approachFit(key, previews, profile)
-      expect(s1).toBe(approachFit(key, previews, profile))
-      expect(s1).not.toMatch(/\d\.\d|%|win|score/i) // no probabilities or result talk
-    }
+  it('keeps tradeoff chips grounded and confirms the legacy fit one-liner is deleted', () => {
+    // `approachFit` was deliberately removed in the alignment-wording
+    // remediation (its "…fit:" copy is prohibited user-facing wording and the
+    // Match Hub renders the Selected Plan Analysis panel instead).
+    expect(approachFit).toBeUndefined()
     const { helps, costs } = approachTradeoffs('control')
     expect(helps.length).toBeGreaterThan(0)
     expect(costs.length).toBeGreaterThan(0)

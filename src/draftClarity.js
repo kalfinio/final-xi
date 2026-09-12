@@ -138,8 +138,14 @@ const POSITION_STRENGTHS = {
   ATT: ['Threatens the defence', 'Supports the attack'],
 }
 
+// Version-safe source record. A catalogue-resolved player carries its own
+// complete immutable `v2Source` snapshot (frozen at the catalogue's data
+// revision), which is ALWAYS preferred: an R1 save must display R1 quality/
+// signatures even after the master database is corrected. The current-master
+// lookup remains only for legacy V1 objects, which have no versioned V2
+// record of their own.
 function sourceProfile(player) {
-  return getV2PlayerById(player?.id) || null
+  return player?.v2Source || getV2PlayerById(player?.id) || null
 }
 
 const QUALITY_BY_TIER = {
@@ -268,7 +274,7 @@ const IDENTITY_SIGNATURES = {
   fortress: new Set(['Duel Hunter', 'Lane Reader', 'Box Guardian', 'Aerial Target', 'Shot Blocker', 'Front-Foot Defender']),
 }
 
-export const IDENTITY_FIT_LABELS = ['EXCELLENT', 'GOOD', 'MODERATE', 'WEAK']
+export const IDENTITY_ALIGNMENT_LABELS = ['STRONG', 'GOOD', 'MODERATE', 'WEAK']
 
 function suitabilityWord(level) {
   if (level >= 3) return 'Natural'
@@ -277,7 +283,7 @@ function suitabilityWord(level) {
 }
 
 function fitLabel(score) {
-  if (score >= 6.35) return 'EXCELLENT'
+  if (score >= 6.35) return 'STRONG'
   if (score >= 4.75) return 'GOOD'
   if (score >= 3) return 'MODERATE'
   return 'WEAK'
@@ -393,7 +399,7 @@ export function analyzeSquadNeed({ squad, candidate, pickIndex, formationSlots =
 
 export function playerTradeoff(player, { fit = null, squadNeed = null } = {}) {
   if (squadNeed?.kind === 'covered') return 'Similar profile already covered'
-  if (fit?.label === 'WEAK') return `Less suited to the ${fit.identityName} identity`
+  if (fit?.label === 'WEAK') return `Less aligned with your ${fit.identityName} identity`
   return ROLE_TRADEOFF[player?.role] || null
 }
 
@@ -403,7 +409,7 @@ export function buildPickFeedback({ player, identityKey, squad, pickIndex, forma
   const strengths = playerKeyStrengths(player)
   const positives = []
   if (squadNeed?.kind === 'weakness' || squadNeed?.kind === 'adds') positives.push(`Adds ${squadNeed.detail.toLowerCase()}`)
-  if (fit && (fit.label === 'EXCELLENT' || fit.label === 'GOOD')) positives.push(`${fit.label === 'EXCELLENT' ? 'Strong' : 'Good'} fit for ${fit.identityName}`)
+  if (fit && (fit.label === 'STRONG' || fit.label === 'GOOD')) positives.push(`${fit.label === 'STRONG' ? 'Strong' : 'Good'} ${fit.identityName} alignment`)
   if (positives.length < 2 && strengths[0]) positives.push(strengths[0])
   return {
     title: `${player.name} added`,

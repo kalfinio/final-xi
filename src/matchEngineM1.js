@@ -126,7 +126,13 @@ function fallbackSignatures(player) {
 }
 
 export function signaturesForM1Player(player) {
-  const signatures = player?.signatures || MODERN_SIGNATURES[player?.id] || LEGEND_SIGNATURES[player?.id] || fallbackSignatures(player)
+  // Version isolation: a catalogue-resolved player carries its own signature
+  // record (direct `signatures` and/or the frozen `v2Source` snapshot) and
+  // must NEVER fall back to the current master database — a historical R1
+  // squad replays with R1 data even after master corrections. The master
+  // lookups below remain only for legacy V1 objects, whose data is frozen.
+  const versioned = player?.signatures || player?.v2Source?.signatures || null
+  const signatures = versioned || MODERN_SIGNATURES[player?.id] || LEGEND_SIGNATURES[player?.id] || fallbackSignatures(player)
   return unique(signatures.filter((signature) => M1_SIGNATURE_HOOKS[signature]), 4)
 }
 
@@ -453,6 +459,10 @@ export function buildM1ApproachPreviews({ baseProfile, opponent, legacyPreviews 
   return Object.fromEntries(Object.entries(legacyPreviews).map(([approach, legacy]) => {
     const current = evidence[approach]
     const recommended = current.score >= bestScore - 0.2
+    // `fit` and its exact historical strings are part of the frozen M1 replay
+    // payload. They are intentionally retained for byte-identical R1 saves;
+    // no current UI renders this field (MatchHub uses score/recommended and
+    // its own Alignment/Matchup vocabulary).
     const fit = recommended
       ? `Recommended fit: ${current.benefit.charAt(0).toLowerCase()}${current.benefit.slice(1)}`
       : current.score <= -0.55
