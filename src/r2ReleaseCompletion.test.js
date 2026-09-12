@@ -257,6 +257,61 @@ describe('direct Identity Alignment rendering coverage', () => {
   })
 })
 
+describe('selected Match Plan matchup wording regressions', () => {
+  function renderPlan({ identityKey = 'control', approach = 'control', score, recommended, opponent = 'Eindhoven Lights' }) {
+    const legacyPreview = { overallLabel: 'Even', probabilityDelta: 0, keyAdvantage: { text: 'Keeps the shape compact.' }, keyRisk: { text: 'Offers less width.' } }
+    const preview = { ...legacyPreview, m1Preview: { score, recommended, benefit: 'Targets open space.', risk: 'Concedes territory.' } }
+    return renderToStaticMarkup(createElement(MatchHub, {
+      teamName: 'Wording XI', record: { w: 0, d: 0, l: 0, gf: 0, ga: 0 }, matchNumber: 1,
+      firstTime: false, squadProfile: {}, clubIdentityKey: identityKey, upgrades: [], initialApproach: approach,
+      onApproachChange: () => {}, onWatch: () => {}, onQuick: () => {}, onSimAll: () => {},
+      pending: {
+        kind: 'league', matchNo: 1, leagueTotal: 8,
+        opponentMeta: { name: opponent, archetype: 'pressing', strength: 88, style: 'pressing high' },
+        previews: { balanced: legacyPreview, control: legacyPreview, wide: legacyPreview, counter: legacyPreview, [approach]: preview },
+      },
+    }))
+  }
+
+  it.each([
+    { name: 'aligned + Recommended', score: 0.8, recommended: true, badge: 'Recommended', wording: 'Matches your CONTROL squad identity and is strongly suited to this opponent.' },
+    { name: 'aligned + Strong, not recommended (Eindhoven regression)', score: 0.49, recommended: false, badge: 'Strong Matchup', wording: 'Matches your CONTROL squad identity and is a strong option for this opponent.' },
+    { name: 'aligned + Viable, not recommended (Belgian regression)', identityKey: 'press', approach: 'counter', opponent: 'Belgian Royals', score: -0.07, recommended: false, badge: 'Viable', wording: 'Matches your PRESS squad identity and remains a viable option for this opponent.' },
+    { name: 'aligned + Risky', score: -0.5, recommended: false, badge: 'Risky', wording: 'Matches your CONTROL squad identity, but may struggle against this opponent.' },
+    { name: 'less aligned + Strong', approach: 'counter', score: 0.49, recommended: false, badge: 'Strong Matchup', wording: 'Less aligned with your CONTROL squad identity, but a strong option for this opponent.' },
+    { name: 'less aligned + Viable', approach: 'counter', score: -0.07, recommended: false, badge: 'Viable', wording: 'Less aligned with your CONTROL squad identity, but still a viable approach here.' },
+    { name: 'less aligned + Risky', approach: 'counter', score: -0.5, recommended: false, badge: 'Risky', wording: 'Less aligned with your CONTROL squad identity and a difficult matchup here.' },
+    { name: 'less aligned + Recommended', approach: 'counter', score: 0.8, recommended: true, badge: 'Recommended', wording: 'Less aligned with your CONTROL squad identity, but strongly suited to this opponent.' },
+  ])('$name', (scenario) => {
+    const markup = renderPlan(scenario)
+    expect(markup).toContain(`${scenario.badge}</span>`)
+    expect(markup).toContain(scenario.wording)
+    expect(markup).toContain('Identity Alignment: squad-style alignment only — no direct performance bonus.')
+    if (scenario.score > -0.35) expect(markup).not.toMatch(/may struggle|difficult matchup here/i)
+    else expect(markup).toMatch(/may struggle|difficult matchup here/i)
+  })
+
+  it.each(['control', 'balanced', 'counter'])('recommendation alone cannot change matchup quality for %s (natural/neutral/stretch)', (approach) => {
+    // Include both exact existing tier boundaries and the reported failures.
+    for (const score of [-0.5, -0.35, -0.349, -0.07, 0.349, 0.35, 0.49]) {
+      for (const recommended of [true, false]) {
+        const markup = renderPlan({ approach, score, recommended })
+        const analysis = markup.split('Selected Plan Analysis')[1]
+        expect(analysis).toBeTruthy()
+        if (score >= 0.35) {
+          expect(analysis).toMatch(/strongly suited|strong option/i)
+          expect(analysis).not.toMatch(/may struggle|difficult matchup here/i)
+        } else if (score > -0.35) {
+          expect(analysis).toMatch(/viable option|viable approach/i)
+          expect(analysis).not.toMatch(/may struggle|difficult matchup here|strongly suited/i)
+        } else {
+          expect(analysis).toMatch(/may struggle|difficult matchup here/i)
+        }
+      }
+    }
+  })
+})
+
 describe('deep immutability and developer-only artifact verifier', () => {
   it('deep-freezes the registry, ordered ids, every R2 wrapper and every nested versioned value', () => {
     expect(Object.isFrozen(CATALOGUES)).toBe(true)

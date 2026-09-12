@@ -38,7 +38,7 @@ import {
 } from './runPersistence'
 import { LEGACY_ENGINE_VERSION } from './matchEngineVersions'
 import {
-  opponentScout, identityPlanFit, identityRelationship, matchPlanBadges,
+  opponentScout, identityPlanFit, identityRelationship, matchPlanAssessment, matchPlanBadges,
   planRecommendationLine, APPROACH_KEYS, IDENTITY_ALIGNMENT_NOTE,
 } from './tacticalApproach'
 import { squadFromPhase3Fixture } from './matchCalibration'
@@ -446,14 +446,21 @@ describe('D. tactical UX clarity', () => {
     expect(identityPlanFit('press', 'control')).toBe('stretch')
     expect(identityPlanFit('control', 'control')).toBe('natural')
     expect(identityPlanFit('fortress', 'wide')).toBe('stretch')
-    // …and the combined line distinguishes all four quadrants.
-    const natGood = identityRelationship({ identityKey: 'press', identityName: 'PRESS', approachKey: 'counter', opponentGood: true })
-    const natBad = identityRelationship({ identityKey: 'press', identityName: 'PRESS', approachKey: 'counter', opponentGood: false })
-    const stretchGood = identityRelationship({ identityKey: 'press', identityName: 'PRESS', approachKey: 'control', opponentGood: true })
-    const stretchBad = identityRelationship({ identityKey: 'press', identityName: 'PRESS', approachKey: 'control', opponentGood: false })
+    // …and non-recommended plans can be strong, viable, or genuinely risky.
+    const line = (approachKey, score) => identityRelationship({
+      identityName: 'PRESS',
+      assessment: matchPlanAssessment({ identityKey: 'press', approachKey, preview: { m1Preview: { score, recommended: false } } }),
+    })
+    const natGood = line('counter', 0.49)
+    const natBad = line('counter', -0.35)
+    const stretchGood = line('control', 0.49)
+    const stretchBad = line('control', -0.35)
     expect(new Set([natGood, natBad, stretchGood, stretchBad]).size).toBe(4)
     expect(natBad).toMatch(/may struggle against this opponent/i)
-    expect(stretchGood).toMatch(/less natural/i)
+    expect(stretchGood).toMatch(/less aligned.*strong option/i)
+    expect(natGood).not.toMatch(/may struggle/i)
+    expect(line('counter', -0.07)).toMatch(/viable option/i)
+    expect(line('counter', -0.07)).not.toMatch(/may struggle/i)
   })
 
   it('derives selector badges only from existing M1 evidence plus the identity table', () => {
@@ -818,9 +825,10 @@ describe('H. prohibited wording guard', () => {
     const appSource = readFileSync('src/App.jsx', 'utf8')
     expect(appSource).toMatch(/\{fit\.identityName\} alignment: \{fit\.label\}/)
     // 2. the identity relationship line uses alignment phrasing.
-    expect(identityRelationship({ identityKey: 'press', identityName: 'PRESS', approachKey: 'counter', opponentGood: true }))
+    const legacyAssessment = matchPlanAssessment({ identityKey: 'press', approachKey: 'counter' })
+    expect(identityRelationship({ identityName: 'PRESS', assessment: legacyAssessment }))
       .toBe('Naturally aligned with your PRESS identity.')
-    expect(identityRelationship({ identityKey: 'press', identityName: 'PRESS', approachKey: 'counter', opponentGood: true }))
+    expect(identityRelationship({ identityName: 'PRESS', assessment: legacyAssessment }))
       .not.toMatch(/fit/i)
     // The alignment concept and its no-bonus disclosure are present instead.
     const runFlow = readFileSync('src/RunFlow.jsx', 'utf8')

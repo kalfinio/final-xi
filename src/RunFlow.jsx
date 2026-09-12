@@ -3,7 +3,7 @@ import { shortDisplayName, squadDisplayName } from './data'
 import { buildMatchTimeline, matchVerdict } from './matchTimeline'
 import {
   TACTICAL_APPROACHES, APPROACH_KEYS, approachTradeoffs, approachEmphasis, approachFeedback,
-  opponentScout, identityRelationship, matchPlanBadges, planRecommendationLine, IDENTITY_ALIGNMENT_NOTE,
+  opponentScout, identityRelationship, matchPlanAssessment, matchPlanBadges, planRecommendationLine, IDENTITY_ALIGNMENT_NOTE,
 } from './tacticalApproach'
 import { clubIdentity } from './draftClarity'
 import { buildUpgradeContext, upgradeLabel, UPGRADES_BY_ID } from './runUpgrades'
@@ -115,9 +115,9 @@ export function MatchHub({ pending, teamName, record, matchNumber, firstTime, sq
   const { helps, costs } = approachTradeoffs(approach)
   const emphasis = approachEmphasis(approach)
   const m1Sel = matchup?.m1Preview || null
-  const opponentGood = m1Sel ? m1Sel.recommended : null
+  const assessment = matchPlanAssessment({ preview: matchup, identityKey: identity?.key, approachKey: approach })
   const identityLine = identity
-    ? identityRelationship({ identityKey: identity.key, identityName: identity.name, approachKey: approach, opponentGood })
+    ? identityRelationship({ identityName: identity.name, assessment })
     : null
   const recommendationLine = planRecommendationLine(approach, pending.previews)
   // Owned upgrades: gold emphasis only for those that would actually fire

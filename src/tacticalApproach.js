@@ -212,18 +212,49 @@ export function identityPlanFit(identityKey, approachKey) {
   return IDENTITY_PLAN_FIT[identityKey]?.[approachKey] || 'neutral'
 }
 
-// One combined line for the selected plan: opponent read × identity read.
-// `opponentGood` comes from existing preview evidence (m1Preview.recommended
-// or a positive legacy label) — this helper adds no judgement of its own.
-export function identityRelationship({ identityKey, identityName, approachKey, opponentGood = null }) {
-  if (!identityKey || !identityName) return null
-  const fit = identityPlanFit(identityKey, approachKey)
-  if (fit === 'natural') {
-    if (opponentGood === false) return `Matches your ${identityName} identity but may struggle against this opponent.`
+// Presentation-only assessment: recommendation is relative to other plans,
+// while matchup quality uses the existing selector thresholds independently.
+// No M1 evidence means no M1 classification (including Daily/legacy runs).
+export function matchPlanAssessment({ preview = null, identityKey = null, approachKey }) {
+  const m1 = preview?.m1Preview
+  return {
+    recommended: m1 ? m1.recommended : null,
+    score: m1 ? m1.score : null,
+    matchupTier: m1 ? (m1.score >= 0.35 ? 'strong' : m1.score > -0.35 ? 'viable' : 'risky') : null,
+    identityAlignment: identityKey ? identityPlanFit(identityKey, approachKey) : null,
+  }
+}
+
+// Opponent quality and squad-style alignment stay separate in the combined
+// explanation. Only a strong recommended plan earns "strongly suited" wording.
+export function identityRelationship({ identityName, assessment }) {
+  if (!identityName || !assessment?.identityAlignment) return null
+  const { identityAlignment, matchupTier, recommended } = assessment
+  if (matchupTier) {
+    const identity = identityAlignment === 'natural'
+      ? `Matches your ${identityName} squad identity`
+      : identityAlignment === 'stretch'
+        ? `Less aligned with your ${identityName} squad identity`
+        : `Compatible with your ${identityName} squad identity`
+    if (matchupTier === 'risky') {
+      return identityAlignment === 'stretch'
+        ? `${identity} and a difficult matchup here.`
+        : `${identity}, but may struggle against this opponent.`
+    }
+    if (matchupTier === 'viable') {
+      return identityAlignment === 'stretch'
+        ? `${identity}, but still a viable approach here.`
+        : `${identity} and remains a viable option for this opponent.`
+    }
+    const opponent = recommended ? 'strongly suited to this opponent' : 'a strong option for this opponent'
+    return identityAlignment === 'stretch'
+      ? `${identity}, but ${opponent}.`
+      : `${identity} and is ${opponent}.`
+  }
+  if (identityAlignment === 'natural') {
     return `Naturally aligned with your ${identityName} identity.`
   }
-  if (fit === 'stretch') {
-    if (opponentGood === true) return `Effective matchup, but less natural for your ${identityName} squad identity.`
+  if (identityAlignment === 'stretch') {
     return `A stretch for your ${identityName} identity — your squad is not built around this plan.`
   }
   return `Compatible with your ${identityName} identity.`
@@ -237,14 +268,14 @@ export function identityRelationship({ identityKey, identityName, approachKey, o
 // modifier — it carries no performance bonus of any kind.
 export function matchPlanBadges({ preview = null, identityKey = null, approachKey }) {
   const badges = []
-  const m1 = preview?.m1Preview
-  if (m1) {
-    if (m1.recommended) badges.push({ label: 'Recommended', tone: 'success' })
-    else if (m1.score >= 0.35) badges.push({ label: 'Strong Matchup', tone: 'success' })
-    else if (m1.score > -0.35) badges.push({ label: 'Viable', tone: 'neutral' })
+  const assessment = matchPlanAssessment({ preview, identityKey, approachKey })
+  if (assessment.matchupTier) {
+    if (assessment.recommended) badges.push({ label: 'Recommended', tone: 'success' })
+    else if (assessment.matchupTier === 'strong') badges.push({ label: 'Strong Matchup', tone: 'success' })
+    else if (assessment.matchupTier === 'viable') badges.push({ label: 'Viable', tone: 'neutral' })
     else badges.push({ label: 'Risky', tone: 'danger' })
   }
-  if (identityKey && identityPlanFit(identityKey, approachKey) === 'natural') {
+  if (assessment.identityAlignment === 'natural') {
     badges.push({ label: 'Identity Alignment', tone: 'neutral' })
   }
   return badges
@@ -264,8 +295,10 @@ export function planRecommendationLine(approachKey, previews) {
   if (!sel) return ''
   const m1 = sel.m1Preview
   if (m1) {
-    if (m1.recommended) return 'Recommended read for this opponent.'
-    if (m1.score > -0.35) return 'Viable option against this opponent.'
+    const assessment = matchPlanAssessment({ preview: sel, approachKey })
+    if (assessment.recommended) return 'Recommended read for this opponent.'
+    if (assessment.matchupTier === 'strong') return 'Strong option against this opponent.'
+    if (assessment.matchupTier === 'viable') return 'Viable option against this opponent.'
     return 'Risky read against this opponent.'
   }
   if (approachKey === 'balanced' || !base) return 'Trusts your natural shape against this opponent.'
