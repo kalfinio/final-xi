@@ -8,9 +8,22 @@ const interpolate = (path, progress) => ({
 })
 const progressAt = (segment, time) => Math.max(0, Math.min(1, (time - segment.startMs) / (segment.endMs - segment.startMs)))
 const latest = (items, time, field = 'startMs') => {
-  let found = null
-  for (const item of items) { if (item[field] > time) break; found = item }
-  return found
+  let low = 0, high = items.length
+  while (low < high) {
+    const mid = (low + high) >>> 1
+    if (items[mid][field] <= time) low = mid + 1
+    else high = mid
+  }
+  return items[low - 1] || null
+}
+
+// Compiled programs are deeply frozen. Share their immutable scene/action
+// records instead of cloning whole choreography trees on every Canvas frame.
+// Mutable JSON reconstructions still get copied/frozen, as in Phase 1.
+const freezeSample = (value) => {
+  if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value
+  if (Array.isArray(value)) return Object.freeze(value.map(freezeSample))
+  return Object.freeze(Object.fromEntries(Object.entries(value).map(([key, item]) => [key, freezeSample(item)])))
 }
 
 /** Pure random-access sampling. Seeking IS sampling at another timestamp.
@@ -66,7 +79,7 @@ export function sampleVisualProgram(program, timestampMs) {
     if (['high', 'clear'].includes(event.chanceQuality)) shotTotals[side].bigChances++
   }
   const currentReveal = revealed[revealed.length - 1] || null
-  return immutableCopy({
+  return (football ? freezeSample : immutableCopy)({
     timeMs, activeScene, activeAction, players, ball,
     ...(football ? { actionProgress: activeAction ? progressAt(activeAction, timeMs) : null, scenePhase: activeAction?.phase ?? null } : {}),
     revealedCanonicalEvents, goals, score, shotTotals,

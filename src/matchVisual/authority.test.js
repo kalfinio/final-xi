@@ -13,6 +13,7 @@ import { compileVisualProgram as compileProgram } from './compile.js'
 import { VISUAL_V2_1, VISUAL_V2_2 } from './versions.js'
 import { sampleVisualProgram } from './sample.js'
 import { immutableCopy } from './immutable.js'
+import { createPlaybackController } from './playback/controller.js'
 
 const squad = squadFromPhase3Fixture(m1Fixtures.squadFixtureRunIndex)
 const opponentById = Object.fromEntries(OPPONENTS.map((opponent) => [opponent.id, opponent]))
@@ -82,6 +83,21 @@ describe.each([VISUAL_V2_1, VISUAL_V2_2])('canonical authority and historical si
       expect(watched.draws.length).toBe(count)
       const program = compileVisualProgram(view)
       expect(watched.draws.length).toBe(count)
+      const pending = new Map()
+      let frameId = 0
+      const playback = createPlaybackController(program, {
+        requestFrame: (callback) => { pending.set(++frameId, callback); return frameId },
+        cancelFrame: (id) => pending.delete(id),
+      })
+      for (const speed of [1, 2, 4]) {
+        playback.setSpeed(speed); playback.play()
+        for (const stamp of [100, 300]) { const frames = [...pending.values()]; pending.clear(); frames.forEach((callback) => callback(stamp)) }
+        playback.pause(); playback.nextHighlight(); playback.fullTime(); playback.replay()
+        playback.setHidden(true); playback.setHidden(false)
+        expect(watched.draws.length).toBe(count)
+      }
+      playback.destroy()
+      expect(pending.size).toBe(0)
       sampleVisualProgram(program, 500)
       expect(watched.draws.length).toBe(count)
       // Nonchronological sampling is the seeking API.
