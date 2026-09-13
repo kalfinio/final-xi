@@ -1,6 +1,7 @@
 import { immutableCopy } from './immutable.js'
-import { selectVisualEngineVersion, VISUAL_ENGINE_VERSIONS } from './versions.js'
+import { selectVisualEngineVersion, VISUAL_ENGINE_VERSIONS, VISUAL_V2_2 } from './versions.js'
 import { visualSeedFor, sceneSeedFor, visualActionRng } from './rng.js'
+import { compileFootballProgram } from './eventScenes.js'
 
 const owned = (actorId) => ({ kind: 'owned', actorId })
 const dead = () => ({ kind: 'dead', actorId: null })
@@ -22,6 +23,7 @@ export function compileVisualProgram(view, { visualEngineVersion: requestedVersi
   if (view?.kind !== 'CanonicalMatchView' || view.schemaVersion !== 1 || !VISUAL_ENGINE_VERSIONS[visualEngineVersion].matchEngineVersions.includes(view.engineVersion)) {
     throw new TypeError('A supported CanonicalMatchView is required')
   }
+  if (visualEngineVersion === VISUAL_V2_2) return compileFootballProgram(view, visualEngineVersion)
   const visualSeed = visualSeedFor(view.seed.value, visualEngineVersion)
   const points = Object.fromEntries(view.actors.map((actor, index) => [actor.id, stagingPoint(actor, index)]))
   const scenes = [], ballTracks = [], revealSchedule = []

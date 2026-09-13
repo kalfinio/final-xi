@@ -1,7 +1,9 @@
 // Independent of matchEngineVersions and deliberately unused by the live app.
 export const VISUAL_V2_1 = 'visual_v2_1'
+export const VISUAL_V2_2 = 'visual_v2_2'
 export const VISUAL_ENGINE_VERSIONS = Object.freeze({
   [VISUAL_V2_1]: Object.freeze({ id: VISUAL_V2_1, implemented: true, matchEngineVersions: Object.freeze(['m1']) }),
+  [VISUAL_V2_2]: Object.freeze({ id: VISUAL_V2_2, implemented: true, matchEngineVersions: Object.freeze(['m1']) }),
 })
 
 export function isVisualEngineVersion(version) {

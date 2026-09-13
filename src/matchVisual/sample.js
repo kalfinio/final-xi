@@ -1,5 +1,6 @@
 import { immutableCopy } from './immutable.js'
-import { assertVisualEngineVersion } from './versions.js'
+import { assertVisualEngineVersion, VISUAL_V2_2 } from './versions.js'
+import { samplePath } from './ballPaths.js'
 
 const interpolate = (path, progress) => ({
   x: path.from.x + (path.to.x - path.from.x) * progress,
@@ -21,6 +22,7 @@ export function sampleVisualProgram(program, timestampMs) {
   assertVisualEngineVersion(program.visualEngineVersion)
   if (typeof timestampMs !== 'number' || !Number.isFinite(timestampMs)) throw new TypeError('A finite presentation timestamp is required')
   const timeMs = Math.max(0, Math.min(program.durationMs, timestampMs))
+  const football = program.visualEngineVersion === VISUAL_V2_2
   const fullTime = timeMs === program.durationMs
   const scene = latest(program.scenes, timeMs)
   const activeScene = scene && timeMs < scene.endMs ? scene : null
@@ -28,11 +30,22 @@ export function sampleVisualProgram(program, timestampMs) {
   const activeAction = action && timeMs < action.endMs ? action : null
   const players = program.playerTracks.map((track) => {
     const segment = latest(track.segments, timeMs)
-    return { actorId: track.actorId, position: interpolate(segment.path, progressAt(segment, timeMs)) }
+    return { actorId: track.actorId, position: football ? samplePath(segment.path, progressAt(segment, timeMs)).position : interpolate(segment.path, progressAt(segment, timeMs)) }
   })
   const ballTrack = latest(program.ballTracks, timeMs)
   let ball = { ...program.initialBall, mode: program.initialBall.ownership.kind, ownerId: program.initialBall.ownership.actorId }
-  if (ballTrack) {
+  if (ballTrack && football) {
+    const progress = progressAt(ballTrack, timeMs)
+    const ownership = progress >= 1 ? ballTrack.ownershipAfter : ballTrack.ownershipDuring
+    const pathState = samplePath(ballTrack.path, progress)
+    const owner = ownership.kind === 'owned' ? players.find((player) => player.actorId === ownership.actorId) : null
+    const position = owner ? owner.position : ownership.kind === 'dead' ? ownership.position : pathState.position
+    ball = {
+      position, ownership, mode: ownership.kind, ownerId: owner?.actorId ?? null,
+      fromActorId: ownership.fromActorId ?? null, receiverId: ownership.toActorId ?? ownership.scheduledCollector ?? null,
+      height: owner || ownership.kind === 'dead' ? 0 : pathState.height, shadowPosition: { ...position },
+    }
+  } else if (ballTrack) {
     const progress = progressAt(ballTrack, timeMs)
     const moving = progress < 1 && ballTrack.kind !== 'carry'
     const ownership = moving ? { kind: 'inFlight', actorId: null } : progress >= 1 ? ballTrack.ownershipAfter : ballTrack.ownershipBefore
@@ -55,6 +68,7 @@ export function sampleVisualProgram(program, timestampMs) {
   const currentReveal = revealed[revealed.length - 1] || null
   return immutableCopy({
     timeMs, activeScene, activeAction, players, ball,
+    ...(football ? { actionProgress: activeAction ? progressAt(activeAction, timeMs) : null, scenePhase: activeAction?.phase ?? null } : {}),
     revealedCanonicalEvents, goals, score, shotTotals,
     clock: latest(program.clockTrack, timeMs, 'atMs'),
     currentReveal, commentary: currentReveal?.commentary ?? null, fullTime,

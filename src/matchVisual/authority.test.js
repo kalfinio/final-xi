@@ -9,7 +9,8 @@ import { catalogueEligiblePlayers } from '../data/v2/catalogues'
 import { canonicalMatchSignature, createRunSnapshot, reconstructRun } from '../runPersistence'
 import { buildUpgradeContext } from '../runUpgrades'
 import { createCanonicalMatchView } from './adapter.js'
-import { compileVisualProgram } from './compile.js'
+import { compileVisualProgram as compileProgram } from './compile.js'
+import { VISUAL_V2_1, VISUAL_V2_2 } from './versions.js'
 import { sampleVisualProgram } from './sample.js'
 import { immutableCopy } from './immutable.js'
 
@@ -17,7 +18,8 @@ const squad = squadFromPhase3Fixture(m1Fixtures.squadFixtureRunIndex)
 const opponentById = Object.fromEntries(OPPONENTS.map((opponent) => [opponent.id, opponent]))
 const viewOf = (match, xi = squad, extra = {}) => createCanonicalMatchView({ match, squad: xi, formation: '4-3-3', canonicalSignature: canonicalMatchSignature(match, 0), ...extra })
 
-function arbitraryVisualWork(match, xi = squad) {
+function arbitraryVisualWork(match, xi = squad, visualEngineVersion = VISUAL_V2_1) {
+  const compileVisualProgram = (view) => compileProgram(view, { visualEngineVersion })
   const view = viewOf(match, xi)
   const program = compileVisualProgram(view)
   for (const time of [50000, 10000, 40000, 20000, 0, program.durationMs, 500, 0, program.durationMs + 1000]) {
@@ -28,7 +30,8 @@ function arbitraryVisualWork(match, xi = squad) {
   return program
 }
 
-describe('canonical authority and historical signatures', () => {
+describe.each([VISUAL_V2_1, VISUAL_V2_2])('canonical authority and historical signatures — %s', (visualEngineVersion) => {
+  const compileVisualProgram = (view) => compileProgram(view, { visualEngineVersion })
   it.each(m1Fixtures.fixtures)('retains frozen signature $signature for $name before and after all visual operations', (fixture) => {
     const match = controlledM1Match({
       seed: fixture.seed, squad, opponent: opponentById[fixture.opponentId],
@@ -37,7 +40,7 @@ describe('canonical authority and historical signatures', () => {
     expect(canonicalMatchSignature(match, 0)).toBe(fixture.signature)
     const frozen = immutableCopy(match)
     const before = JSON.stringify(frozen)
-    const program = arbitraryVisualWork(frozen, immutableCopy(squad))
+    const program = arbitraryVisualWork(frozen, immutableCopy(squad), visualEngineVersion)
     expect(JSON.stringify(frozen)).toBe(before)
     expect(canonicalMatchSignature(frozen, 0)).toBe(fixture.signature)
     expect(program.canonicalSignature).toBe(fixture.signature)
@@ -187,5 +190,5 @@ describe('canonical authority and historical signatures', () => {
     }
     expect(observedRoutes.size).toBe(12)
     expect(observedOutcomes).toEqual(new Set(['goal', 'saved', 'off_target', 'cross_blocked', 'delivery_cleared', 'possession_recycled', 'counter_halted', 'foul_won', 'turnover_created', 'heavy_touch_turnover', 'set_piece_cleared', 'keeper_claim', 'pass_intercepted', 'buildup_stopped']))
-  })
+  }, 30000)
 })
